@@ -10,6 +10,42 @@
       "group": { "kind": "build", "isDefault": true }
     },
     {
+      "label": "MSPM0G3507: Build",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\build-mspm0g3507.ps1"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "MSPM0G3507: Install pyOCD tools",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\install-g3507-debug-tools.ps1"],
+      "problemMatcher": []
+    },
+    {
+      "label": "MSPM0G3507: List pyOCD probes",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-g3507.ps1", "-Action", "List"],
+      "problemMatcher": []
+    },
+    {
+      "label": "MSPM0G3507: Load firmware to Flash",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-g3507.ps1", "-Action", "Load"],
+      "problemMatcher": []
+    },
+    {
+      "label": "MSPM0G3507: Start pyOCD GDB server",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-g3507.ps1", "-Action", "GdbServer"],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
       "label": "MSPM0: List pyOCD probes",
       "type": "shell",
       "command": "powershell",

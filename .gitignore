@@ -1,5 +1,6 @@
 # CCS build output
 /mspm0l1306_bringup/Debug/
+/mspm0g3507_bringup/Debug/
 
 # Local Python debug environment and downloaded CMSIS packs
 /tools/.venv/
