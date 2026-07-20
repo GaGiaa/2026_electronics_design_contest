@@ -24,6 +24,13 @@
       "problemMatcher": ["$gcc"]
     },
     {
+      "label": "MSPM0G3507 App: Build",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\build-mspm0g3507-app.ps1"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
       "label": "MSPM0G3507: Install pyOCD tools",
       "type": "shell",
       "command": "powershell",
@@ -49,6 +56,13 @@
       "type": "shell",
       "command": "powershell",
       "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-g3507.ps1", "-Action", "Load", "-Firmware", "freertos"],
+      "problemMatcher": []
+    },
+    {
+      "label": "MSPM0G3507 App: Load firmware to Flash",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-g3507.ps1", "-Action", "Load", "-Firmware", "app"],
       "problemMatcher": []
     },
     {

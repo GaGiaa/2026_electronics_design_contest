@@ -108,3 +108,28 @@ powershell -ExecutionPolicy Bypass -File tools\flash-and-debug-g3507.ps1 -Action
 该命令会 `--erase chip`，执行前必须取得用户明确同意。已验证 SysConfig 生成、
 TI Clang 编译、FreeRTOS 内核链接和静态集成检查；尚未执行探针枚举、Flash 写入、
 PB22 LED 实测或 UART 回显实测。
+
+## G3507 正式应用工程
+
+`mspm0g3507_app/` 是 G3507 的长期 FreeRTOS 应用工程，与 bring-up 和
+`mspm0g3507_freertos/` 基线独立。UART0 保持 PA10 TX、PA11 RX、115200 8-N-1，
+接收 FIFO 在中断中排空，并通过静态队列回显。PB22 经 3.3 V 至 5 V 电平转换器驱动
+4 颗标准 800 kHz WS2812；MCU、转换器和 LED 5 V 电源必须共地。
+
+构建命令：
+
+```powershell
+.\tools\build-mspm0g3507-app.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
+```
+
+应用 ELF 为 `mspm0g3507_app/Debug/mspm0g3507_app.out`。默认动画每 500 ms
+只点亮一颗灯珠，按红、绿、蓝、白及灯珠 1 至 4 的顺序循环，通道亮度为 16。
+WS2812 使用 SPI1 PICO 输出到 PB22，SPI 目标速率为 2.666667 MHz，编码为
+`0=100`、`1=110`；PB9 是未连接的 SPI 时钟输出。每帧含 36 字节编码数据和 24 字节
+低电平锁存数据。发送期间关闭中断，发送后 PB22 保持低电平至少 80 us，未占用
+SysTick 或替换 FreeRTOS 时钟处理。烧录该 ELF 需要显式传入 `-Firmware app`，且
+`Load` 会擦除目标 Flash，未经用户明确授权不得执行。
+
+已完成静态集成检查和 TI Clang 构建验证；尚未执行探针枚举、GDB 服务、Flash 写入、
+LED 实测或 UART 连续回显实测。

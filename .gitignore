@@ -2,6 +2,7 @@
 /mspm0l1306_bringup/Debug/
 /mspm0g3507_bringup/Debug/
 /mspm0g3507_freertos/Debug/
+/mspm0g3507_app/Debug/
 
 # Local Python debug environment and downloaded CMSIS packs
 /tools/.venv/

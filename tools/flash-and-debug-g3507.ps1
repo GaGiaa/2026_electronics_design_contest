@@ -4,7 +4,7 @@ param(
     [ValidateSet('List', 'Load', 'GdbServer')]
     [string] $Action,
 
-    [ValidateSet('bringup', 'freertos')]
+    [ValidateSet('bringup', 'freertos', 'app')]
     [string] $Firmware = 'bringup'
 )
 
@@ -16,6 +16,9 @@ $VenvPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 $PackFile = Join-Path $PSScriptRoot 'packs\TexasInstruments.MSPM0G1X0X_G3X0X_DFP.1.3.1.pack'
 $ElfPath = if ($Firmware -eq 'freertos') {
     Join-Path $ProjectRoot 'mspm0g3507_freertos\Debug\mspm0g3507_freertos.out'
+}
+elseif ($Firmware -eq 'app') {
+    Join-Path $ProjectRoot 'mspm0g3507_app\Debug\mspm0g3507_app.out'
 }
 else {
     Join-Path $ProjectRoot 'mspm0g3507_bringup\Debug\mspm0g3507_bringup.out'

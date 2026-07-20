@@ -1,0 +1,36 @@
+/**
+ * MSPM0G3507 application SysConfig source.
+ * Generated files are written only to this project's Debug directory.
+ * @cliArgs --device "MSPM0G350X" --package "LQFP-64(PM)" --part "Default" --product "mspm0_sdk@2.11.00.07"
+ * @v2CliArgs --device "MSPM0G3507" --package "LQFP-64(PM)" --product "mspm0_sdk@2.11.00.07"
+ */
+const Board = scripting.addModule("/ti/driverlib/Board", {}, false);
+const GPIO = scripting.addModule("/ti/driverlib/GPIO", {}, false);
+const GPIO1 = GPIO.addInstance();
+const SPI = scripting.addModule("/ti/driverlib/SPI", {}, false);
+const SPI1 = SPI.addInstance();
+const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
+const UART = scripting.addModule("/ti/driverlib/UART", {}, false);
+const UART1 = UART.addInstance();
+Board.configureUnused = true;
+SPI1.$name = "SPI_WS2812";
+SPI1.targetBitRate = 2666667;
+SPI1.phase = "0";
+SPI1.dataSize = 8;
+SPI1.chipSelect = [];
+SPI1.frameFormat = "MOTO3";
+SPI1.peripheral.$assign = "SPI1";
+SPI1.peripheral.sclkPin.$assign = "PB9";
+SPI1.peripheral.mosiPin.$assign = "PB22";
+SYSCTL.clockTreeEn = true;
+UART1.$name = "UART_0";
+UART1.profile = "CONFIG_PROFILE_1";
+UART1.targetBaudRate = 115200;
+UART1.enableDMARX = false;
+UART1.enableDMATX = false;
+UART1.enableInternalLoopback = false;
+UART1.enabledInterrupts = ["RX"];
+UART1.enableFIFO = true;
+UART1.peripheral.$assign = "UART0";
+UART1.peripheral.rxPin.$assign = "PA11";
+UART1.peripheral.txPin.$assign = "PA10";
