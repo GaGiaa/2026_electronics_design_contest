@@ -9,7 +9,7 @@ functions:
 ## Tools
 
 - CCS: `D:\Software\ti\ccs2020`
-- MSPM0 SDK: `D:\Software\ti\mspm0_sdk_2_05_01_00`
+- MSPM0 SDK: `D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07`
 - Probe: Horco CMSIS-DAP v2
 - PC serial port: COM37
 
@@ -37,9 +37,9 @@ Run once from PowerShell:
 .\tools\install-debug-tools.ps1
 ```
 
-The script creates `.venv`, installs pyOCD, and downloads TI's
-MSPM0L11XX_L13XX CMSIS-Pack into `tools\packs`. The pack contains MSPM0L1306
-Flash algorithms.
+From the repository root, run `tools\install-debug-tools.ps1`. It creates
+`tools\.venv`, installs pyOCD, and downloads TI's MSPM0L11XX/L13XX CMSIS-Pack
+into `tools\packs`. The pack contains the MSPM0L1306 Flash algorithm.
 
 ## CCS Workflow
 
@@ -47,7 +47,7 @@ Flash algorithms.
 2. Choose `Project -> Import CCS Projects` and select this folder.
 3. Open `mspm0l1306_bringup.syscfg` to inspect or change the graphical setup.
 4. Build the Debug configuration.
-5. Run `tools\flash-and-debug.ps1 -Action Load` to program the ELF.
+5. Run `..\tools\flash-and-debug.ps1 -Action Load` to erase and program the ELF.
 
 ## VS Code Workflow
 
@@ -55,8 +55,8 @@ Open this repository folder in VS Code. CCS remains the tool for SysConfig
 graphical edits and project import; VS Code is configured for everyday editing,
 building, and SWD debugging.
 
-1. Run the `MSPM0: Build` task to generate SysConfig files and build
-   `ticlang\mspm0l1306_bringup.out`.
+1. Run `MSPM0: Build` to generate SysConfig files and build
+   `Debug\mspm0l1306_bringup.out`.
 2. Run `MSPM0: List pyOCD probes` to confirm that the Horco CMSIS-DAP is
    visible.
 3. Run `MSPM0: Start pyOCD GDB server`; keep its task terminal running.
@@ -66,6 +66,11 @@ building, and SWD debugging.
 `MSPM0: Load firmware to Flash (erases/writes target)` is deliberately a
 separate task. It erases and writes target Flash. The build, probe-list, and
 GDB-server tasks do not program Flash.
+
+If a probe is not listed, check the USB cable, target power, SWDIO/PA19 and
+SWCLK/PA20 wiring, and the shared ground. If loading fails, rebuild first and
+confirm that the target uses 3.3 V logic. Run the GDB-server task before F5;
+the F5 configuration attaches to `localhost:3333` and does not program Flash.
 
 ## Serial Test
 

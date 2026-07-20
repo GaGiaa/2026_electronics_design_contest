@@ -4,7 +4,7 @@ ROM_TABLE_ADDRESS = 0xF0000000
 
 
 def will_init_target(target, init_sequence):
-    """Fix AP0 discovery before pyOCD scans its CoreSight ROM table."""
+    """Set the AP0 ROM-table address before pyOCD discovers CoreSight."""
 
     def apply_rom_table_address():
         access_port = target.aps[0]

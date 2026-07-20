@@ -1,80 +1,35 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "MSPM0: Build",
-            "type": "shell",
-            "command": "D:\\Software\\ti\\ccs2020\\ccs\\utils\\bin\\gmake.exe",
-            "args": [
-                "-C",
-                "ticlang",
-                "all"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        },
-        {
-            "label": "MSPM0: List pyOCD probes",
-            "type": "shell",
-            "command": "powershell",
-            "args": [
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                "${workspaceFolder}\\tools\\flash-and-debug.ps1",
-                "-Action",
-                "List"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "MSPM0: Start pyOCD GDB server",
-            "type": "shell",
-            "command": "powershell",
-            "args": [
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                "${workspaceFolder}\\tools\\flash-and-debug.ps1",
-                "-Action",
-                "GdbServer"
-            ],
-            "isBackground": true,
-            "problemMatcher": {
-                "owner": "pyocd",
-                "pattern": [
-                    {
-                        "regexp": "^(.*)$",
-                        "message": 1
-                    }
-                ],
-                "background": {
-                    "activeOnStart": true,
-                    "beginsPattern": "^.*$",
-                    "endsPattern": "^.*(GDB server started|port 3333|3333).*$"
-                }
-            }
-        },
-        {
-            "label": "MSPM0: Load firmware to Flash (erases/writes target)",
-            "type": "shell",
-            "command": "powershell",
-            "args": [
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                "${workspaceFolder}\\tools\\flash-and-debug.ps1",
-                "-Action",
-                "Load"
-            ],
-            "dependsOn": "MSPM0: Build",
-            "problemMatcher": []
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "MSPM0: Build",
+      "type": "shell",
+      "command": "D:\\Software\\ti\\ccs2020\\ccs\\utils\\bin\\gmake.exe",
+      "args": ["-C", "${workspaceFolder}\\mspm0l1306_bringup\\Debug", "all"],
+      "problemMatcher": ["$gcc"],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "MSPM0: List pyOCD probes",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug.ps1", "-Action", "List"],
+      "problemMatcher": []
+    },
+    {
+      "label": "MSPM0: Load firmware to Flash",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug.ps1", "-Action", "Load"],
+      "problemMatcher": []
+    },
+    {
+      "label": "MSPM0: Start pyOCD GDB server",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug.ps1", "-Action", "GdbServer"],
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
 }

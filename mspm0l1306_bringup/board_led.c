@@ -4,5 +4,5 @@
 
 void board_led_toggle(void)
 {
-    DL_GPIO_togglePins(GPIO_LED4_PORT, GPIO_LED4_LED_PIN);
+    DL_GPIO_togglePins(GPIO_LED_PORT, GPIO_LED_LED_PIN);
 }

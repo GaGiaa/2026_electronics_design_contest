@@ -1,18 +1,17 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "MSPM0L1306: Attach to pyOCD",
-            "type": "cortex-debug",
-            "request": "launch",
-            "servertype": "external",
-            "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}\\ticlang\\mspm0l1306_bringup.out",
-            "device": "MSPM0L1306",
-            "gdbTarget": "localhost:3333",
-            "gdbPath": "D:\\Software\\STM32CubeCLT_1.18.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gdb.exe",
-            "preLaunchTask": "MSPM0: Build",
-            "showDevDebugOutput": "none"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "MSPM0L1306: Attach to pyOCD",
+      "type": "cortex-debug",
+      "request": "attach",
+      "servertype": "external",
+      "gdbTarget": "localhost:3333",
+      "cwd": "${workspaceFolder}/mspm0l1306_bringup",
+      "executable": "${workspaceFolder}/mspm0l1306_bringup/Debug/mspm0l1306_bringup.out",
+      "gdbPath": "D:/Software/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb.exe",
+      "device": "MSPM0L1306",
+      "preLaunchTask": "MSPM0: Build"
+    }
+  ]
 }

@@ -1,27 +1,22 @@
-Debug/
-Release/
-.metadata/
-*.d
-*.o
-*.obj
-*.out
-*.map
-*.hex
-*.bin
-.pyocd.yaml
-.venv/
+# CCS build output
+/mspm0l1306_bringup/Debug/
+
+# Local Python debug environment and downloaded CMSIS packs
+/tools/.venv/
+/tools/packs/
+
+# Python caches
 __pycache__/
-tests/build/
-ticlang/syscfg/
-ticlang/*.obj
-ticlang/*.d
-ticlang/*.out
-ticlang/*.map
-ticlang/device.opt
-ticlang/device.cmd.genlibs
-ticlang/device_linker.cmd
-ticlang/ti_msp_dl_config.c
-ticlang/ti_msp_dl_config.h
-ticlang/Event.dot
-tools/packs/
-tools/*.log
+*.py[cod]
+*$py.class
+
+# VS Code user/workspace state (keep shared .vscode configuration)
+.vscode/.browse.VC.db*
+.vscode/ipch/
+.vscode/.ropeproject/
+.vscode/*.log
+.vscode/workspaceStorage/
+
+# Operating system files
+Thumbs.db
+.DS_Store
