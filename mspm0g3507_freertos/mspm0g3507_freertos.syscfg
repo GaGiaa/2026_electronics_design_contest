@@ -1,0 +1,35 @@
+/**
+ * MSPM0G3507 FreeRTOS application SysConfig source.
+ * Generated ti_msp_dl_config.* files are written to Debug/ and are not tracked.
+ * @cliArgs --device "MSPM0G350X" --package "LQFP-64(PM)" --part "Default" --product "mspm0_sdk@2.11.00.07"
+ * @v2CliArgs --device "MSPM0G3507" --package "LQFP-64(PM)" --product "mspm0_sdk@2.11.00.07"
+ */
+
+const Board = scripting.addModule("/ti/driverlib/Board", {}, false);
+const GPIO = scripting.addModule("/ti/driverlib/GPIO", {}, false);
+const GPIO1 = GPIO.addInstance();
+const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
+const UART = scripting.addModule("/ti/driverlib/UART", {}, false);
+const UART1 = UART.addInstance();
+
+Board.configureUnused = true;
+
+GPIO1.$name = "GPIO_LED";
+GPIO1.port = "PORTB";
+GPIO1.associatedPins[0].$name = "LED";
+GPIO1.associatedPins[0].assignedPin = "22";
+GPIO1.associatedPins[0].pin.$assign = "PB22";
+
+SYSCTL.clockTreeEn = true;
+
+UART1.$name = "UART_0";
+UART1.profile = "CONFIG_PROFILE_1";
+UART1.targetBaudRate = 115200;
+UART1.enableDMARX = false;
+UART1.enableDMATX = false;
+UART1.enableInternalLoopback = false;
+UART1.enabledInterrupts = ["RX"];
+UART1.enableFIFO = false;
+UART1.peripheral.$assign = "UART0";
+UART1.peripheral.rxPin.$assign = "PA11";
+UART1.peripheral.txPin.$assign = "PA10";

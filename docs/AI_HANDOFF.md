@@ -76,3 +76,35 @@ G3507 使用 `TexasInstruments.MSPM0G1X0X_G3X0X_DFP.1.3.1.pack` 和 `tools/flash
 ## Git 与文件卫生
 
 不得提交 `mspm0l1306_bringup/Debug/`、`mspm0g3507_bringup/Debug/`、`tools/.venv/`、`tools/packs/`、Python 缓存、VS Code 本地状态或操作系统临时文件。完整规则以 `.gitignore` 为准。
+
+## G3507 FreeRTOS 工程
+
+`mspm0g3507_freertos/` 是 G3507 裸机工程之外的独立 FreeRTOS 基线，必须与
+`mspm0g3507_bringup/` 共存。它使用同一块天猛星核心板的 `PB22` 用户 LED 与
+UART0 `PA10` TX、`PA11` RX，但不复用裸机工程的 SysConfig 生成文件或 ELF。
+
+构建命令：
+
+```powershell
+.\tools\build-mspm0g3507-freertos.ps1
+```
+
+构建脚本从 SDK 2.11.00.07 的只读 FreeRTOS 内核和 TI ARM Clang Cortex-M0+
+移植层编译，工程本地 `FreeRTOSConfig.h` 固定为 1 kHz 抢占式 tick，开启静态
+对象分配和栈溢出检查，禁用动态对象分配及软件定时器。应用创建两个静态任务：
+LED 任务通过 `vTaskDelayUntil()` 使用 `LED_TOGGLE_INTERVAL_MS` 翻转电平；
+UART 回显任务阻塞接收静态队列。UART RX ISR 必须使用 `xQueueSendFromISR()`；
+不得恢复裸机的 `SysTick_Handler` 或 `EchoQueue`。
+
+RTOS ELF 为 `mspm0g3507_freertos/Debug/mspm0g3507_freertos.out`。VS Code
+构建任务为 `MSPM0G3507 FreeRTOS: Build`，调试配置为
+`MSPM0G3507 FreeRTOS: Attach to pyOCD`。启动 GDB server 仍使用原有 G3507
+脚本；要写入 RTOS ELF 必须显式传入 `-Firmware freertos`：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\flash-and-debug-g3507.ps1 -Action Load -Firmware freertos
+```
+
+该命令会 `--erase chip`，执行前必须取得用户明确同意。已验证 SysConfig 生成、
+TI Clang 编译、FreeRTOS 内核链接和静态集成检查；尚未执行探针枚举、Flash 写入、
+PB22 LED 实测或 UART 回显实测。
