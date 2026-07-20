@@ -1,15 +1,13 @@
-# AI Development Rules
+# AI 开发规则
 
-Before any analysis, code change, build, debug, or Flash operation, every AI
-working in this repository must read `docs/AI_HANDOFF.md` in full.
+任何 AI 在分析、修改、构建、调试或烧录本仓库前，必须完整阅读
+`docs/AI_HANDOFF.md`。
 
-After each development task, the AI must update `docs/AI_HANDOFF.md` with the
-current implementation state, validation evidence, changed hardware or tool
-facts, and any remaining risks before handing the task back.
+每次开发任务结束时，AI 必须在交接前更新 `docs/AI_HANDOFF.md`，记录当前
+工程状态、实际验证结果、工具或硬件变化以及遗留风险。
 
-Do not commit generated build output, `.venv`, CMSIS-Pack downloads, or tool
-logs. Follow the Flash-write boundary documented in the handoff file.
+不要提交构建产物、`.venv`、CMSIS-Pack 下载文件或工具日志。必须遵守交接
+文档中的 Flash 烧录边界。
 
-Every Git commit must use a detailed message: a concise subject followed by a
-body that describes the changed behavior, affected tools or hardware, and
-verification performed. Do not use a one-line-only commit message.
+每次 Git 提交必须使用详细提交信息：简洁标题之后必须有正文，说明功能变化、
+涉及的工具或硬件，以及实际执行的验证。禁止只写一行标题。
