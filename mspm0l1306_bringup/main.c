@@ -6,6 +6,10 @@
 #include "echo_queue.h"
 #include "ti_msp_dl_config.h"
 
+#ifndef LED_TOGGLE_INTERVAL_MS
+#define LED_TOGGLE_INTERVAL_MS 2000U
+#endif
+
 static EchoQueue g_echo_queue;
 static volatile uint32_t g_milliseconds;
 
@@ -44,8 +48,8 @@ int main(void)
             board_uart_transmit(byte);
         }
 
-        if ((uint32_t) (g_milliseconds - last_toggle_ms) >= 500U) {
-            last_toggle_ms += 500U;
+        if ((uint32_t) (g_milliseconds - last_toggle_ms) >= LED_TOGGLE_INTERVAL_MS) {
+            last_toggle_ms += LED_TOGGLE_INTERVAL_MS;
             board_led_toggle();
         }
     }
