@@ -4,6 +4,17 @@
 /mspm0g3507_freertos/Debug/
 /mspm0g3507_app/Debug/
 
+# Keil MDK build output
+/keil/mspm0g3507_app/Generated/
+/keil/mspm0g3507_app/Objects/
+/keil/mspm0g3507_app/Listings/
+/keil/mspm0g3507_app/*.uvoptx
+/keil/mspm0g3507_app/*.uvguix*
+/keil/mspm0g3507_app/EventRecorderStub.scvd
+/keil/mspm0g3507_app/*.axf
+/keil/mspm0g3507_app/*.hex
+/keil/mspm0g3507_app/*.map
+
 # Local Python debug environment and downloaded CMSIS packs
 /tools/.venv/
 /tools/packs/

@@ -238,17 +238,54 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 静态集成测试与 TI Clang 构建；尚未进行 Flash 写入或蜂鸣器硬件实测。蜂鸣器驱动
 电路必须与 MCU 共地。
 
-### Encoder channel calibration update
+### 编码器通道校准更新
 
-Hardware hand-turn calibration established the following physical-to-logical
-encoder mapping, now declared directly in `mspm0g3507_app.syscfg`:
+通过手动转轮硬件校准，已确定以下物理引脚到逻辑轮位的编码器映射，
+并已直接写入 `mspm0g3507_app.syscfg`：
 
-- logical front-left: PA15/PB24;
-- logical front-right: PA17/PA22, direction inverted;
-- logical rear-left: PA14/PA9;
-- logical rear-right: PA16/PB20, direction inverted.
+- 逻辑前左轮：PA15/PB24；
+- 逻辑前右轮：PA17/PA22，方向取反；
+- 逻辑后左轮：PA14/PA9；
+- 逻辑后右轮：PA16/PB20，方向取反。
 
-The generated `ENCODER_*` macros now represent these logical positions directly;
-`board_encoder_gpioa_irq_handler()` only applies the two calibrated direction
-signs. The PWM motor mapping is unchanged. `BOARD_ENCODER_COUNTS_PER_REVOLUTION`
-is still 1040 until each wheel is measured over a known number of physical turns.
+生成的 `ENCODER_*` 宏现在直接表示上述逻辑轮位；
+`board_encoder_gpioa_irq_handler()` 只应用两路已校准的方向符号。PWM 电机映射保持不变。
+在完成每个车轮已知圈数的实测前，`BOARD_ENCODER_COUNTS_PER_REVOLUTION` 仍保持为 1040。
+
+## G3507 Keil MDK 迁移
+
+`keil/mspm0g3507_app/` 是现有 `mspm0g3507_app/` 应用的独立 Keil MDK 工程。
+Keil 工程通过相对路径共享应用的 C/H 文件和原始 SysConfig 源文件；不会修改 CCS
+的 `.project`、`.cproject`、原始 `.syscfg`、原始构建脚本或 VS Code 调试配置。
+
+该工程以 `MSPM0G3507` 为目标，使用 Arm Compiler 6、SDK 提供的 Keil 启动文件和
+scatter 文件，以及本地 FreeRTOS `GCC/ARM_CM0` 移植层副本。本地移植层用于保持
+Keil 构建边界与 TI Clang 移植层分离。由于 SDK Keil 版 `driverlib.a` 使用特定 ABI，
+Keil 编译器必须启用短枚举和短 wchar（`vShortEn=1`、`vShortWch=1`），否则会出现
+`wchart-16`/`wchart-32` 以及 packed-enum/enum-is-int ABI 冲突。
+
+SysConfig 使用 `--compiler keil` 生成到 `keil/mspm0g3507_app/Generated/`；
+原始 `mspm0g3507_app/Debug/` 不会被使用或修改。Keil 工程选择 CMSIS-DAP
+（`DriverSelection=4096`）、`MSPM0G1X0X_G3X0X_MAIN_128KB.FLM` 算法和
+`MSPM0G350X.svd`。构建脚本为 `tools/build-keil-mspm0g3507-app.ps1`，
+只生成位于 `keil/mspm0g3507_app/Objects/` 的调试 AXF，不会编程 Flash。
+
+静态检查和临时 AC6 编译/链接检查已覆盖 SysConfig Keil 输出、应用源码、FreeRTOS
+内核、本地 M0 移植层、启动文件、scatter 文件和 DriverLib。CMSIS-Pack 压缩包包含
+MSPM0G3507 器件、MSPM0G350X SVD，以及 128 KB、64 KB、32 KB 主 Flash 算法。
+
+2026-07-21 的验证命令均已完成：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
+```
+
+UV4 报告 `0 Error(s), 0 Warning(s)`，并生成调试 AXF/HEX；MAP 文件生成在 Keil 工程
+目录旁。`fromelf` 已确认调试段、`motor_task` 函数符号以及带类型信息的
+`g_encoder_samples[4]` 符号。Keil Pack 已安装到本地 MDK Pack 根目录，
+`cpackget list` 报告版本为 1.3.1。
+
+截至本次交接，实体 CMSIS-DAP 枚举、Flash 下载、Keil 断点/单步、寄存器查看以及
+`g_encoder_samples` 实时观察仍属于硬件验收事项；未实际连接探针时不得报告为成功。

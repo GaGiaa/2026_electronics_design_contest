@@ -1,0 +1,74 @@
+[CmdletBinding()]
+param(
+    [string] $ProjectRoot,
+    [string] $SdkRoot = 'D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07',
+    [string] $SysConfigRoot = 'D:\Software\ti\ccs2020\sysconfig_1.26.2',
+    [string] $KeilRoot = 'D:\Keil_v5'
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
+    $ProjectRoot = Split-Path -Parent $PSScriptRoot
+}
+
+$projectDir = Join-Path $ProjectRoot 'keil\mspm0g3507_app'
+$projectFile = Join-Path $projectDir 'mspm0g3507_app.uvprojx'
+$generator = Join-Path $PSScriptRoot 'generate-keil-mspm0g3507-sysconfig.ps1'
+$uv4 = Join-Path $KeilRoot 'UV4\UV4.exe'
+$objects = Join-Path $projectDir 'Objects'
+$log = Join-Path $objects 'build.log'
+$axf = Join-Path $objects 'mspm0g3507_app.axf'
+$hex = Join-Path $objects 'mspm0g3507_app.hex'
+$map = Join-Path $projectDir 'mspm0g3507_app.map'
+
+foreach ($path in @($projectFile, $generator, $uv4)) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Required Keil build path is unavailable: $path"
+    }
+}
+
+$protectedPaths = @(
+    (Join-Path $ProjectRoot 'mspm0g3507_app\.cproject'),
+    (Join-Path $ProjectRoot 'mspm0g3507_app\.project'),
+    (Join-Path $ProjectRoot 'mspm0g3507_app\mspm0g3507_app.syscfg'),
+    (Join-Path $ProjectRoot 'tools\build-mspm0g3507-app.ps1')
+)
+$protectedPaths += Get-ChildItem -LiteralPath (Join-Path $ProjectRoot '.vscode') -File -ErrorAction Stop | Select-Object -ExpandProperty FullName
+$beforeHashes = @{}
+foreach ($path in $protectedPaths) {
+    $beforeHashes[$path] = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
+}
+
+& $generator -ProjectRoot $ProjectRoot -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot
+if ($LASTEXITCODE -ne 0) {
+    throw 'Keil SysConfig generation failed.'
+}
+
+New-Item -ItemType Directory -Force -Path $objects | Out-Null
+Push-Location $projectDir
+try {
+    & $uv4 -b $projectFile -j0 -o $log
+    if ($LASTEXITCODE -ne 0) {
+        throw "Keil UV4 build failed (exit code $LASTEXITCODE). See $log"
+    }
+}
+finally {
+    Pop-Location
+}
+
+foreach ($path in @($axf, $hex, $map)) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Keil build did not produce the expected output: $path"
+    }
+}
+
+foreach ($path in $protectedPaths) {
+    $afterHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
+    if ($afterHash -ne $beforeHashes[$path]) {
+        throw "Protected CCS or VS Code file changed during Keil build: $path"
+    }
+}
+
+Write-Output "Keil build succeeded: $axf"
