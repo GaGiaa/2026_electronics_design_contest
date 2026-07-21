@@ -177,6 +177,9 @@ FreeRTOS API。默认以参考电机的单沿 520 计数为依据，采用 A 相
 `delta_counts,total_counts,speed_mm_per_s`，速度以截断后的整数 mm/s 表示。UART 回显和遥测均通过
 `board_uart_write()` 入队，内部使用静态帧队列；专用 `board_uart_tx_task` 独占 UART FIFO，
 确保完整报文不会互相交错。工程仍禁用动态内存分配，遥测不得移动到 GPIO ISR 或 10 ms 电机任务中。
+`main.c` 的 `ENCODER_TELEMETRY_ENABLE` 默认是 `0U`；改为 `1U` 会在编译期启用
+`telemetry_task`、其静态栈和 `enc` 报文，同时保留电机任务中的编码器采样、调试器快照、
+IMU 输出、UART 回显和 UART TX 任务。
 首次硬件测试时，GDB 确认 `telemetry` 任务触发了 `vApplicationStackOverflowHook()`；原因是包含多次
 格式化调用的遥测任务仅有 256 words 栈。已将 `ENCODER_TELEMETRY_TASK_STACK_DEPTH` 增至 512U，
 并由 `tests/test_mspm0g3507_app.ps1` 固定检查。重新构建、烧录后，用户已确认 100 ms `enc` 遥测和
@@ -289,3 +292,44 @@ UV4 报告 `0 Error(s), 0 Warning(s)`，并生成调试 AXF/HEX；MAP 文件生�
 
 截至本次交接，实体 CMSIS-DAP 枚举、Flash 下载、Keil 断点/单步、寄存器查看以及
 `g_encoder_samples` 实时观察仍属于硬件验收事项；未实际连接探针时不得报告为成功。
+### BMI160 六轴 IMU 接入
+
+BMI160 首版使用 G3507 的独立硬件 SPI0，不使用原接线图中的 I2C 方案。
+MSPM0G3507 的 PB17/PB18 没有 I2C 复用，但支持 SPI0：模块 `SCK` 接 PB18，
+`SDI`/MOSI 接 PB17，`SDO`/MISO 接 PB19，低有效 `CS` 接 PB0。PA21 保留给
+后续数据就绪中断，首版不启用；SPI 模式下 SA0 不参与地址选择。SPI1 仍由
+WS2812 使用。
+
+模块必须使用 3.3 V 并与 MCU 共地；不要在未核对模块原理图前同时给 VIN 和
+3V3 供电。若模块只有 SDA/SCL 标注，必须确认其是否支持 SPI 并找出独立的
+SDI、SDO 和 SCK 引脚，不能把 I2C SDA 直接当作完整 SPI 接线。
+
+`mspm0g3507_app.syscfg` 中的 `SPI_BMI160` 配置为 SPI0、8 MHz、8 位、MSB
+first、Motorola mode 3，PB0 配置为高电平空闲 GPIO CS。上电后驱动先拉低再
+拉高 CS 并发送一次 `0xFF` dummy SPI 事务，以完成 BMI160 的 SPI 接口选择；该
+启动步骤与 Bosch COINES 和公开 SPI 移植例程一致。该模式与 Bosch BMI160_SensorAPI
+官方 `read_sensor_data` 例程一致。`board_bmi160.c/.h` 提供
+`board_bmi160_init(uint8_t *)` 和 `board_bmi160_read_sample(...)`，使用状态码、
+有界 SPI 超时和 CS 错误释放。初始化读取 `CHIP_ID` 并要求 `0xD1`，执行软复位，
+配置加速度计 ±4g/100 Hz、陀螺仪 ±500dps/100 Hz；软复位后按 Bosch 官方流程读取
+0x7F 重新启用 SPI，并在每次寄存器写入后等待 1 ms，再从陀螺仪数据起始寄存器
+0x0C 连续读取至加速度数据结束寄存器 0x17 的 12 字节，并按“陀螺仪三轴在前、
+加速度三轴在后”解析六个有符号原始值。
+
+独立静态 FreeRTOS IMU 任务每 10 ms 读取一次数据，并复用目标基线已有的
+`board_uart_write()` 静态帧队列输出：
+
+```text
+bmi160,id=0xD1,status=0
+imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
+```
+
+初始化失败每秒重试，连续三次采样失败后重新初始化。当前已完成目标提交
+`2f644e99dd4606ab2ba911fb29d4e2e813da77c9` 基线迁移、静态集成检查、SysConfig
+生成和 TI Clang 构建。硬件已验证 `CHIP_ID=0xD1`、静止 Z 轴约 1g、陀螺仪三轴
+接近 0dps，编码器遥测、IMU 报文和 UART 回显未出现交叉损坏。后续烧录仍需
+遵循明确授权原则。
+
+`main.c` 中的 `IMU_TELEMETRY_ENABLE` 是 IMU 串口输出的编译期开关，默认值为
+`0U`。设为 `1U` 后输出初始化状态、采样错误和六轴原始数据；设为 `0U` 时仅
+关闭这些 UART 报文，IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。

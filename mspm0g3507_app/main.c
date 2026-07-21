@@ -6,6 +6,7 @@
 #include <task.h>
 
 #include "board_encoder.h"
+#include "board_bmi160.h"
 #include "board_buzzer.h"
 #include "board_motor.h"
 #include "board_uart.h"
@@ -20,9 +21,15 @@
 #define BUZZER_TASK_STACK_DEPTH 128U
 #define UART_RX_QUEUE_LENGTH 64U
 #define WS2812_BRIGHTNESS 16U
+#define ENCODER_TELEMETRY_ENABLE 0U
 #define ENCODER_TELEMETRY_INTERVAL_MS 100U
 #define ENCODER_TELEMETRY_TASK_STACK_DEPTH 512U
 #define TELEMETRY_TASK_PRIORITY 0U
+#define IMU_TELEMETRY_ENABLE 0U
+#define IMU_TASK_STACK_DEPTH 512U
+#define IMU_TASK_PRIORITY 0U
+#define IMU_SAMPLE_INTERVAL_MS 10U
+#define IMU_REINIT_FAILURE_THRESHOLD 3U
 
 #define BUZZER_FEATURE_ENABLE 0U
 #define BUZZER_FREQUENCY_HZ 2000U
@@ -55,8 +62,12 @@ static StaticTask_t g_uart_task_buffer;
 static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
 static StaticTask_t g_uart_tx_task_buffer;
 static StackType_t g_uart_tx_task_stack[UART_TX_TASK_STACK_DEPTH];
+#if ENCODER_TELEMETRY_ENABLE
 static StaticTask_t g_telemetry_task_buffer;
 static StackType_t g_telemetry_task_stack[ENCODER_TELEMETRY_TASK_STACK_DEPTH];
+#endif
+static StaticTask_t g_imu_task_buffer;
+static StackType_t g_imu_task_stack[IMU_TASK_STACK_DEPTH];
 #if BUZZER_FEATURE_ENABLE
 static StaticTask_t g_buzzer_task_buffer;
 static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
@@ -179,6 +190,7 @@ static void encoder_samples_copy(board_encoder_sample_t samples[BOARD_MOTOR_COUN
     }
 }
 
+#if ENCODER_TELEMETRY_ENABLE
 static void telemetry_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -209,6 +221,72 @@ static void telemetry_task(void *argument)
             board_uart_write((const uint8_t *)message, (size_t)length);
         }
         vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
+
+static void imu_task(void *argument)
+{
+    TickType_t last_wake_time;
+    const TickType_t interval = pdMS_TO_TICKS(IMU_SAMPLE_INTERVAL_MS);
+    board_bmi160_sample_t sample;
+    board_bmi160_status_t status;
+    uint8_t chip_id;
+    uint32_t consecutive_failures;
+#if IMU_TELEMETRY_ENABLE
+    char message[128];
+#endif
+
+    (void)argument;
+    for (;;) {
+#if IMU_TELEMETRY_ENABLE
+        int length;
+#endif
+
+        chip_id = 0U;
+        status = board_bmi160_init(&chip_id);
+#if IMU_TELEMETRY_ENABLE
+        length = snprintf(message, sizeof(message),
+                          "bmi160,id=0x%02X,status=%u\r\n",
+                          chip_id, (unsigned)status);
+        if ((length > 0) && ((size_t)length < sizeof(message))) {
+            board_uart_write((const uint8_t *)message, (size_t)length);
+        }
+#endif
+        if (status != BOARD_BMI160_STATUS_OK) {
+            vTaskDelay(pdMS_TO_TICKS(1000U));
+        } else {
+            consecutive_failures = 0U;
+            last_wake_time = xTaskGetTickCount();
+            for (;;) {
+                status = board_bmi160_read_sample(&sample);
+                if (status != BOARD_BMI160_STATUS_OK) {
+                    ++consecutive_failures;
+#if IMU_TELEMETRY_ENABLE
+                    length = snprintf(message, sizeof(message),
+                                      "bmi160,error=%u\r\n", (unsigned)status);
+                    if ((length > 0) && ((size_t)length < sizeof(message))) {
+                        board_uart_write((const uint8_t *)message, (size_t)length);
+                    }
+#endif
+                    if (consecutive_failures >= IMU_REINIT_FAILURE_THRESHOLD) {
+                        break;
+                    }
+                } else {
+                    consecutive_failures = 0U;
+#if IMU_TELEMETRY_ENABLE
+                    length = snprintf(message, sizeof(message),
+                                      "imu,ax=%+6d,ay=%+6d,az=%+6d,gx=%+6d,gy=%+6d,gz=%+6d\r\n",
+                                      sample.accel_x, sample.accel_y, sample.accel_z,
+                                      sample.gyro_x, sample.gyro_y, sample.gyro_z);
+                    if ((length > 0) && ((size_t)length < sizeof(message))) {
+                        board_uart_write((const uint8_t *)message, (size_t)length);
+                    }
+#endif
+                }
+                vTaskDelayUntil(&last_wake_time, interval);
+            }
+        }
     }
 }
 #if BUZZER_FEATURE_ENABLE
@@ -244,7 +322,10 @@ int main(void)
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812", WS2812_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_ws2812_task_stack, &g_ws2812_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx", UART_TX_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_uart_tx_task_stack, &g_uart_tx_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
+#if ENCODER_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(telemetry_task, "telemetry", ENCODER_TELEMETRY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_telemetry_task_stack, &g_telemetry_task_buffer) != NULL);
+#endif
+    configASSERT(xTaskCreateStatic(imu_task, "imu", IMU_TASK_STACK_DEPTH, NULL, IMU_TASK_PRIORITY, g_imu_task_stack, &g_imu_task_buffer) != NULL);
 #if BUZZER_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(buzzer_task, "buzzer", BUZZER_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_buzzer_task_stack, &g_buzzer_task_buffer) != NULL);
 #endif
