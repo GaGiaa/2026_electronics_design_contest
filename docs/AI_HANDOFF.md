@@ -334,6 +334,23 @@ imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
 `0U`。设为 `1U` 后输出初始化状态、采样错误和六轴原始数据；设为 `0U` 时仅
 关闭这些 UART 报文，IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。
 
+### VOFA+ JustFloat 速度环遥测
+
+`mspm0g3507_app/main.c` 的 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 是速度环调参
+专用 UART 编译期开关，默认 `0U`。设为 `1U` 后，`telemetry_task` 以 10 ms 周期
+通过既有 `board_uart_write()` 静态帧队列发送 VOFA+ JustFloat 二进制帧。每帧为
+三个小端 IEEE-754 `float32` 加帧尾 `00 00 80 7F`，固定 16 字节；字段顺序为当前
+`g_motor_debug.wheel` 的 `target_speed_mm_per_s`、`feedback_speed_mm_per_s` 与
+`output_duty_percent`。非法轮位自动降级为前左轮，调试模式未使能时仍按所选轮位输出
+状态。
+
+VOFA 模式独占 UART0 输出：UART 回显任务不会创建，BMI160 初始化、错误和采样文本
+也被编译期抑制，不能在该模式下向串口发送文本或同时使用文本串口监视器。VOFA+ 选择
+JustFloat 后应观察三条曲线以 100 Hz 更新；先低速确认编码器符号，再调整
+`g_motor_debug.speed_pid_params`。电机运动时禁止设置断点。新增
+`mspm0g3507_app/vofa_justfloat.c/.h` 为无硬件依赖编码模块，主机测试覆盖固定帧长、
+三个已知浮点的字节序与帧尾；尚未执行 Flash 写入或 VOFA 硬件验收。
+
 ### 四轮 PWM 速度闭环与 SWD 单轮调试
 
 `mspm0g3507_app/` 的 10 ms 电机任务已加入四路独立增量式速度 PID。速度统一为

@@ -57,25 +57,21 @@ motor is moving.
 
 For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without
-adding breakpoints. A lower-priority telemetry task also transmits one line every
-100 ms through UART0. Each wheel is reported as
-`target_mm_s,feedback_mm_s,p,i,d,duty_percent`:
+adding breakpoints. For speed-loop tuning, set the compile-time
+`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `main.c` from `0U` to `1U` and select
+JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 16-byte frame
+every 10 ms. Its three float32 channels follow `g_motor_debug.wheel` and are ordered
+as `target_speed_mm_per_s`, `feedback_speed_mm_per_s`, and
+`output_duty_percent`; the frame ends in `00 00 80 7F`.
 
-```text
-ctl,fl=200,181,2,0,0,2,fr=0,0,0,0,0,0,rl=0,0,0,0,0,0,rr=0,0,0,0,0,0,dbg=0,0,0,0,0,0,0
-```
-
-All values are truncated to signed integers in the serial frame. UART echo and telemetry
-enqueue whole messages to a static frame queue, and one transmit task owns the
-hardware FIFO so bytes from different messages cannot interleave. Telemetry does
-not run in the encoder ISR or motor task. For initial validation,
-use the debugger without breakpoints to turn one wheel by hand and confirm count
-sign and isolation before driving the chassis at low duty.
-
-`main.c` provides the compile-time `ENCODER_TELEMETRY_ENABLE` switch. It defaults
-to `0U`; set it to `1U` to enable the periodic `ctl` UART frames and telemetry
-task. Encoder sampling in the motor task, the debugger-visible sample snapshot,
-IMU output, UART echo, and the UART transmit task remain enabled.
+VOFA mode owns UART0 output: the UART echo task is not created and BMI160 text
+telemetry is suppressed, even if `IMU_TELEMETRY_ENABLE` is `1U`. Do not send text
+to UART0 while VOFA mode is enabled. Frames are still queued through
+`board_uart_write()` and emitted by the dedicated UART TX task, so the motor task
+and encoder ISR never block on the UART. If `g_motor_debug.wheel` is invalid, the
+telemetry task safely sends the front-left wheel status. For initial validation, use
+the debugger without breakpoints to turn one wheel by hand and confirm count sign
+and isolation before driving the chassis at low duty.
 
 PA2 drives a passive buzzer through TIMG8 CCP1. `main.c` provides the
 compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,

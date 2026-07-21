@@ -19,6 +19,7 @@ try {
     & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$appDir" "-I$appDir\motor_pid" `
         (Join-Path $appDir 'motor_control.c') `
         (Join-Path $appDir 'motor_pid\pid.c') `
+        (Join-Path $appDir 'vofa_justfloat.c') `
         $testSource '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) {
         throw "Motor control test build failed (exit code $LASTEXITCODE)."

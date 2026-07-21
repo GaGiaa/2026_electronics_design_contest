@@ -4,6 +4,7 @@
 
 #include "motor_control.h"
 #include "pid.h"
+#include "vofa_justfloat.h"
 
 static void expect_close(float actual, float expected, float tolerance, const char *message)
 {
@@ -196,6 +197,27 @@ static void test_nonfinite_debug_duty_stops_output(void)
                  "nonfinite debug PWM must be rejected as a stop command");
 }
 
+static void test_vofa_justfloat_encodes_three_float_channels(void)
+{
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
+    static const uint8_t expected[] = {
+        0x00U, 0x00U, 0xC0U, 0x3FU,
+        0x00U, 0x00U, 0x10U, 0xC0U,
+        0x00U, 0x00U, 0x48U, 0x42U,
+        0x00U, 0x00U, 0x80U, 0x7FU,
+    };
+    size_t index;
+
+    expect_true(vofa_justfloat_encode3(frame, sizeof(frame), 1.5f, -2.25f, 50.0f),
+                "JustFloat encoder must accept a correctly sized frame buffer");
+    for (index = 0U; index < sizeof(expected); ++index) {
+        expect_true(frame[index] == expected[index],
+                    "JustFloat frame must use little-endian float32 channels and the VOFA tail");
+    }
+    expect_true(!vofa_justfloat_encode3(frame, sizeof(frame) - 1U, 0.0f, 0.0f, 0.0f),
+                "JustFloat encoder must reject a frame buffer with the wrong fixed length");
+}
+
 int main(void)
 {
     test_incremental_pid_accumulates_and_resets();
@@ -207,6 +229,7 @@ int main(void)
     test_invalid_debug_speed_parameters_stop_all_wheels();
     test_zero_speed_target_resets_accumulated_output();
     test_nonfinite_debug_duty_stops_output();
+    test_vofa_justfloat_encodes_three_float_channels();
     puts("PASS: motor PID and control tests passed.");
     return EXIT_SUCCESS;
 }
