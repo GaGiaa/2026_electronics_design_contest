@@ -24,6 +24,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Local Codex planning notes
+/docs/superpowers/
+
 # VS Code user/workspace state (keep shared .vscode configuration)
 .vscode/.browse.VC.db*
 .vscode/ipch/
