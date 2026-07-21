@@ -16,8 +16,12 @@ the LEDs and echoing continuous UART input; no Flash operation is implied by
 the build or test commands.
 
 The application CPU runs at 80 MHz from the board's 40 MHz HFXT and SYSPLL.
-Four 10 kHz, two-input PWM motor channels use PA12/PA13 (front-left),
-PA28/PA31 (front-right), PA29/PB27 (rear-left), and PB4/PB5 (rear-right).
+Four 10 kHz, two-input PWM hardware channels use PA12/PA13, PA28/PA31,
+PA29/PB27, and PB4/PB5. The logical-wheel calibration maps front-left to
+PA29/PB27, front-right to PB4/PB5, rear-left to PA28/PA31, and rear-right to
+PA12/PA13. The logical rear-left wheel reverses the PWM input order because
+its motor polarity is opposite. `BOARD_MOTOR_DIRECTION_FORWARD` therefore
+means vehicle-forward motion for every logical wheel.
 `main.c` contains separate direction and duty-percent macros for every wheel;
 all default to stop and 0 percent. The static motor task applies the macros
 every 10 ms. Forward drives IN1 with PWM and holds IN2 low; reverse does the

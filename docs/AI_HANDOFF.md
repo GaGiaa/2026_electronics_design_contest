@@ -136,8 +136,16 @@ LED 实测或 UART 连续回显实测。
 
 应用工程已配置 40 MHz HFXT 经 SYSPLL 的 80 MHz CPU 时钟，FreeRTOS 的
 `configCPU_CLOCK_HZ` 同步为 80 MHz；ULPCLK 经 UDIV /2 保持在 40 MHz 以下。
-底盘电机使用双 PWM 输入：前左 PA12/PA13、前右 PA28/PA31、后左 PA29/PB27、
-后右 PB4/PB5。四组定时器均为 40 MHz 时钟与 4000 计数周期，输出 10 kHz。
-`main.c` 中每轮都有方向和占空比宏，默认 `STOP/0%`；静态电机任务每 10 ms
-应用命令。正转为 IN1 PWM/IN2 低，反转为 IN1 低/IN2 PWM，停止时两路均低。
+底盘电机使用双 PWM 输入；按当前底盘校准后的逻辑轮位为：前左 PA29/PB27、前右
+PB4/PB5、后左 PA28/PA31、后右 PA12/PA13。四组定时器均为 40 MHz 时钟与 4000
+计数周期，输出 10 kHz。
+`main.c` 中每轮都有方向和占空比宏，默认占空比为 `0%`，因此安全停转；静态电机任务每
+10 ms 应用命令。正转为 IN1 PWM/IN2 低，反转为 IN1 低/IN2 PWM，停止时两路均低。
 已通过静态集成检查、SysConfig 生成和 TI Clang 构建；未执行 Flash 写入或硬件电机测试。
+
+### 电机轮位校准
+
+`board_motor` 的逻辑轮位已按当前底盘接线校准：逻辑前左使用 PA29/PB27，逻辑前右使用
+PB4/PB5，逻辑后左使用 PA28/PA31 且正反方向反相，逻辑后右使用 PA12/PA13。
+因此，四个逻辑轮位的 `BOARD_MOTOR_DIRECTION_FORWARD` 都表示车辆前进方向。重新接线或
+更换电机驱动板后，必须重新进行单轮校准。

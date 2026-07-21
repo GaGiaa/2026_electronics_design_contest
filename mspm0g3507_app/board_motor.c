@@ -41,6 +41,12 @@ void board_motor_set(board_motor_wheel_t wheel, board_motor_direction_t directio
                          GPIO_MOTOR_FRONT_RIGHT_C1_IDX, direction, duty);
         break;
     case BOARD_MOTOR_REAR_LEFT:
+        /* This physical channel has the opposite motor polarity. */
+        if (direction == BOARD_MOTOR_DIRECTION_FORWARD) {
+            direction = BOARD_MOTOR_DIRECTION_REVERSE;
+        } else if (direction == BOARD_MOTOR_DIRECTION_REVERSE) {
+            direction = BOARD_MOTOR_DIRECTION_FORWARD;
+        }
         write_motor_pair(MOTOR_REAR_LEFT_INST, GPIO_MOTOR_REAR_LEFT_C0_IDX,
                          GPIO_MOTOR_REAR_LEFT_C1_IDX, direction, duty);
         break;
