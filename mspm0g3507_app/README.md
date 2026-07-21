@@ -54,3 +54,11 @@ hardware FIFO so bytes from different messages cannot interleave. Telemetry does
 not run in the encoder ISR or motor task. For initial validation,
 use the debugger without breakpoints to turn one wheel by hand and confirm count
 sign and isolation before driving the chassis at low duty.
+
+PA2 drives a passive buzzer through TIMG8 CCP1. `main.c` provides the
+compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,
+`BUZZER_DUTY_PERCENT`, `BUZZER_ON_TIME_MS`, and `BUZZER_OFF_TIME_MS` macros.
+The defaults are disabled, 2000 Hz, 50 percent, 200 ms on, and 1800 ms off.
+When enabled, a dedicated static FreeRTOS task repeats the on/off interval;
+when disabled, the PWM is initialized with a zero compare value and no buzzer
+task is created. The passive buzzer driver circuit and MCU must share ground.

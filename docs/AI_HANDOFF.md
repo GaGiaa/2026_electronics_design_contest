@@ -228,3 +228,12 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 四组同一 `TIMGx` 的 CCP0/CCP1，因此本版本明确采用 GPIO 中断。不要在没有重新分配硬件引脚和
 确认定时器资源前，把四路 GPIO 驱动改成“四个 QEI”或盲目改成 Timer Capture；Timer Capture
 本身不能自动完成 AB 相方向解码。
+### PA2 无源蜂鸣器
+
+`mspm0g3507_app/` 将 PA2 配置为 TIMG8 CCP1 硬件 PWM 输出。`main.c` 的
+`BUZZER_FEATURE_ENABLE`、`BUZZER_FREQUENCY_HZ`、`BUZZER_DUTY_PERCENT`、
+`BUZZER_ON_TIME_MS` 和 `BUZZER_OFF_TIME_MS` 为编译期配置宏；默认分别为
+关闭、2000 Hz、50%、200 ms 和 1800 ms。启用时新增一个静态 FreeRTOS 任务循环
+响/停，禁用时驱动初始化后保持 PA2 低电平且不创建任务。已验证 SysConfig 生成、
+静态集成测试与 TI Clang 构建；尚未进行 Flash 写入或蜂鸣器硬件实测。蜂鸣器驱动
+电路必须与 MCU 共地。
