@@ -20,6 +20,7 @@
 #define BUZZER_TASK_STACK_DEPTH 128U
 #define UART_RX_QUEUE_LENGTH 64U
 #define WS2812_BRIGHTNESS 16U
+#define ENCODER_TELEMETRY_ENABLE 0U
 #define ENCODER_TELEMETRY_INTERVAL_MS 100U
 #define ENCODER_TELEMETRY_TASK_STACK_DEPTH 512U
 #define TELEMETRY_TASK_PRIORITY 0U
@@ -55,8 +56,10 @@ static StaticTask_t g_uart_task_buffer;
 static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
 static StaticTask_t g_uart_tx_task_buffer;
 static StackType_t g_uart_tx_task_stack[UART_TX_TASK_STACK_DEPTH];
+#if ENCODER_TELEMETRY_ENABLE
 static StaticTask_t g_telemetry_task_buffer;
 static StackType_t g_telemetry_task_stack[ENCODER_TELEMETRY_TASK_STACK_DEPTH];
+#endif
 #if BUZZER_FEATURE_ENABLE
 static StaticTask_t g_buzzer_task_buffer;
 static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
@@ -179,6 +182,7 @@ static void encoder_samples_copy(board_encoder_sample_t samples[BOARD_MOTOR_COUN
     }
 }
 
+#if ENCODER_TELEMETRY_ENABLE
 static void telemetry_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -211,6 +215,7 @@ static void telemetry_task(void *argument)
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }
+#endif
 #if BUZZER_FEATURE_ENABLE
 static void buzzer_task(void *argument)
 {
@@ -244,7 +249,9 @@ int main(void)
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812", WS2812_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_ws2812_task_stack, &g_ws2812_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx", UART_TX_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_uart_tx_task_stack, &g_uart_tx_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
+#if ENCODER_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(telemetry_task, "telemetry", ENCODER_TELEMETRY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_telemetry_task_stack, &g_telemetry_task_buffer) != NULL);
+#endif
 #if BUZZER_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(buzzer_task, "buzzer", BUZZER_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_buzzer_task_stack, &g_buzzer_task_buffer) != NULL);
 #endif

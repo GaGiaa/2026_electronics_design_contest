@@ -96,6 +96,8 @@ Assert-Contains -Path $main -Pattern 'GROUP1_IRQHandler' -Description 'Applicati
 Assert-Contains -Path $main -Pattern 'g_encoder_samples' -Description 'Application must retain encoder samples for debugger observation'
 Assert-Contains -Path $main -Pattern 'ENCODER_TELEMETRY_INTERVAL_MS\s+100U' -Description 'Encoder telemetry must run at 10 Hz'
 Assert-Contains -Path $main -Pattern 'ENCODER_TELEMETRY_TASK_STACK_DEPTH\s+512U' -Description 'Telemetry task must have enough stack for formatted encoder reports'
+Assert-Contains -Path $main -Pattern 'ENCODER_TELEMETRY_ENABLE\s+0U' -Description 'Encoder telemetry must default to disabled'
+Assert-Contains -Path $main -Pattern '#if ENCODER_TELEMETRY_ENABLE' -Description 'Encoder telemetry task must be compile-time gated'
 Assert-Contains -Path $main -Pattern 'telemetry_task' -Description 'Application must provide a telemetry task'
 Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(telemetry_task' -Description 'Encoder telemetry task must use static allocation'
 Assert-Contains -Path $main -Pattern 'board_uart_write' -Description 'Telemetry must send through the serialized UART writer'

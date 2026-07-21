@@ -177,6 +177,9 @@ FreeRTOS API。默认以参考电机的单沿 520 计数为依据，采用 A 相
 `delta_counts,total_counts,speed_mm_per_s`，速度以截断后的整数 mm/s 表示。UART 回显和遥测均通过
 `board_uart_write()` 入队，内部使用静态帧队列；专用 `board_uart_tx_task` 独占 UART FIFO，
 确保完整报文不会互相交错。工程仍禁用动态内存分配，遥测不得移动到 GPIO ISR 或 10 ms 电机任务中。
+`main.c` 的 `ENCODER_TELEMETRY_ENABLE` 默认是 `0U`；改为 `1U` 会在编译期启用
+`telemetry_task`、其静态栈和 `enc` 报文，同时保留电机任务中的编码器采样、调试器快照、
+IMU 输出、UART 回显和 UART TX 任务。
 首次硬件测试时，GDB 确认 `telemetry` 任务触发了 `vApplicationStackOverflowHook()`；原因是包含多次
 格式化调用的遥测任务仅有 256 words 栈。已将 `ENCODER_TELEMETRY_TASK_STACK_DEPTH` 增至 512U，
 并由 `tests/test_mspm0g3507_app.ps1` 固定检查。重新构建、烧录后，用户已确认 100 ms `enc` 遥测和

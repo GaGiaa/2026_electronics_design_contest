@@ -55,6 +55,11 @@ not run in the encoder ISR or motor task. For initial validation,
 use the debugger without breakpoints to turn one wheel by hand and confirm count
 sign and isolation before driving the chassis at low duty.
 
+`main.c` provides the compile-time `ENCODER_TELEMETRY_ENABLE` switch. It defaults
+to `0U`; set it to `1U` to enable the periodic `enc` UART frames and telemetry
+task. Encoder sampling in the motor task, the debugger-visible sample snapshot,
+IMU output, UART echo, and the UART transmit task remain enabled.
+
 PA2 drives a passive buzzer through TIMG8 CCP1. `main.c` provides the
 compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,
 `BUZZER_DUTY_PERCENT`, `BUZZER_ON_TIME_MS`, and `BUZZER_OFF_TIME_MS` macros.
