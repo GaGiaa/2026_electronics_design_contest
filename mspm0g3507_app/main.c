@@ -8,6 +8,7 @@
 #include "board_encoder.h"
 #include "board_bmi160.h"
 #include "board_buzzer.h"
+#include "board_grayscale.h"
 #include "board_motor.h"
 #include "board_uart.h"
 #include "board_ws2812.h"
@@ -30,6 +31,10 @@
 #define IMU_TASK_PRIORITY 0U
 #define IMU_SAMPLE_INTERVAL_MS 10U
 #define IMU_REINIT_FAILURE_THRESHOLD 3U
+#define GRAY_TELEMETRY_ENABLE 0U
+#define GRAY_SAMPLE_INTERVAL_MS 10U
+#define GRAY_TELEMETRY_INTERVAL_MS 100U
+#define GRAY_TASK_STACK_DEPTH 512U
 
 #define BUZZER_FEATURE_ENABLE 0U
 #define BUZZER_FREQUENCY_HZ 2000U
@@ -68,6 +73,12 @@ static StackType_t g_telemetry_task_stack[ENCODER_TELEMETRY_TASK_STACK_DEPTH];
 #endif
 static StaticTask_t g_imu_task_buffer;
 static StackType_t g_imu_task_stack[IMU_TASK_STACK_DEPTH];
+static StaticTask_t g_gray_task_buffer;
+static StackType_t g_gray_task_stack[GRAY_TASK_STACK_DEPTH];
+#if GRAY_TELEMETRY_ENABLE
+static StaticTask_t g_gray_telemetry_task_buffer;
+static StackType_t g_gray_telemetry_task_stack[GRAY_TASK_STACK_DEPTH];
+#endif
 #if BUZZER_FEATURE_ENABLE
 static StaticTask_t g_buzzer_task_buffer;
 static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
@@ -77,6 +88,8 @@ static uint8_t g_uart_queue_storage[UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
 static StaticTask_t g_idle_task_buffer;
 static StackType_t g_idle_task_stack[configIDLE_TASK_STACK_DEPTH];
 volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
+volatile board_grayscale_snapshot_t g_grayscale_snapshot;
+static volatile uint32_t g_grayscale_publish_sequence;
 static volatile uint32_t g_encoder_sample_sequence;
 void UART_0_INST_IRQHandler(void) { board_uart_irq_handler(); }
 void GROUP1_IRQHandler(void) { board_encoder_gpioa_irq_handler(); }
@@ -289,6 +302,79 @@ static void imu_task(void *argument)
         }
     }
 }
+
+static void grayscale_snapshot_copy(board_grayscale_snapshot_t *snapshot)
+{
+    uint32_t begin_sequence;
+    uint32_t end_sequence;
+    uint32_t channel;
+
+    for (;;) {
+        begin_sequence = g_grayscale_publish_sequence;
+        if ((begin_sequence & 1U) == 0U) {
+            for (channel = 0U; channel < BOARD_GRAYSCALE_CHANNEL_COUNT; ++channel) {
+                snapshot->raw[channel] = g_grayscale_snapshot.raw[channel];
+                snapshot->normalized[channel] = g_grayscale_snapshot.normalized[channel];
+            }
+            snapshot->digital = g_grayscale_snapshot.digital;
+            snapshot->sequence = g_grayscale_snapshot.sequence;
+            end_sequence = g_grayscale_publish_sequence;
+            if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
+                break;
+            }
+        }
+    }
+}
+
+static void gray_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval = pdMS_TO_TICKS(GRAY_SAMPLE_INTERVAL_MS);
+    board_grayscale_snapshot_t sample;
+    uint32_t channel;
+
+    (void)argument;
+    for (;;) {
+        board_grayscale_sample(&sample);
+        ++g_grayscale_publish_sequence;
+        for (channel = 0U; channel < BOARD_GRAYSCALE_CHANNEL_COUNT; ++channel) {
+            g_grayscale_snapshot.raw[channel] = sample.raw[channel];
+            g_grayscale_snapshot.normalized[channel] = sample.normalized[channel];
+        }
+        g_grayscale_snapshot.digital = sample.digital;
+        g_grayscale_snapshot.sequence = sample.sequence;
+        ++g_grayscale_publish_sequence;
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+
+#if GRAY_TELEMETRY_ENABLE
+static void gray_telemetry_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval = pdMS_TO_TICKS(GRAY_TELEMETRY_INTERVAL_MS);
+    board_grayscale_snapshot_t snapshot;
+    char message[256];
+
+    (void)argument;
+    for (;;) {
+        int length;
+
+        grayscale_snapshot_copy(&snapshot);
+        length = snprintf(message, sizeof(message),
+                          "gray,raw=%u,%u,%u,%u,%u,%u,%u,%u,norm=%u,%u,%u,%u,%u,%u,%u,%u,digital=0x%02X\r\n",
+                          snapshot.raw[0], snapshot.raw[1], snapshot.raw[2], snapshot.raw[3],
+                          snapshot.raw[4], snapshot.raw[5], snapshot.raw[6], snapshot.raw[7],
+                          snapshot.normalized[0], snapshot.normalized[1], snapshot.normalized[2],
+                          snapshot.normalized[3], snapshot.normalized[4], snapshot.normalized[5],
+                          snapshot.normalized[6], snapshot.normalized[7], snapshot.digital);
+        if ((length > 0) && ((size_t)length < sizeof(message))) {
+            board_uart_write((const uint8_t *)message, (size_t)length);
+        }
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
 #if BUZZER_FEATURE_ENABLE
 static void buzzer_task(void *argument)
 {
@@ -311,8 +397,14 @@ void vApplicationStackOverflowHook(TaskHandle_t task, char *task_name)
 int main(void)
 {
     QueueHandle_t uart_queue;
+    static const uint16_t grayscale_white[BOARD_GRAYSCALE_CHANNEL_COUNT] =
+        {3000U, 3000U, 3000U, 3000U, 3000U, 3000U, 3000U, 3000U};
+    static const uint16_t grayscale_black[BOARD_GRAYSCALE_CHANNEL_COUNT] =
+        {500U, 500U, 500U, 500U, 500U, 500U, 500U, 500U};
+
     SYSCFG_DL_init();
     board_encoder_init();
+    board_grayscale_init(grayscale_white, grayscale_black);
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
     board_buzzer_init(BUZZER_FREQUENCY_HZ, BUZZER_DUTY_PERCENT);
     uart_queue = xQueueCreateStatic(UART_RX_QUEUE_LENGTH, sizeof(uint8_t), g_uart_queue_storage, &g_uart_queue_buffer);
@@ -326,6 +418,10 @@ int main(void)
     configASSERT(xTaskCreateStatic(telemetry_task, "telemetry", ENCODER_TELEMETRY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_telemetry_task_stack, &g_telemetry_task_buffer) != NULL);
 #endif
     configASSERT(xTaskCreateStatic(imu_task, "imu", IMU_TASK_STACK_DEPTH, NULL, IMU_TASK_PRIORITY, g_imu_task_stack, &g_imu_task_buffer) != NULL);
+    configASSERT(xTaskCreateStatic(gray_task, "gray", GRAY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_gray_task_stack, &g_gray_task_buffer) != NULL);
+#if GRAY_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(gray_telemetry_task, "gray_tele", GRAY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_gray_telemetry_task_stack, &g_gray_telemetry_task_buffer) != NULL);
+#endif
 #if BUZZER_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(buzzer_task, "buzzer", BUZZER_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_buzzer_task_stack, &g_buzzer_task_buffer) != NULL);
 #endif

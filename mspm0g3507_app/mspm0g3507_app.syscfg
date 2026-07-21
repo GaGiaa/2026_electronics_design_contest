@@ -5,10 +5,13 @@
  * @v2CliArgs --device "MSPM0G3507" --package "LQFP-64(PM)" --product "mspm0_sdk@2.11.00.07"
  */
 const Board = scripting.addModule("/ti/driverlib/Board", {}, false);
+const ADC12 = scripting.addModule("/ti/driverlib/ADC12", {}, false);
+const ADCGray = ADC12.addInstance();
 const GPIO = scripting.addModule("/ti/driverlib/GPIO", {}, false);
 const GPIO1 = GPIO.addInstance();
 const GPIO2 = GPIO.addInstance();
 const GPIO3 = GPIO.addInstance();
+const GPIO4 = GPIO.addInstance();
 const PWM = scripting.addModule("/ti/driverlib/PWM", {}, false);
 const PWMFrontLeft = PWM.addInstance();
 const PWMFrontRight = PWM.addInstance();
@@ -33,6 +36,30 @@ hsclkMux.inputSelect = "HSCLKMUX_SYSPLL0";
 ulpDiv.divideValue = 2;
 
 Board.configureUnused = true;
+ADCGray.$name = "GRAYSCALE_ADC";
+ADCGray.sampleTime0 = "2 us";
+ADCGray.sampClkDiv = "DL_ADC12_CLOCK_DIVIDE_8";
+ADCGray.adcMem0_name = "ADC_CH0";
+ADCGray.repeatMode = false;
+ADCGray.peripheral.$assign = "ADC0";
+ADCGray.peripheral.adcPin0.$assign = "PA27";
+ADCGray.adcPin0Config.$name = "GRAYSCALE_ADC_INPUT";
+
+GPIO4.$name = "GRAY_ADDRESS";
+GPIO4.associatedPins.create(3);
+GPIO4.associatedPins[0].$name = "AD0";
+GPIO4.associatedPins[0].direction = "OUTPUT";
+GPIO4.associatedPins[0].initialValue = "CLEARED";
+GPIO4.associatedPins[0].pin.$assign = "PB13";
+GPIO4.associatedPins[1].$name = "AD1";
+GPIO4.associatedPins[1].direction = "OUTPUT";
+GPIO4.associatedPins[1].initialValue = "CLEARED";
+GPIO4.associatedPins[1].pin.$assign = "PB1";
+GPIO4.associatedPins[2].$name = "AD2";
+GPIO4.associatedPins[2].direction = "OUTPUT";
+GPIO4.associatedPins[2].initialValue = "CLEARED";
+GPIO4.associatedPins[2].pin.$assign = "PB23";
+
 GPIO2.$name = "ENCODER";
 GPIO2.associatedPins.create(8);
 GPIO2.associatedPins[0].$name = "REAR_RIGHT_A";

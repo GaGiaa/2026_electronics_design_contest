@@ -52,3 +52,14 @@ repository build checks unless they have been performed on the physical target.
 
 The debugger can inspect `g_encoder_samples[0]` through
 `g_encoder_samples[3]`. Do not place breakpoints while motors are moving.
+
+The shared application also exposes `g_grayscale_snapshot` for SWD observation.
+The grayscale sensor wiring is AD0=PB13, AD1=PB1, AD2=PB23, OUT=PA27, with EN
+left floating and the sensor powered from a stable separate 5 V supply. Keil
+generates the ADC and GPIO configuration from the CCS-owned SysConfig source;
+do not edit `Generated/` manually. Physical sensor acceptance is separate from
+the Keil build and requires checking all eight address selections.
+The driver exposes `g_grayscale_adc_timeout_count` for SWD diagnostics. After
+downloading a new AXF, a changing `g_grayscale_snapshot.sequence` confirms
+sampling progress; a changing timeout counter means ADC0 is not reporting the
+MEM0 result-complete flag.
