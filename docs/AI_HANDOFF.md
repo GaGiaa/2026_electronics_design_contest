@@ -423,3 +423,32 @@ digital=0x..`。当前默认白值为每路 3000、黑值为每路 500，仅是�
 前三项覆盖 PID 数值、四轮隔离、单轮调试覆盖与模式切换归零；后两项仅构建，不写
 Flash。硬件验收仍须先手动转轮确认编码器符号和单圈计数，再低速逐轮调 PID；未获
 用户明确授权不得执行 Flash `Load`。
+
+## 2026-07-22 分支合并交接
+
+本次以 `develop` 基线 `8e5fe8c` 为目标分支，按顺序使用普通合并提交：
+
+- `f79f611`：合并 `develop_2` 八路灰度传感器接入；
+- `a048193`：合并 `develop_3` 四轮速度闭环与单轮 SWD 调试。
+
+合并后的 G3507 应用同时保留灰度 ADC 采样、四个低有效按键、BMI160、四轮编码器、
+四轮增量式速度 PID、单轮调试入口、WS2812、蜂鸣器和 UART 静态帧队列。电机任务顺序为
+编码器采样、电机控制计算、带符号 PWM 更新；灰度任务每 10 ms 采样，灰度遥测默认关闭；
+四轮目标速度默认全为 0，单轮调试默认停机。
+
+本次合并后已验证：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
+```
+
+上述命令均返回成功。CCS/TI Clang 构建完成 SysConfig 生成、应用 ELF 编译和链接；Keil
+构建生成 AXF、HEX、MAP，UV4 日志为 `0 Error(s), 0 Warning(s)`。构建只更新被忽略的
+`Debug/`、`Generated/` 和 `Objects/` 产物，未执行探针枚举、GDB 服务、Flash 擦除或烧录。
+
+灰度传感器的实际接线、逐路地址响应、白黑标定、UART 实测，以及电机编码器方向/单圈计数、
+低速逐轮 PID 调试仍属于后续硬件验收事项；未完成这些项目时不得宣称实体功能验收完成。
