@@ -7,6 +7,7 @@
 
 #include "board_encoder.h"
 #include "board_bmi160.h"
+#include "board_buttons.h"
 #include "board_buzzer.h"
 #include "board_motor.h"
 #include "board_uart.h"
@@ -19,8 +20,10 @@
 #define UART_TASK_STACK_DEPTH 256U
 #define UART_TX_TASK_STACK_DEPTH 256U
 #define BUZZER_TASK_STACK_DEPTH 128U
+#define BUTTON_TASK_STACK_DEPTH 128U
 #define UART_RX_QUEUE_LENGTH 64U
 #define WS2812_BRIGHTNESS 16U
+#define BUTTON_TASK_INTERVAL_MS 10U
 #define ENCODER_TELEMETRY_ENABLE 0U
 #define ENCODER_TELEMETRY_INTERVAL_MS 100U
 #define ENCODER_TELEMETRY_TASK_STACK_DEPTH 512U
@@ -62,6 +65,8 @@ static StaticTask_t g_uart_task_buffer;
 static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
 static StaticTask_t g_uart_tx_task_buffer;
 static StackType_t g_uart_tx_task_stack[UART_TX_TASK_STACK_DEPTH];
+static StaticTask_t g_button_task_buffer;
+static StackType_t g_button_task_stack[BUTTON_TASK_STACK_DEPTH];
 #if ENCODER_TELEMETRY_ENABLE
 static StaticTask_t g_telemetry_task_buffer;
 static StackType_t g_telemetry_task_stack[ENCODER_TELEMETRY_TASK_STACK_DEPTH];
@@ -78,6 +83,29 @@ static StaticTask_t g_idle_task_buffer;
 static StackType_t g_idle_task_stack[configIDLE_TASK_STACK_DEPTH];
 volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 static volatile uint32_t g_encoder_sample_sequence;
+
+typedef struct {
+    const uint8_t *data;
+    size_t length;
+} button_message_t;
+
+#define BUTTON_MESSAGE(text) { (const uint8_t *)(text), sizeof(text) - 1U }
+
+static const button_message_t g_button_down_messages[BOARD_BUTTON_COUNT] = {
+    BUTTON_MESSAGE("key,pa7=down\r\n"),
+    BUTTON_MESSAGE("key,pb12=down\r\n"),
+    BUTTON_MESSAGE("key,pa8=down\r\n"),
+    BUTTON_MESSAGE("key,pa30=down\r\n")
+};
+static const button_message_t g_button_up_messages[BOARD_BUTTON_COUNT] = {
+    BUTTON_MESSAGE("key,pa7=up\r\n"),
+    BUTTON_MESSAGE("key,pb12=up\r\n"),
+    BUTTON_MESSAGE("key,pa8=up\r\n"),
+    BUTTON_MESSAGE("key,pa30=up\r\n")
+};
+
+#undef BUTTON_MESSAGE
+
 void UART_0_INST_IRQHandler(void) { board_uart_irq_handler(); }
 void GROUP1_IRQHandler(void) { board_encoder_gpioa_irq_handler(); }
 
@@ -148,6 +176,31 @@ static void ws2812_task(void *argument)
             ++pixel_index;
             if (pixel_index == BOARD_WS2812_PIXEL_COUNT) {
                 pixel_index = 0U;
+            }
+        }
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+
+static void button_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval = pdMS_TO_TICKS(BUTTON_TASK_INTERVAL_MS);
+
+    (void)argument;
+    for (;;) {
+        board_buttons_events_t events = board_buttons_scan();
+        uint32_t button;
+
+        for (button = 0U; button < BOARD_BUTTON_COUNT; ++button) {
+            uint32_t mask = 1U << button;
+            if ((events.pressed_mask & mask) != 0U) {
+                board_uart_write(g_button_down_messages[button].data,
+                                 g_button_down_messages[button].length);
+            }
+            if ((events.released_mask & mask) != 0U) {
+                board_uart_write(g_button_up_messages[button].data,
+                                 g_button_up_messages[button].length);
             }
         }
         vTaskDelayUntil(&last_wake_time, interval);
@@ -312,6 +365,7 @@ int main(void)
 {
     QueueHandle_t uart_queue;
     SYSCFG_DL_init();
+    board_buttons_init();
     board_encoder_init();
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
     board_buzzer_init(BUZZER_FREQUENCY_HZ, BUZZER_DUTY_PERCENT);
@@ -320,6 +374,7 @@ int main(void)
     board_uart_enable_rx_interrupt(uart_queue);
     configASSERT(xTaskCreateStatic(motor_task, "motor", MOTOR_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_motor_task_stack, &g_motor_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812", WS2812_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_ws2812_task_stack, &g_ws2812_task_buffer) != NULL);
+    configASSERT(xTaskCreateStatic(button_task, "buttons", BUTTON_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_button_task_stack, &g_button_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx", UART_TX_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_uart_tx_task_stack, &g_uart_tx_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
 #if ENCODER_TELEMETRY_ENABLE

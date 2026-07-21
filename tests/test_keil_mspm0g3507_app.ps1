@@ -103,6 +103,8 @@ Assert-Equal -Actual $target.TargetOption.TargetCommonOption.DebugInformation -E
 Assert-Equal -Actual $compiler.vShortEn -Expected '1' -Description 'short enum ABI'
 Assert-Equal -Actual $compiler.vShortWch -Expected '1' -Description 'short wchar ABI'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\main\.c' -Description 'shared application source'
+Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\board_buttons\.c' -Description 'shared button driver source'
+Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\board_bmi160\.c' -Description 'shared BMI160 driver source'
 Assert-Contains -Path $projectFile -Pattern 'Generated\\ti_msp_dl_config\.c' -Description 'Keil SysConfig C output'
 Assert-Contains -Path $projectFile -Pattern 'freertos_port\\ARM_CM0\\port\.c' -Description 'local Keil FreeRTOS port'
 Assert-NotContains -Path $projectFile -Pattern 'TI_ARM_CLANG' -Description 'Keil project must not use the TI Clang port'

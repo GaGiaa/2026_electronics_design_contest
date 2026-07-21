@@ -333,3 +333,36 @@ imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
 `main.c` 中的 `IMU_TELEMETRY_ENABLE` 是 IMU 串口输出的编译期开关，默认值为
 `0U`。设为 `1U` 后输出初始化状态、采样错误和六轴原始数据；设为 `0U` 时仅
 关闭这些 UART 报文，IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。
+
+### 四个低有效按键
+
+`mspm0g3507_app.syscfg` 新增 `BUTTONS` GPIO 组，按键输入依次为 PA7、PB12、PA8
+和 PA30。四个引脚均为普通输入，不启用 GPIO 中断，也不配置内部上下拉；硬件必须
+提供外部上拉，按下时将输入拉至低电平。
+
+`board_buttons.c/.h` 提供独立的按键状态驱动。`board_buttons_init()` 只记录上电时
+的当前状态，`board_buttons_scan()` 每次扫描要求连续两个相同采样才确认变化。新增的
+静态 `button_task` 每 10 ms 运行一次，按 PA7、PB12、PA8、PA30 顺序经
+`board_uart_write()` 上报稳定边沿：
+
+```text
+key,pa7=down\r\n
+key,pa7=up\r\n
+```
+
+按键任务使用 `BUTTON_TASK_STACK_DEPTH=128U`，不新增队列、不使用中断，也不合并现有
+WS2812、蜂鸣器、IMU、UART 或编码器任务。TI Clang map 中该任务栈为 512 bytes，
+任务控制块为 76 bytes，按键驱动运行态数据为 12 bytes，按键驱动代码约 568 bytes。
+
+已通过以下验证：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
+```
+
+TI Clang 和 Keil 构建均已生成目标文件；Keil 工程同时补齐了此前 BMI160 分支遗漏的
+`board_bmi160.c` 源文件。当前尚未进行四个按键的实体按压、释放和抗抖硬件验收，也未
+执行 Flash 擦除或烧录。

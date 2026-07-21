@@ -102,3 +102,12 @@ performed by the build and test commands.
 to `0U`; set it to `1U` to enable initialization, error, and six-axis IMU UART
 frames. When set to `0U`, only those IMU UART frames are disabled; the IMU task
 continues to initialize BMI160, sample periodically, and retry after failures.
+
+PA7, PB12, PA8, and PA30 are four external-pull-up, active-low button inputs.
+The independent static `button_task` scans them every 10 ms and confirms a
+state after two consecutive samples. Stable press and release edges are sent
+through the serialized UART frame queue in pin order using lines such as
+`key,pa7=down\r\n` and `key,pa7=up\r\n`. SysConfig leaves the internal resistor
+disabled and does not enable GPIO interrupts for these inputs. The button task
+uses a 128-word stack; the TI Clang map reports a 512-byte stack, 76-byte task
+control block, and 12 bytes of button driver state.
