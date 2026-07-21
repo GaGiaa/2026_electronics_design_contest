@@ -114,3 +114,22 @@ control block, and 12 bytes of button driver state. `main.c` provides the
 compile-time `BUTTON_FEATURE_ENABLE` switch, defaulting to `0U`. Setting it to
 `1U` enables button initialization, state scanning, UART reports, and the
 button task's static RAM while keeping the SysConfig pin definitions unchanged.
+## Eight-channel grayscale sensor
+
+The Ganv no-MCU eight-channel sensor uses a 74HC4051 analog multiplexer. Wire
+AD0 to PB13, AD1 to PB1, AD2 to PB23, and OUT to PA27. Leave EN floating; the
+sensor's internal pulldown keeps it enabled. Connect sensor ground to MCU
+ground and power the sensor from a stable separate 5 V supply.
+
+`board_grayscale.c/.h` selects channels in address order: channel 0 is 000 and
+channel 7 is 111. Every channel waits approximately 1 us after address change
+and averages eight single 12-bit ADC conversions. The driver exposes raw and
+0..4095 normalized arrays plus an eight-bit hysteresis result.
+
+`main.c` uses starting calibration arrays of white=3000 and black=500 for all
+channels. These are placeholders for the actual installation; replace them
+with measured per-channel values after fixing sensor height and position.
+`GRAY_TELEMETRY_ENABLE` defaults to `0U`. Set it to `1U` to emit one serialized
+`gray,raw=...,norm=...,digital=0x..` line every 100 ms. The volatile
+`g_grayscale_snapshot` is available for SWD observation even when telemetry is
+disabled. Build success does not constitute physical sensor acceptance.

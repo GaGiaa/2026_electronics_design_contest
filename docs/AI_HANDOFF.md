@@ -368,3 +368,32 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 TI Clang 和 Keil 构建均已生成目标文件；Keil 工程同时补齐了此前 BMI160 分支遗漏的
 `board_bmi160.c` 源文件。当前尚未进行四个按键的实体按压、释放和抗抖硬件验收，也未
 执行 Flash 擦除或烧录。
+### 八路灰度传感器接入
+
+`mspm0g3507_app/board_grayscale.c/.h` 已接入感为无 MCU 八路灰度传感器。
+传感器使用 74HC4051 复用模拟输出，物理接线固定为 AD0 -> PB13、AD1 -> PB1、
+AD2 -> PB23、OUT -> PA27；EN 悬空，利用模块内部下拉保持低电平使能。传感器
+必须与 MCU 共地，并使用稳定的独立 5 V 供电。软件通道顺序为地址升序：通道 0
+对应 AD2:AD1:AD0=000，通道 7 对应 111。
+
+`mspm0g3507_app.syscfg` 将 PA27 配置为 ADC0 单通道、12 位、VDDA 参考，
+PB13/PB1/PB23 配置为 AD0/AD1/AD2 推挽输出。驱动每次切换地址后等待约 1 us，
+对每路执行 8 次单次 ADC 转换并取平均，避免重复转换模式下同步等待无法结束。
+原始值、0..4095 归一化值和带滞回的 8 位数字值发布到 `g_grayscale_snapshot`。
+
+应用灰度任务使用静态内存，每 10 ms 采样一次；`GRAY_TELEMETRY_ENABLE` 默认
+为 `0U`，设为 `1U` 后每 100 ms 通过现有串行帧队列输出 `gray,raw=...,norm=...,
+digital=0x..`。当前默认白值为每路 3000、黑值为每路 500，仅是起始标定参数，
+必须在固定实际安装高度后替换为实测值。
+
+本次已完成灰度静态集成检查、CCS SysConfig/TI Clang 构建和 Keil SysConfig/UV4
+构建。Keil 构建日志为 `0 Error(s), 0 Warning(s)`，并生成 AXF/HEX。尚未完成
+灰度传感器实物接线、烧录、逐路地址响应、白黑读数和 UART 实测验收；不能仅凭
+编译结果宣称硬件验收完成。
+
+后续修复：Keil 某些 SysConfig 生成结果只生成 ADC memory 配置，没有生成
+`DL_ADC12_initSingleSample()`，导致灰度任务在 `DL_ADC12_isConversionStarted()`
+等待处停住，`g_grayscale_snapshot.sequence` 保持 0。`board_grayscale_init()`
+现在显式关闭并初始化 ADC 为单次、自动采样、软件触发、12 位无符号模式后再
+重新使能，避免依赖生成器是否输出该控制模式初始化。修复已通过 CCS/Keil
+构建；仍需用最新 AXF/HEX 重新下载后进行硬件确认。
