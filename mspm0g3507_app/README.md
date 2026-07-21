@@ -28,3 +28,29 @@ every 10 ms. Forward drives IN1 with PWM and holds IN2 low; reverse does the
 opposite. The motor supply, driver and MCU must share ground. Hardware
 acceptance starts with one wheel at a low duty cycle and requires explicit
 authorization before any Flash write.
+
+Each wheel also has an AB incremental encoder. The logical front-left, front-right,
+rear-left and rear-right encoder A/B pins are PA16/PB20, PA14/PA9, PA15/PB24 and
+PA17/PA22 respectively. Inputs use pull-ups; each A phase interrupts on both edges
+and the B phase determines direction. `board_encoder` defaults to 1040 A-phase
+edges per wheel revolution (twice the reference single-edge 520 count) and a 48 mm
+wheel diameter. Every 10 ms motor-task iteration samples the signed encoder delta,
+accumulated count and calculated mm/s speed before updating PWM. The current PWM
+commands remain open loop. Hardware validation must confirm count polarity for each
+wheel and calibrate the counts-per-revolution constant against one physical turn.
+
+For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
+snapshot written by the 10 ms motor task and can be watched through SWD without
+adding breakpoints. A lower-priority telemetry task also transmits one line every
+100 ms through UART0. Each wheel is reported as `delta_counts,total_counts,speed`:
+
+```text
+enc,fl=12,1240,181,fr=11,1228,165,rl=12,1237,181,rr=11,1221,165
+```
+
+Speed is truncated to integer mm/s in the serial frame. UART echo and telemetry
+enqueue whole messages to a static frame queue, and one transmit task owns the
+hardware FIFO so bytes from different messages cannot interleave. Telemetry does
+not run in the encoder ISR or motor task. For initial validation,
+use the debugger without breakpoints to turn one wheel by hand and confirm count
+sign and isolation before driving the chassis at low duty.

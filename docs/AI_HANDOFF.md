@@ -149,3 +149,82 @@ PB4/PB5、后左 PA28/PA31、后右 PA12/PA13。四组定时器均为 40 MHz 时
 PB4/PB5，逻辑后左使用 PA28/PA31 且正反方向反相，逻辑后右使用 PA12/PA13。
 因此，四个逻辑轮位的 `BOARD_MOTOR_DIRECTION_FORWARD` 都表示车辆前进方向。重新接线或
 更换电机驱动板后，必须重新进行单轮校准。
+
+### 四轮编码器采样
+
+`mspm0g3507_app/board_encoder.*` 提供四轮 AB 相增量编码器的独立驱动，逻辑轮位的 A/B
+输入依次为：前左 PA16/PB20、前右 PA14/PA9、后左 PA15/PB24、后右 PA17/PA22。八个输入
+均为上拉，四个 A 相配置双沿 GPIO 中断，B 相仅在 A 相边沿时读取以判定方向；GPIO 中断不调用
+FreeRTOS API。默认以参考电机的单沿 520 计数为依据，采用 A 相双沿的
+`BOARD_ENCODER_COUNTS_PER_REVOLUTION=1040` 与 `BOARD_ENCODER_WHEEL_DIAMETER_MM=48`。
+
+电机静态任务仍以 10 ms 周期运行，且每轮均先通过 `board_encoder_sample()` 原子取得并清零本周期
+有符号计数，再按原有开环方向和占空比命令更新 PWM。采样结构包含 `delta_counts`、
+`total_counts` 和 `speed_mm_per_s`；本次未引入 PI 闭环或改变默认 0% 停转。已于 2026-07-21
+通过 `tests/test_mspm0g3507_app.ps1` 静态集成检查，并通过
+`tools/build-mspm0g3507-app.ps1` 的 SysConfig 生成、TI Clang 编译和 ELF 链接。已执行 app ELF
+烧录；用户已确认烧录后的 UART 遥测和串口回显恢复正常。编码器计数正负方向和完整一圈脉冲数仍须
+逐轮低占空比确认，并据此校准 1040 常量。
+
+### 编码器观测与遥测
+
+应用的 `main.c` 导出 `volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT]`，
+由 10 ms 电机任务在完成四轮采样后写入。SWD 调试时可在 Live Expressions/Watch 中观察该全局数组，
+但禁止在电机运动中设置断点，以免暂停 PWM、FreeRTOS 时基和编码器边沿处理。推荐先在不驱动或低占空比
+条件下手动逐轮转动，确认单轮隔离、正反向计数符号和一圈脉冲数。
+
+低优先级遥测任务每 100 ms 经 UART0 输出一行 `enc` CSV 数据；每轮字段顺序是
+`delta_counts,total_counts,speed_mm_per_s`，速度以截断后的整数 mm/s 表示。UART 回显和遥测均通过
+`board_uart_write()` 入队，内部使用静态帧队列；专用 `board_uart_tx_task` 独占 UART FIFO，
+确保完整报文不会互相交错。工程仍禁用动态内存分配，遥测不得移动到 GPIO ISR 或 10 ms 电机任务中。
+首次硬件测试时，GDB 确认 `telemetry` 任务触发了 `vApplicationStackOverflowHook()`；原因是包含多次
+格式化调用的遥测任务仅有 256 words 栈。已将 `ENCODER_TELEMETRY_TASK_STACK_DEPTH` 增至 512U，
+并由 `tests/test_mspm0g3507_app.ps1` 固定检查。重新构建、烧录后，用户已确认 100 ms `enc` 遥测和
+UART 回显均正常。
+
+### 当前工作树交接状态
+
+本次工作位于 `develop_1` 分支，本次新增/修改内容如下：
+
+- `mspm0g3507_app/board_encoder.c/.h`：四轮 GPIO 编码器驱动。参考工程只用于提取引脚和 520
+  计数参数；新驱动未复用参考代码。A 相使用双沿 GPIOA 中断，B 相在边沿时读取判向；引脚为
+  前左 PA16/PB20、前右 PA14/PA9、后左 PA15/PB24、后右 PA17/PA22。驱动使用 SysConfig
+  生成的 `ENCODER_*` 宏，不要手工编辑 `Debug/ti_msp_dl_config.*`。
+- `mspm0g3507_app/main.c`：`motor_task` 仍为 10 ms，循环顺序固定为四轮编码器采样、再四轮
+  PWM 输出。`g_encoder_samples[BOARD_MOTOR_COUNT]` 是可通过 SWD Watch/Live Expressions 观察的
+  `volatile` 全局数组；序列号用于遥测任务读取一致快照。遥测任务栈为 512 words，避免格式化
+  编码器报文时触发 FreeRTOS 栈溢出。
+- UART 观测：`telemetry_task` 优先级 0、周期 100 ms，输出格式为
+  `enc,fl=delta,total,speed,fr=delta,total,speed,rl=delta,total,speed,rr=delta,total,speed`，
+  速度为截断整数 mm/s。`board_uart_write()` 将整帧复制到 8 槽静态发送队列；
+  `board_uart_tx_task` 优先级 1 独占发送 FIFO，回显任务和遥测任务不直接操作 FIFO，避免之前
+  “遥测持锁轮询 FIFO 导致回显接收队列溢出”的问题。
+- `mspm0g3507_app/FreeRTOSConfig.h`：动态内存仍为禁用状态；不需要 `configUSE_MUTEXES`。
+- `tests/test_mspm0g3507_app.ps1`：已覆盖编码器文件、八个引脚、A 相双沿/B 相上拉、任务顺序、
+  快照全局变量、遥测任务、静态 UART 帧队列和构建脚本接入。
+- `tools/build-mspm0g3507-app.ps1`：已加入 `board_encoder.c`，SysConfig 生成文件仍由脚本生成。
+
+最近验证证据：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+```
+
+两条命令在当前 512-word telemetry 栈版本均返回成功。构建只产生/更新被忽略的
+`mspm0g3507_app/Debug/` 产物。SysConfig 仍会输出既有的 Flash 状态位和 PWM/低功耗保持提示，
+这些不是本次构建失败。随后已烧录该 app ELF，用户确认 UART 遥测和回显均恢复正常。
+
+下一步优先级：
+
+1. 保持四路占空比 0%，通过 SWD 手动转轮，观察 `g_encoder_samples` 的单轮隔离、正反
+   符号和一圈脉冲数；确认后再设置一个轮子的低占空比。
+2. 持续接收 UART0 PA10/PA11 的 100 ms `enc` 报文，确认回显与遥测不交错。若需连续主机输入，
+   重点观察 `board_uart_rx_overflow_count()` 是否保持不变。
+3. 以实测完整一圈计数校准 `BOARD_ENCODER_COUNTS_PER_REVOLUTION`；当前默认是 A 相双沿的 1040，
+   不是硬件 QEI 四倍计数。
+
+已知设计边界：MSPM0G3507 这块硬件只有一个可用定时器 QEI，当前八根参考编码器线也不能组成
+四组同一 `TIMGx` 的 CCP0/CCP1，因此本版本明确采用 GPIO 中断。不要在没有重新分配硬件引脚和
+确认定时器资源前，把四路 GPIO 驱动改成“四个 QEI”或盲目改成 Timer Capture；Timer Capture
+本身不能自动完成 AB 相方向解码。
