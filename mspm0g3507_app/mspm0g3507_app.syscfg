@@ -7,12 +7,63 @@
 const Board = scripting.addModule("/ti/driverlib/Board", {}, false);
 const GPIO = scripting.addModule("/ti/driverlib/GPIO", {}, false);
 const GPIO1 = GPIO.addInstance();
+const PWM = scripting.addModule("/ti/driverlib/PWM", {}, false);
+const PWMFrontLeft = PWM.addInstance();
+const PWMFrontRight = PWM.addInstance();
+const PWMRearLeft = PWM.addInstance();
+const PWMRearRight = PWM.addInstance();
 const SPI = scripting.addModule("/ti/driverlib/SPI", {}, false);
 const SPI1 = SPI.addInstance();
 const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
 const UART = scripting.addModule("/ti/driverlib/UART", {}, false);
 const UART1 = UART.addInstance();
+const hfxT = system.clockTree["HFXT"];
+const pllQDiv = system.clockTree["PLL_QDIV"];
+const hsclkMux = system.clockTree["HSCLKMUX"];
+const ulpDiv = system.clockTree["UDIV"];
+
+hfxT.inputFreq = 40;
+hfxT.enable = true;
+pllQDiv.multiplyValue = 5;
+hsclkMux.inputSelect = "HSCLKMUX_SYSPLL0";
+ulpDiv.divideValue = 2;
+
 Board.configureUnused = true;
+PWMFrontLeft.$name = "MOTOR_FRONT_LEFT";
+PWMFrontLeft.timerStartTimer = true;
+PWMFrontLeft.pwmMode = "EDGE_ALIGN_UP";
+PWMFrontLeft.timerCount = 4000;
+PWMFrontLeft.peripheral.$assign = "TIMG0";
+PWMFrontLeft.peripheral.ccp0Pin.$assign = "PA12";
+PWMFrontLeft.peripheral.ccp1Pin.$assign = "PA13";
+
+PWMFrontRight.$name = "MOTOR_FRONT_RIGHT";
+PWMFrontRight.timerStartTimer = true;
+PWMFrontRight.pwmMode = "EDGE_ALIGN_UP";
+PWMFrontRight.clockDivider = 2;
+PWMFrontRight.timerCount = 4000;
+PWMFrontRight.peripheral.$assign = "TIMG7";
+PWMFrontRight.peripheral.ccp0Pin.$assign = "PA28";
+PWMFrontRight.peripheral.ccp1Pin.$assign = "PA31";
+
+PWMRearLeft.$name = "MOTOR_REAR_LEFT";
+PWMRearLeft.timerStartTimer = true;
+PWMRearLeft.pwmMode = "EDGE_ALIGN_UP";
+PWMRearLeft.clockPrescale = 2;
+PWMRearLeft.timerCount = 4000;
+PWMRearLeft.peripheral.$assign = "TIMG6";
+PWMRearLeft.peripheral.ccp0Pin.$assign = "PA29";
+PWMRearLeft.peripheral.ccp1Pin.$assign = "PB27";
+
+PWMRearRight.$name = "MOTOR_REAR_RIGHT";
+PWMRearRight.timerStartTimer = true;
+PWMRearRight.pwmMode = "EDGE_ALIGN_UP";
+PWMRearRight.clockDivider = 2;
+PWMRearRight.timerCount = 4000;
+PWMRearRight.peripheral.$assign = "TIMA1";
+PWMRearRight.peripheral.ccp0Pin.$assign = "PB4";
+PWMRearRight.peripheral.ccp1Pin.$assign = "PB5";
+
 SPI1.$name = "SPI_WS2812";
 SPI1.targetBitRate = 2666667;
 SPI1.phase = "0";
@@ -23,6 +74,7 @@ SPI1.peripheral.$assign = "SPI1";
 SPI1.peripheral.sclkPin.$assign = "PB9";
 SPI1.peripheral.mosiPin.$assign = "PB22";
 SYSCTL.clockTreeEn = true;
+SYSCTL.forceDefaultClkConfig = true;
 UART1.$name = "UART_0";
 UART1.profile = "CONFIG_PROFILE_1";
 UART1.targetBaudRate = 115200;

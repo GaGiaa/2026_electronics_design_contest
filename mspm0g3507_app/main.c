@@ -4,16 +4,29 @@
 #include <queue.h>
 #include <task.h>
 
+#include "board_motor.h"
 #include "board_uart.h"
 #include "board_ws2812.h"
 #include "ti_msp_dl_config.h"
 
 #define APP_TASK_PRIORITY 1U
+#define MOTOR_TASK_STACK_DEPTH 256U
 #define WS2812_TASK_STACK_DEPTH 256U
 #define UART_TASK_STACK_DEPTH 256U
 #define UART_RX_QUEUE_LENGTH 64U
 #define WS2812_BRIGHTNESS 16U
 
+#define MOTOR_FRONT_LEFT_DIRECTION BOARD_MOTOR_DIRECTION_STOP
+#define MOTOR_FRONT_LEFT_DUTY_PERCENT 0U
+#define MOTOR_FRONT_RIGHT_DIRECTION BOARD_MOTOR_DIRECTION_STOP
+#define MOTOR_FRONT_RIGHT_DUTY_PERCENT 0U
+#define MOTOR_REAR_LEFT_DIRECTION BOARD_MOTOR_DIRECTION_STOP
+#define MOTOR_REAR_LEFT_DUTY_PERCENT 0U
+#define MOTOR_REAR_RIGHT_DIRECTION BOARD_MOTOR_DIRECTION_STOP
+#define MOTOR_REAR_RIGHT_DUTY_PERCENT 0U
+
+static StaticTask_t g_motor_task_buffer;
+static StackType_t g_motor_task_stack[MOTOR_TASK_STACK_DEPTH];
 static StaticTask_t g_ws2812_task_buffer;
 static StackType_t g_ws2812_task_stack[WS2812_TASK_STACK_DEPTH];
 static StaticTask_t g_uart_task_buffer;
@@ -24,6 +37,25 @@ static StaticTask_t g_idle_task_buffer;
 static StackType_t g_idle_task_stack[configIDLE_TASK_STACK_DEPTH];
 
 void UART_0_INST_IRQHandler(void) { board_uart_irq_handler(); }
+
+static void motor_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval = pdMS_TO_TICKS(10U);
+
+    (void)argument;
+    for (;;) {
+        board_motor_set(BOARD_MOTOR_FRONT_LEFT, MOTOR_FRONT_LEFT_DIRECTION,
+                        MOTOR_FRONT_LEFT_DUTY_PERCENT);
+        board_motor_set(BOARD_MOTOR_FRONT_RIGHT, MOTOR_FRONT_RIGHT_DIRECTION,
+                        MOTOR_FRONT_RIGHT_DUTY_PERCENT);
+        board_motor_set(BOARD_MOTOR_REAR_LEFT, MOTOR_REAR_LEFT_DIRECTION,
+                        MOTOR_REAR_LEFT_DUTY_PERCENT);
+        board_motor_set(BOARD_MOTOR_REAR_RIGHT, MOTOR_REAR_RIGHT_DIRECTION,
+                        MOTOR_REAR_RIGHT_DUTY_PERCENT);
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
 
 static void ws2812_task(void *argument)
 {
@@ -93,6 +125,7 @@ int main(void)
     uart_queue = xQueueCreateStatic(UART_RX_QUEUE_LENGTH, sizeof(uint8_t), g_uart_queue_storage, &g_uart_queue_buffer);
     configASSERT(uart_queue != NULL);
     board_uart_enable_rx_interrupt(uart_queue);
+    configASSERT(xTaskCreateStatic(motor_task, "motor", MOTOR_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_motor_task_stack, &g_motor_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812", WS2812_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_ws2812_task_stack, &g_ws2812_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
     vTaskStartScheduler();

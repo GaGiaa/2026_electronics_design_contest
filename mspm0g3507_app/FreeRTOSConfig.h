@@ -1,7 +1,7 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
-#define configCPU_CLOCK_HZ                         (32000000UL)
+#define configCPU_CLOCK_HZ                         (80000000UL)
 #define configTICK_RATE_HZ                          1000U
 #define configENABLE_MPU                            0
 #define configUSE_PREEMPTION                        1
