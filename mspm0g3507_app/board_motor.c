@@ -58,3 +58,20 @@ void board_motor_set(board_motor_wheel_t wheel, board_motor_direction_t directio
         break;
     }
 }
+
+void board_motor_set_signed_duty(board_motor_wheel_t wheel, float duty_percent)
+{
+    if (duty_percent > 100.0f) {
+        duty_percent = 100.0f;
+    } else if (duty_percent < -100.0f) {
+        duty_percent = -100.0f;
+    }
+
+    if (duty_percent > 0.0f) {
+        board_motor_set(wheel, BOARD_MOTOR_DIRECTION_FORWARD, (uint8_t)duty_percent);
+    } else if (duty_percent < 0.0f) {
+        board_motor_set(wheel, BOARD_MOTOR_DIRECTION_REVERSE, (uint8_t)(-duty_percent));
+    } else {
+        board_motor_set(wheel, BOARD_MOTOR_DIRECTION_STOP, 0U);
+    }
+}

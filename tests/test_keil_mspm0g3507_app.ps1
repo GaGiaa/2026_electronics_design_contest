@@ -106,6 +106,8 @@ Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\main\.c
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\board_buttons\.c' -Description 'shared button driver source'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\board_bmi160\.c' -Description 'shared BMI160 driver source'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\board_grayscale\.c' -Description 'shared grayscale source'
+Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\motor_control\.c' -Description 'Keil project must compile the motor control layer'
+Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\motor_pid\\pid\.c' -Description 'Keil project must compile the PID core'
 Assert-Contains -Path $projectFile -Pattern 'Generated\\ti_msp_dl_config\.c' -Description 'Keil SysConfig C output'
 Assert-Contains -Path $projectFile -Pattern 'freertos_port\\ARM_CM0\\port\.c' -Description 'local Keil FreeRTOS port'
 Assert-NotContains -Path $projectFile -Pattern 'TI_ARM_CLANG' -Description 'Keil project must not use the TI Clang port'

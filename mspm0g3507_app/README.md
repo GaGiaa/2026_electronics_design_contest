@@ -22,11 +22,10 @@ PA29/PB27, front-right to PB4/PB5, rear-left to PA28/PA31, and rear-right to
 PA12/PA13. The logical rear-left wheel reverses the PWM input order because
 its motor polarity is opposite. `BOARD_MOTOR_DIRECTION_FORWARD` therefore
 means vehicle-forward motion for every logical wheel.
-`main.c` contains separate direction and duty-percent macros for every wheel;
-all default to stop and 0 percent. The static motor task applies the macros
-every 10 ms. Forward drives IN1 with PWM and holds IN2 low; reverse does the
-opposite. The motor supply, driver and MCU must share ground. Hardware
-acceptance starts with one wheel at a low duty cycle and requires explicit
+`board_motor_set_signed_duty()` converts signed duty commands into the existing
+forward/reverse dual-PWM mapping. Positive duty means vehicle-forward motion and
+negative duty means reverse. The motor supply, driver and MCU must share ground.
+Hardware acceptance starts with one wheel at a low duty cycle and requires explicit
 authorization before any Flash write.
 
 Each wheel also has an AB incremental encoder. Hardware calibration found that the
@@ -39,19 +38,34 @@ direction. `board_encoder` still defaults to 1040 A-phase edges per wheel
 revolution (twice the reference single-edge 520 count) and a 48 mm wheel diameter;
 the counts-per-revolution value remains subject to one-physical-turn measurement.
 Every 10 ms motor-task iteration samples the signed encoder delta, accumulated count
-and calculated mm/s speed before updating PWM. The current PWM commands remain open
-loop.
+and calculated mm/s speed before updating PWM. It runs one incremental PID speed
+controller per wheel. `motor_pid/` is a controlled copy of only the platform-
+independent PID core from the external MotorLib; CAN protocols, STM32 HAL, DJI, and
+RobStride code are intentionally not included. The SWD-writable
+`volatile g_motor_speed_targets_mm_s[4]` array supplies normal four-wheel mm/s
+targets and starts with all targets at zero.
+
+`volatile g_motor_debug` provides a single-wheel SWD override. Set `enable`, select
+`wheel`, and choose `MOTOR_CONTROL_DEBUG_MODE_STOP`,
+`MOTOR_CONTROL_DEBUG_MODE_PWM`, or `MOTOR_CONTROL_DEBUG_MODE_SPEED`. PWM mode uses
+signed `target_duty_percent`; speed mode uses `target_speed_mm_per_s` and writable
+`speed_pid_params` (`kp`, `ki`, `kd`, `output_limit`, `deadband`). Output is clamped
+to signed 100 percent. When enabled, debug stops all non-selected wheels. Enabling
+debug or changing its wheel or mode resets controller state and holds every wheel at
+zero for one 10 ms control step before output resumes. Do not set breakpoints while a
+motor is moving.
 
 For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without
 adding breakpoints. A lower-priority telemetry task also transmits one line every
-100 ms through UART0. Each wheel is reported as `delta_counts,total_counts,speed`:
+100 ms through UART0. Each wheel is reported as
+`target_mm_s,feedback_mm_s,p,i,d,duty_percent`:
 
 ```text
-enc,fl=12,1240,181,fr=11,1228,165,rl=12,1237,181,rr=11,1221,165
+ctl,fl=200,181,2,0,0,2,fr=0,0,0,0,0,0,rl=0,0,0,0,0,0,rr=0,0,0,0,0,0,dbg=0,0,0,0,0,0,0
 ```
 
-Speed is truncated to integer mm/s in the serial frame. UART echo and telemetry
+All values are truncated to signed integers in the serial frame. UART echo and telemetry
 enqueue whole messages to a static frame queue, and one transmit task owns the
 hardware FIFO so bytes from different messages cannot interleave. Telemetry does
 not run in the encoder ISR or motor task. For initial validation,
@@ -59,7 +73,7 @@ use the debugger without breakpoints to turn one wheel by hand and confirm count
 sign and isolation before driving the chassis at low duty.
 
 `main.c` provides the compile-time `ENCODER_TELEMETRY_ENABLE` switch. It defaults
-to `0U`; set it to `1U` to enable the periodic `enc` UART frames and telemetry
+to `0U`; set it to `1U` to enable the periodic `ctl` UART frames and telemetry
 task. Encoder sampling in the motor task, the debugger-visible sample snapshot,
 IMU output, UART echo, and the UART transmit task remain enabled.
 

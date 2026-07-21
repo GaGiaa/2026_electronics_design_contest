@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>__MSPM0G3507__</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\mspm0g3507_app;.\Generated;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\source;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\source\third_party\CMSIS\Core\Include;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
+              <IncludePath>..\..\mspm0g3507_app;..\..\mspm0g3507_app\motor_pid;.\Generated;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\source;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\source\third_party\CMSIS\Core\Include;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -418,6 +418,16 @@
               <FileName>board_motor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\board_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\motor_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\motor_pid\pid.c</FilePath>
             </File>
             <File>
               <FileName>board_uart.c</FileName>
