@@ -74,6 +74,34 @@
       "problemMatcher": []
     },
     {
+      "label": "MSPM0G3507 App: Start pyOCD GDB server",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\start-mspm0g3507-app-debug.ps1"],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "pyocd",
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^Starting pyOCD GDB server",
+          "endsPattern": "GDB server listening on port 3333"
+        }
+      }
+    },
+    {
+      "label": "MSPM0G3507 App: Prepare debug",
+      "dependsOn": ["MSPM0G3507 App: Build", "MSPM0G3507 App: Start pyOCD GDB server"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "MSPM0G3507 App: Stop pyOCD GDB server",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\stop-mspm0g3507-app-debug.ps1"],
+      "problemMatcher": []
+    },
+    {
       "label": "MSPM0: List pyOCD probes",
       "type": "shell",
       "command": "powershell",

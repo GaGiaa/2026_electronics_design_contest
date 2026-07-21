@@ -68,12 +68,14 @@ $rtosConfig = Join-Path $projectDir 'FreeRTOSConfig.h'
 $ccsBuildConfig = Join-Path $projectDir '.cproject'
 $buildScript = Join-Path $ProjectRoot 'tools\build-mspm0g3507-app.ps1'
 $flashScript = Join-Path $ProjectRoot 'tools\flash-and-debug-g3507.ps1'
+$debugStartScript = Join-Path $ProjectRoot 'tools\start-mspm0g3507-app-debug.ps1'
+$debugStopScript = Join-Path $ProjectRoot 'tools\stop-mspm0g3507-app-debug.ps1'
 $tasks = Join-Path $ProjectRoot '.vscode\tasks.json'
 $launch = Join-Path $ProjectRoot '.vscode\launch.json'
 $gitIgnore = Join-Path $ProjectRoot '.gitignore'
 
 foreach ($path in @($projectDir, $main, $ws2812, $ws2812Header, $buzzer, $buzzerHeader, $uart, $motor, $motorHeader, $encoder, $encoderHeader, $syscfg, $rtosConfig, $ccsBuildConfig,
-                        $buildScript, $flashScript, $tasks, $launch, $gitIgnore)) {
+                         $buildScript, $flashScript, $debugStartScript, $debugStopScript, $tasks, $launch, $gitIgnore)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "MSPM0G3507 app project is incomplete: $path is missing."
     }
@@ -233,8 +235,15 @@ Assert-Contains -Path $buildScript -Pattern 'board_motor\.c' -Description 'Build
 Assert-Contains -Path $buildScript -Pattern 'board_encoder\.c' -Description 'Build must compile the encoder driver'
 Assert-Contains -Path $buildScript -Pattern 'board_buzzer\.c' -Description 'Build must compile the buzzer driver'
 Assert-Contains -Path $flashScript -Pattern "'app'" -Description 'Flash script must select the app ELF explicitly'
+Assert-Contains -Path $debugStartScript -Pattern "'-m', 'pyocd', 'gdbserver'" -Description 'App debug task must use the Python pyOCD module entry point'
+Assert-Contains -Path $debugStartScript -Pattern 'ProbeUid\s*=\s*''2dd0719d''' -Description 'App debug task must select the calibrated DAPLink probe'
+Assert-Contains -Path $debugStartScript -Pattern "'--frequency', '1000000'" -Description 'App debug task must use a stable 1 MHz SWD clock'
+Assert-Contains -Path $debugStopScript -Pattern "'monitor exit'" -Description 'App debug cleanup must request a graceful pyOCD shutdown'
 Assert-Contains -Path $tasks -Pattern 'MSPM0G3507 App: Build' -Description 'VS Code must provide an app build task'
+Assert-Contains -Path $tasks -Pattern 'MSPM0G3507 App: Prepare debug' -Description 'VS Code must prepare the app build and GDB server automatically'
+Assert-Contains -Path $tasks -Pattern 'GDB server listening on port 3333' -Description 'VS Code must wait for the GDB server readiness event'
 Assert-Contains -Path $launch -Pattern 'MSPM0G3507 App: Attach to pyOCD' -Description 'VS Code must provide an app attach configuration'
+Assert-Contains -Path $launch -Pattern '"gdbTarget": "localhost:3333"' -Description 'App debug must attach to the automatically managed GDB server'
 Assert-Contains -Path $gitIgnore -Pattern '/mspm0g3507_app/Debug/' -Description 'App Debug output must be ignored'
 
 Write-Host 'PASS: MSPM0G3507 app static integration checks passed.'

@@ -252,3 +252,22 @@ The generated `ENCODER_*` macros now represent these logical positions directly;
 `board_encoder_gpioa_irq_handler()` only applies the two calibrated direction
 signs. The PWM motor mapping is unchanged. `BOARD_ENCODER_COUNTS_PER_REVOLUTION`
 is still 1040 until each wheel is measured over a known number of physical turns.
+
+### VS Code automatic pyOCD debug update
+
+The MSPM0G3507 app debug configuration now uses an external GDB target on
+`localhost:3333`, but VS Code starts and stops that target automatically through
+the `MSPM0G3507 App: Prepare debug` and `MSPM0G3507 App: Stop pyOCD GDB server`
+tasks. The start task runs the repository virtual environment's Python module
+entry point (`python -m pyocd gdbserver`) instead of relying on the Cortex-Debug
+pyOCD launcher. It selects probe UID `2dd0719d`, uses 1 MHz SWD, the G3507 pack,
+and does not program Flash. `postDebugTask` sends the pyOCD `monitor exit`
+command through GDB so the CMSIS-DAP session closes cleanly.
+
+The direct hardware verification on 2026-07-21 established that the same pack,
+probe UID, and target can initialize the MSPM0G3507 DP/AHB-AP/Cortex-M0+ and
+listen on GDB ports 3333/4444. An ARM GDB batch connection read
+`g_encoder_samples` at `0x20202530` and read its delta, total, and speed fields.
+Static app tests and the TI Clang app build also passed. The remaining acceptance
+step is to run the VS Code green-button flow on the user's desktop and confirm
+the Watch view shows the live `g_encoder_samples[0..3]` values.

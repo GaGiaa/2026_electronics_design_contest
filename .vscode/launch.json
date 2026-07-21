@@ -47,7 +47,8 @@
       "executable": "${workspaceFolder}/mspm0g3507_app/Debug/mspm0g3507_app.out",
       "gdbPath": "D:/Software/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb.exe",
       "device": "MSPM0G3507",
-      "preLaunchTask": "MSPM0G3507 App: Build"
+      "preLaunchTask": "MSPM0G3507 App: Prepare debug",
+      "postDebugTask": "MSPM0G3507 App: Stop pyOCD GDB server"
     }
   ]
 }
