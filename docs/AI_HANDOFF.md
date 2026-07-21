@@ -240,3 +240,41 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 响/停，禁用时驱动初始化后保持 PA2 低电平且不创建任务。已验证 SysConfig 生成、
 静态集成测试与 TI Clang 构建；尚未进行 Flash 写入或蜂鸣器硬件实测。蜂鸣器驱动
 电路必须与 MCU 共地。
+
+### BMI160 六轴 IMU 接入
+
+BMI160 首版使用 G3507 的独立硬件 SPI0，不使用原接线图中的 I2C 方案。
+MSPM0G3507 的 PB17/PB18 没有 I2C 复用，但支持 SPI0：模块 `SCK` 接 PB18，
+`SDI`/MOSI 接 PB17，`SDO`/MISO 接 PB19，低有效 `CS` 接 PB0。PA21 保留给
+后续数据就绪中断，首版不启用；SPI 模式下 SA0 不参与地址选择。SPI1 仍由
+WS2812 使用。
+
+模块必须使用 3.3 V 并与 MCU 共地；不要在未核对模块原理图前同时给 VIN 和
+3V3 供电。若模块只有 SDA/SCL 标注，必须确认其是否支持 SPI 并找出独立的
+SDI、SDO 和 SCK 引脚，不能把 I2C SDA 直接当作完整 SPI 接线。
+
+`mspm0g3507_app.syscfg` 中的 `SPI_BMI160` 配置为 SPI0、8 MHz、8 位、MSB
+first、Motorola mode 3，PB0 配置为高电平空闲 GPIO CS。上电后驱动先拉低再
+拉高 CS 并发送一次 `0xFF` dummy SPI 事务，以完成 BMI160 的 SPI 接口选择；该
+启动步骤与 Bosch COINES 和公开 SPI 移植例程一致。该模式与 Bosch BMI160_SensorAPI
+官方 `read_sensor_data` 例程一致。`board_bmi160.c/.h` 提供
+`board_bmi160_init(uint8_t *)` 和 `board_bmi160_read_sample(...)`，使用状态码、
+有界 SPI 超时和 CS 错误释放。初始化读取 `CHIP_ID` 并要求 `0xD1`，执行软复位，
+配置加速度计 ±4g/100 Hz、陀螺仪 ±500dps/100 Hz；软复位后按 Bosch 官方流程读取
+0x7F 重新启用 SPI，并在每次寄存器写入后等待 1 ms，再从陀螺仪数据起始寄存器
+0x0C 连续读取至加速度数据结束寄存器 0x17 的 12 字节，并按“陀螺仪三轴在前、
+加速度三轴在后”解析六个有符号原始值。
+
+独立静态 FreeRTOS IMU 任务每 10 ms 读取一次数据，并复用目标基线已有的
+`board_uart_write()` 静态帧队列输出：
+
+```text
+bmi160,id=0xD1,status=0
+imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
+```
+
+初始化失败每秒重试，连续三次采样失败后重新初始化。当前已完成目标提交
+`2f644e99dd4606ab2ba911fb29d4e2e813da77c9` 基线迁移、静态集成检查、SysConfig
+生成和 TI Clang 构建。硬件已验证 `CHIP_ID=0xD1`、静止 Z 轴约 1g、陀螺仪三轴
+接近 0dps，编码器遥测、IMU 报文和 UART 回显未出现交叉损坏。后续烧录仍需
+遵循明确授权原则。

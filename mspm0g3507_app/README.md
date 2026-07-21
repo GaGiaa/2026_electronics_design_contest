@@ -67,3 +67,30 @@ The defaults are disabled, 2000 Hz, 50 percent, 200 ms on, and 1800 ms off.
 When enabled, a dedicated static FreeRTOS task repeats the on/off interval;
 when disabled, the PWM is initialized with a zero compare value and no buzzer
 task is created. The passive buzzer driver circuit and MCU must share ground.
+
+BMI160 uses the independent SPI0 controller. The module wiring is `SCK` to PB18,
+`SDI`/MOSI to PB17, `SDO`/MISO to PB19, and active-low `CS` to PB0. PA21 is
+reserved for a future data-ready interrupt and is not used by the first version.
+SPI1 remains dedicated to WS2812. The BMI160 module must use 3.3 V and share
+ground with the MCU; do not power both VIN and 3V3 unless the module schematic
+explicitly requires it. In SPI mode, SA0 is not an address setting.
+
+At startup the driver generates one CS low-to-high dummy SPI transaction, as
+required by the Bosch reference flow to select SPI after power-up. Then
+`board_bmi160.c/.h` validates the `CHIP_ID` (`0xD1`), performs the soft reset,
+starts the accelerometer and gyroscope, and configures 100 Hz with ±4g and
+±500dps ranges. The driver performs the official post-reset SPI communication
+test and waits 1 ms after each register write. It also verifies the error,
+power-mode, ODR, bandwidth, and range registers before reporting success. A
+static FreeRTOS task reads the 12-byte acceleration-plus-
+gyroscope register block (`0x0C` through `0x17`, gyro first) every 10 ms. The SPI controller uses Motorola mode 3 to match
+the Bosch reference example. It reports `bmi160,id=...` during initialization
+and compact `imu,ax=...,ay=...,az=...,gx=...,gy=...,gz=...` lines through the
+existing static UART frame queue. SPI transactions have bounded timeouts;
+initialization retries after one second and three consecutive read failures
+trigger reinitialization.
+
+The implementation has passed the static integration check and TI Clang build.
+Hardware validation confirmed `CHIP_ID=0xD1`, approximately 1g on stationary Z
+acceleration, and near-zero stationary gyroscope output. No Flash write is
+performed by the build and test commands.
