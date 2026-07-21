@@ -11,6 +11,7 @@
 #include "board_motor.h"
 #include "board_uart.h"
 #include "board_ws2812.h"
+#include "motor_control.h"
 #include "ti_msp_dl_config.h"
 
 #define APP_TASK_PRIORITY 1U
@@ -45,15 +46,6 @@
 #error "BUZZER_ON_TIME_MS and BUZZER_OFF_TIME_MS must be nonzero"
 #endif
 
-#define MOTOR_FRONT_LEFT_DIRECTION BOARD_MOTOR_DIRECTION_FORWARD
-#define MOTOR_FRONT_LEFT_DUTY_PERCENT 0U
-#define MOTOR_FRONT_RIGHT_DIRECTION BOARD_MOTOR_DIRECTION_FORWARD
-#define MOTOR_FRONT_RIGHT_DUTY_PERCENT 0U
-#define MOTOR_REAR_LEFT_DIRECTION BOARD_MOTOR_DIRECTION_FORWARD
-#define MOTOR_REAR_LEFT_DUTY_PERCENT 0U
-#define MOTOR_REAR_RIGHT_DIRECTION BOARD_MOTOR_DIRECTION_FORWARD
-#define MOTOR_REAR_RIGHT_DUTY_PERCENT 0U
-
 static StaticTask_t g_motor_task_buffer;
 static StackType_t g_motor_task_stack[MOTOR_TASK_STACK_DEPTH];
 static StaticTask_t g_ws2812_task_buffer;
@@ -85,28 +77,30 @@ static void motor_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval = pdMS_TO_TICKS(10U);
+    board_encoder_sample_t samples[BOARD_MOTOR_COUNT];
 
     (void)argument;
     for (;;) {
         ++g_encoder_sample_sequence;
-        g_encoder_samples[BOARD_MOTOR_FRONT_LEFT] =
-            board_encoder_sample(BOARD_MOTOR_FRONT_LEFT);
-        g_encoder_samples[BOARD_MOTOR_FRONT_RIGHT] =
-            board_encoder_sample(BOARD_MOTOR_FRONT_RIGHT);
-        g_encoder_samples[BOARD_MOTOR_REAR_LEFT] =
-            board_encoder_sample(BOARD_MOTOR_REAR_LEFT);
-        g_encoder_samples[BOARD_MOTOR_REAR_RIGHT] =
-            board_encoder_sample(BOARD_MOTOR_REAR_RIGHT);
+        samples[BOARD_MOTOR_FRONT_LEFT] = board_encoder_sample(BOARD_MOTOR_FRONT_LEFT);
+        samples[BOARD_MOTOR_FRONT_RIGHT] = board_encoder_sample(BOARD_MOTOR_FRONT_RIGHT);
+        samples[BOARD_MOTOR_REAR_LEFT] = board_encoder_sample(BOARD_MOTOR_REAR_LEFT);
+        samples[BOARD_MOTOR_REAR_RIGHT] = board_encoder_sample(BOARD_MOTOR_REAR_RIGHT);
+        g_encoder_samples[BOARD_MOTOR_FRONT_LEFT] = samples[BOARD_MOTOR_FRONT_LEFT];
+        g_encoder_samples[BOARD_MOTOR_FRONT_RIGHT] = samples[BOARD_MOTOR_FRONT_RIGHT];
+        g_encoder_samples[BOARD_MOTOR_REAR_LEFT] = samples[BOARD_MOTOR_REAR_LEFT];
+        g_encoder_samples[BOARD_MOTOR_REAR_RIGHT] = samples[BOARD_MOTOR_REAR_RIGHT];
+        motor_control_step(samples);
         ++g_encoder_sample_sequence;
 
-        board_motor_set(BOARD_MOTOR_FRONT_LEFT, MOTOR_FRONT_LEFT_DIRECTION,
-                        MOTOR_FRONT_LEFT_DUTY_PERCENT);
-        board_motor_set(BOARD_MOTOR_FRONT_RIGHT, MOTOR_FRONT_RIGHT_DIRECTION,
-                        MOTOR_FRONT_RIGHT_DUTY_PERCENT);
-        board_motor_set(BOARD_MOTOR_REAR_LEFT, MOTOR_REAR_LEFT_DIRECTION,
-                        MOTOR_REAR_LEFT_DUTY_PERCENT);
-        board_motor_set(BOARD_MOTOR_REAR_RIGHT, MOTOR_REAR_RIGHT_DIRECTION,
-                        MOTOR_REAR_RIGHT_DUTY_PERCENT);
+        board_motor_set_signed_duty(BOARD_MOTOR_FRONT_LEFT,
+                                    motor_control_get_output_duty_percent(BOARD_MOTOR_FRONT_LEFT));
+        board_motor_set_signed_duty(BOARD_MOTOR_FRONT_RIGHT,
+                                    motor_control_get_output_duty_percent(BOARD_MOTOR_FRONT_RIGHT));
+        board_motor_set_signed_duty(BOARD_MOTOR_REAR_LEFT,
+                                    motor_control_get_output_duty_percent(BOARD_MOTOR_REAR_LEFT));
+        board_motor_set_signed_duty(BOARD_MOTOR_REAR_RIGHT,
+                                    motor_control_get_output_duty_percent(BOARD_MOTOR_REAR_RIGHT));
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }
@@ -165,12 +159,7 @@ static void uart_echo_task(void *argument)
     }
 }
 
-static int32_t speed_as_mm_per_s(float speed)
-{
-    return (int32_t)speed;
-}
-
-static void encoder_samples_copy(board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
+static void motor_control_snapshot_copy(motor_control_wheel_status_t control[BOARD_MOTOR_COUNT])
 {
     uint32_t begin_sequence;
     uint32_t end_sequence;
@@ -180,7 +169,7 @@ static void encoder_samples_copy(board_encoder_sample_t samples[BOARD_MOTOR_COUN
         begin_sequence = g_encoder_sample_sequence;
         if ((begin_sequence & 1U) == 0U) {
             for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
-                samples[wheel] = g_encoder_samples[wheel];
+                control[wheel] = g_motor_control_status[wheel];
             }
             end_sequence = g_encoder_sample_sequence;
             if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
@@ -195,28 +184,47 @@ static void telemetry_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval = pdMS_TO_TICKS(ENCODER_TELEMETRY_INTERVAL_MS);
-    board_encoder_sample_t samples[BOARD_MOTOR_COUNT];
-    char message[192];
+    motor_control_wheel_status_t control[BOARD_MOTOR_COUNT];
+    char message[512];
 
     (void)argument;
     for (;;) {
         int length;
 
-        encoder_samples_copy(samples);
+        motor_control_snapshot_copy(control);
         length = snprintf(message, sizeof(message),
-                          "enc,fl=%ld,%ld,%ld,fr=%ld,%ld,%ld,rl=%ld,%ld,%ld,rr=%ld,%ld,%ld\r\n",
-                          (long)samples[BOARD_MOTOR_FRONT_LEFT].delta_counts,
-                          (long)samples[BOARD_MOTOR_FRONT_LEFT].total_counts,
-                          (long)speed_as_mm_per_s(samples[BOARD_MOTOR_FRONT_LEFT].speed_mm_per_s),
-                          (long)samples[BOARD_MOTOR_FRONT_RIGHT].delta_counts,
-                          (long)samples[BOARD_MOTOR_FRONT_RIGHT].total_counts,
-                          (long)speed_as_mm_per_s(samples[BOARD_MOTOR_FRONT_RIGHT].speed_mm_per_s),
-                          (long)samples[BOARD_MOTOR_REAR_LEFT].delta_counts,
-                          (long)samples[BOARD_MOTOR_REAR_LEFT].total_counts,
-                          (long)speed_as_mm_per_s(samples[BOARD_MOTOR_REAR_LEFT].speed_mm_per_s),
-                          (long)samples[BOARD_MOTOR_REAR_RIGHT].delta_counts,
-                          (long)samples[BOARD_MOTOR_REAR_RIGHT].total_counts,
-                          (long)speed_as_mm_per_s(samples[BOARD_MOTOR_REAR_RIGHT].speed_mm_per_s));
+                          "ctl,fl=%ld,%ld,%ld,%ld,%ld,%ld,fr=%ld,%ld,%ld,%ld,%ld,%ld,rl=%ld,%ld,%ld,%ld,%ld,%ld,rr=%ld,%ld,%ld,%ld,%ld,%ld,dbg=%u,%u,%u,%ld,%ld,%ld,%ld\r\n",
+                          (long)control[BOARD_MOTOR_FRONT_LEFT].target_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_FRONT_LEFT].feedback_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_FRONT_LEFT].pid_p_out,
+                          (long)control[BOARD_MOTOR_FRONT_LEFT].pid_i_out,
+                          (long)control[BOARD_MOTOR_FRONT_LEFT].pid_d_out,
+                          (long)control[BOARD_MOTOR_FRONT_LEFT].output_duty_percent,
+                          (long)control[BOARD_MOTOR_FRONT_RIGHT].target_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_FRONT_RIGHT].feedback_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_FRONT_RIGHT].pid_p_out,
+                          (long)control[BOARD_MOTOR_FRONT_RIGHT].pid_i_out,
+                          (long)control[BOARD_MOTOR_FRONT_RIGHT].pid_d_out,
+                          (long)control[BOARD_MOTOR_FRONT_RIGHT].output_duty_percent,
+                          (long)control[BOARD_MOTOR_REAR_LEFT].target_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_REAR_LEFT].feedback_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_REAR_LEFT].pid_p_out,
+                          (long)control[BOARD_MOTOR_REAR_LEFT].pid_i_out,
+                          (long)control[BOARD_MOTOR_REAR_LEFT].pid_d_out,
+                          (long)control[BOARD_MOTOR_REAR_LEFT].output_duty_percent,
+                          (long)control[BOARD_MOTOR_REAR_RIGHT].target_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_REAR_RIGHT].feedback_speed_mm_per_s,
+                          (long)control[BOARD_MOTOR_REAR_RIGHT].pid_p_out,
+                          (long)control[BOARD_MOTOR_REAR_RIGHT].pid_i_out,
+                          (long)control[BOARD_MOTOR_REAR_RIGHT].pid_d_out,
+                          (long)control[BOARD_MOTOR_REAR_RIGHT].output_duty_percent,
+                          (unsigned)g_motor_debug.enable,
+                          (unsigned)g_motor_debug.mode,
+                          (unsigned)g_motor_debug.wheel,
+                          (long)g_motor_debug.target_duty_percent,
+                          (long)g_motor_debug.target_speed_mm_per_s,
+                          (long)g_motor_debug.feedback_speed_mm_per_s,
+                          (long)g_motor_debug.output_duty_percent);
         if ((length > 0) && ((size_t)length < sizeof(message))) {
             board_uart_write((const uint8_t *)message, (size_t)length);
         }
@@ -313,6 +321,7 @@ int main(void)
     QueueHandle_t uart_queue;
     SYSCFG_DL_init();
     board_encoder_init();
+    motor_control_init();
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
     board_buzzer_init(BUZZER_FREQUENCY_HZ, BUZZER_DUTY_PERCENT);
     uart_queue = xQueueCreateStatic(UART_RX_QUEUE_LENGTH, sizeof(uint8_t), g_uart_queue_storage, &g_uart_queue_buffer);

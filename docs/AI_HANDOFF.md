@@ -333,3 +333,36 @@ imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
 `main.c` 中的 `IMU_TELEMETRY_ENABLE` 是 IMU 串口输出的编译期开关，默认值为
 `0U`。设为 `1U` 后输出初始化状态、采样错误和六轴原始数据；设为 `0U` 时仅
 关闭这些 UART 报文，IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。
+
+### 四轮 PWM 速度闭环与 SWD 单轮调试
+
+`mspm0g3507_app/` 的 10 ms 电机任务已加入四路独立增量式速度 PID。速度统一为
+mm/s；`volatile float g_motor_speed_targets_mm_s[4]` 是 SWD 可写的正常四轮目标，
+启动均为 0。控制器输出 -100% 至 100% 的带符号 PWM；
+`board_motor_set_signed_duty()` 仍使用既有双 PWM H 桥和后左反相校准。
+
+`volatile motor_control_debug_t g_motor_debug` 是单电机 SWD 调试入口。可通过
+Live Expressions/Watch 设置 `enable`、`wheel`、`mode`、`target_duty_percent`、
+`target_speed_mm_per_s` 与 `speed_pid_params`。模式为 STOP、PWM 与 SPEED；PWM
+模式是有符号占空比开环，不是伏特闭环，因为当前硬件没有电压采样。启用调试时，
+其余三轮始终停机。启用、改模式或改轮位后的第一个 10 ms 周期会复位 PID 并强制
+四轮 0%，下一周期才输出新命令。电机运动时禁止设置断点。
+
+`motor_pid/` 是从 `D:\desktop\2026RC\Control\single_motor_test\Libraries\MotorLib`
+受控复制的 PID-only 核心，只含增量式与位置式 PID 和夹紧函数；外部 MotorLib
+未修改，且没有复制 CAN、STM32 HAL、DJI 或 RobStride 协议。位置式 PID 已编译与
+测试，但在每轮 `BOARD_ENCODER_COUNTS_PER_REVOLUTION` 实测前不开放位置控制。
+
+新增验证命令：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
+```
+
+前三项覆盖 PID 数值、四轮隔离、单轮调试覆盖与模式切换归零；后两项仅构建，不写
+Flash。硬件验收仍须先手动转轮确认编码器符号和单圈计数，再低速逐轮调 PID；未获
+用户明确授权不得执行 Flash `Load`。

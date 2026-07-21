@@ -19,5 +19,6 @@ typedef enum {
 
 void board_motor_set(board_motor_wheel_t wheel, board_motor_direction_t direction,
                      uint8_t duty_percent);
+void board_motor_set_signed_duty(board_motor_wheel_t wheel, float duty_percent);
 
 #endif
