@@ -110,4 +110,7 @@ through the serialized UART frame queue in pin order using lines such as
 `key,pa7=down\r\n` and `key,pa7=up\r\n`. SysConfig leaves the internal resistor
 disabled and does not enable GPIO interrupts for these inputs. The button task
 uses a 128-word stack; the TI Clang map reports a 512-byte stack, 76-byte task
-control block, and 12 bytes of button driver state.
+control block, and 12 bytes of button driver state. `main.c` provides the
+compile-time `BUTTON_FEATURE_ENABLE` switch, defaulting to `0U`. Setting it to
+`1U` enables button initialization, state scanning, UART reports, and the
+button task's static RAM while keeping the SysConfig pin definitions unchanged.

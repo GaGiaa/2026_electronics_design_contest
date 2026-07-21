@@ -353,6 +353,8 @@ key,pa7=up\r\n
 按键任务使用 `BUTTON_TASK_STACK_DEPTH=128U`，不新增队列、不使用中断，也不合并现有
 WS2812、蜂鸣器、IMU、UART 或编码器任务。TI Clang map 中该任务栈为 512 bytes，
 任务控制块为 76 bytes，按键驱动运行态数据为 12 bytes，按键驱动代码约 568 bytes。
+`main.c` 中的 `BUTTON_FEATURE_ENABLE` 默认为 `0U`；设为 `1U` 后启用按键初始化、
+扫描、按键报文和按键任务的静态资源。无论开关取值如何，SysConfig 引脚定义均保留。
 
 已通过以下验证：
 
