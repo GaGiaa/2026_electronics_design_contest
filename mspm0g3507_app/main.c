@@ -4,6 +4,7 @@
 #include <queue.h>
 #include <task.h>
 
+#include "board_buzzer.h"
 #include "board_motor.h"
 #include "board_uart.h"
 #include "board_ws2812.h"
@@ -13,8 +14,23 @@
 #define MOTOR_TASK_STACK_DEPTH 256U
 #define WS2812_TASK_STACK_DEPTH 256U
 #define UART_TASK_STACK_DEPTH 256U
+#define BUZZER_TASK_STACK_DEPTH 128U
 #define UART_RX_QUEUE_LENGTH 64U
 #define WS2812_BRIGHTNESS 16U
+
+#define BUZZER_FEATURE_ENABLE 0U
+#define BUZZER_FREQUENCY_HZ 2000U
+#define BUZZER_DUTY_PERCENT 10U
+#define BUZZER_ON_TIME_MS 200U
+#define BUZZER_OFF_TIME_MS 1800U
+
+#if (BUZZER_FREQUENCY_HZ < 1000U) || (BUZZER_FREQUENCY_HZ > 20000U)
+#error "BUZZER_FREQUENCY_HZ must be between 1000 Hz and 20000 Hz"
+#endif
+
+#if (BUZZER_ON_TIME_MS == 0U) || (BUZZER_OFF_TIME_MS == 0U)
+#error "BUZZER_ON_TIME_MS and BUZZER_OFF_TIME_MS must be nonzero"
+#endif
 
 #define MOTOR_FRONT_LEFT_DIRECTION BOARD_MOTOR_DIRECTION_FORWARD
 #define MOTOR_FRONT_LEFT_DUTY_PERCENT 0U
@@ -31,6 +47,10 @@ static StaticTask_t g_ws2812_task_buffer;
 static StackType_t g_ws2812_task_stack[WS2812_TASK_STACK_DEPTH];
 static StaticTask_t g_uart_task_buffer;
 static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
+#if BUZZER_FEATURE_ENABLE
+static StaticTask_t g_buzzer_task_buffer;
+static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
+#endif
 static StaticQueue_t g_uart_queue_buffer;
 static uint8_t g_uart_queue_storage[UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
 static StaticTask_t g_idle_task_buffer;
@@ -112,6 +132,19 @@ static void uart_echo_task(void *argument)
     }
 }
 
+#if BUZZER_FEATURE_ENABLE
+static void buzzer_task(void *argument)
+{
+    (void)argument;
+    for (;;) {
+        board_buzzer_start();
+        vTaskDelay(pdMS_TO_TICKS(BUZZER_ON_TIME_MS));
+        board_buzzer_stop();
+        vTaskDelay(pdMS_TO_TICKS(BUZZER_OFF_TIME_MS));
+    }
+}
+#endif
+
 void vApplicationMallocFailedHook(void) { taskDISABLE_INTERRUPTS(); for (;;) { } }
 void vApplicationGetIdleTaskMemory(StaticTask_t **task_buffer, StackType_t **stack_buffer, uint32_t *stack_size)
 { *task_buffer = &g_idle_task_buffer; *stack_buffer = g_idle_task_stack; *stack_size = configIDLE_TASK_STACK_DEPTH; }
@@ -122,12 +155,16 @@ int main(void)
 {
     QueueHandle_t uart_queue;
     SYSCFG_DL_init();
+    board_buzzer_init(BUZZER_FREQUENCY_HZ, BUZZER_DUTY_PERCENT);
     uart_queue = xQueueCreateStatic(UART_RX_QUEUE_LENGTH, sizeof(uint8_t), g_uart_queue_storage, &g_uart_queue_buffer);
     configASSERT(uart_queue != NULL);
     board_uart_enable_rx_interrupt(uart_queue);
     configASSERT(xTaskCreateStatic(motor_task, "motor", MOTOR_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_motor_task_stack, &g_motor_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812", WS2812_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_ws2812_task_stack, &g_ws2812_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
+#if BUZZER_FEATURE_ENABLE
+    configASSERT(xTaskCreateStatic(buzzer_task, "buzzer", BUZZER_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_buzzer_task_stack, &g_buzzer_task_buffer) != NULL);
+#endif
     vTaskStartScheduler();
     taskDISABLE_INTERRUPTS();
     for (;;) { }

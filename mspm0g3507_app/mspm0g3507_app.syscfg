@@ -12,6 +12,7 @@ const PWMFrontLeft = PWM.addInstance();
 const PWMFrontRight = PWM.addInstance();
 const PWMRearLeft = PWM.addInstance();
 const PWMRearRight = PWM.addInstance();
+const PWMBuzzer = PWM.addInstance();
 const SPI = scripting.addModule("/ti/driverlib/SPI", {}, false);
 const SPI1 = SPI.addInstance();
 const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
@@ -63,6 +64,13 @@ PWMRearRight.timerCount = 4000;
 PWMRearRight.peripheral.$assign = "TIMG0";
 PWMRearRight.peripheral.ccp0Pin.$assign = "PA12";
 PWMRearRight.peripheral.ccp1Pin.$assign = "PA13";
+
+PWMBuzzer.$name = "BUZZER";
+PWMBuzzer.timerStartTimer = true;
+PWMBuzzer.pwmMode = "EDGE_ALIGN_UP";
+PWMBuzzer.timerCount = 20000;
+PWMBuzzer.peripheral.$assign = "TIMG8";
+PWMBuzzer.peripheral.ccp1Pin.$assign = "PA2";
 
 SPI1.$name = "SPI_WS2812";
 SPI1.targetBitRate = 2666667;

@@ -28,3 +28,11 @@ every 10 ms. Forward drives IN1 with PWM and holds IN2 low; reverse does the
 opposite. The motor supply, driver and MCU must share ground. Hardware
 acceptance starts with one wheel at a low duty cycle and requires explicit
 authorization before any Flash write.
+
+PA2 drives a passive buzzer through TIMG8 CCP1. `main.c` provides the
+compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,
+`BUZZER_DUTY_PERCENT`, `BUZZER_ON_TIME_MS`, and `BUZZER_OFF_TIME_MS` macros.
+The defaults are disabled, 2000 Hz, 50 percent, 200 ms on, and 1800 ms off.
+When enabled, a dedicated static FreeRTOS task repeats the on/off interval;
+when disabled, the PWM is initialized with a zero compare value and no buzzer
+task is created. The passive buzzer driver circuit and MCU must share ground.

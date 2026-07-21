@@ -149,3 +149,13 @@ PB4/PB5、后左 PA28/PA31、后右 PA12/PA13。四组定时器均为 40 MHz 时
 PB4/PB5，逻辑后左使用 PA28/PA31 且正反方向反相，逻辑后右使用 PA12/PA13。
 因此，四个逻辑轮位的 `BOARD_MOTOR_DIRECTION_FORWARD` 都表示车辆前进方向。重新接线或
 更换电机驱动板后，必须重新进行单轮校准。
+
+### PA2 无源蜂鸣器
+
+`mspm0g3507_app/` 将 PA2 配置为 TIMG8 CCP1 硬件 PWM 输出。`main.c` 的
+`BUZZER_FEATURE_ENABLE`、`BUZZER_FREQUENCY_HZ`、`BUZZER_DUTY_PERCENT`、
+`BUZZER_ON_TIME_MS` 和 `BUZZER_OFF_TIME_MS` 为编译期配置宏；默认分别为
+关闭、2000 Hz、50%、200 ms 和 1800 ms。启用时新增一个静态 FreeRTOS 任务循环
+响/停，禁用时驱动初始化后保持 PA2 低电平且不创建任务。已验证 SysConfig 生成、
+静态集成测试与 TI Clang 构建；尚未进行 Flash 写入或蜂鸣器硬件实测。蜂鸣器驱动
+电路必须与 MCU 共地。
