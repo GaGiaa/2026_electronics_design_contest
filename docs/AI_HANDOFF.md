@@ -237,3 +237,18 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 响/停，禁用时驱动初始化后保持 PA2 低电平且不创建任务。已验证 SysConfig 生成、
 静态集成测试与 TI Clang 构建；尚未进行 Flash 写入或蜂鸣器硬件实测。蜂鸣器驱动
 电路必须与 MCU 共地。
+
+### Encoder channel calibration update
+
+Hardware hand-turn calibration established the following physical-to-logical
+encoder mapping, now declared directly in `mspm0g3507_app.syscfg`:
+
+- logical front-left: PA15/PB24;
+- logical front-right: PA17/PA22, direction inverted;
+- logical rear-left: PA14/PA9;
+- logical rear-right: PA16/PB20, direction inverted.
+
+The generated `ENCODER_*` macros now represent these logical positions directly;
+`board_encoder_gpioa_irq_handler()` only applies the two calibrated direction
+signs. The PWM motor mapping is unchanged. `BOARD_ENCODER_COUNTS_PER_REVOLUTION`
+is still 1040 until each wheel is measured over a known number of physical turns.

@@ -29,15 +29,18 @@ opposite. The motor supply, driver and MCU must share ground. Hardware
 acceptance starts with one wheel at a low duty cycle and requires explicit
 authorization before any Flash write.
 
-Each wheel also has an AB incremental encoder. The logical front-left, front-right,
-rear-left and rear-right encoder A/B pins are PA16/PB20, PA14/PA9, PA15/PB24 and
-PA17/PA22 respectively. Inputs use pull-ups; each A phase interrupts on both edges
-and the B phase determines direction. `board_encoder` defaults to 1040 A-phase
-edges per wheel revolution (twice the reference single-edge 520 count) and a 48 mm
-wheel diameter. Every 10 ms motor-task iteration samples the signed encoder delta,
-accumulated count and calculated mm/s speed before updating PWM. The current PWM
-commands remain open loop. Hardware validation must confirm count polarity for each
-wheel and calibrate the counts-per-revolution constant against one physical turn.
+Each wheel also has an AB incremental encoder. Hardware calibration found that the
+physical wheel inputs do not match the original SysConfig names. The corrected
+logical mapping in `mspm0g3507_app.syscfg` is front-left from PA15/PB24,
+front-right from PA17/PA22 (direction inverted), rear-left from PA14/PA9, and
+rear-right from PA16/PB20 (direction inverted). Inputs use
+pull-ups; each A phase interrupts on both edges and the B phase determines
+direction. `board_encoder` still defaults to 1040 A-phase edges per wheel
+revolution (twice the reference single-edge 520 count) and a 48 mm wheel diameter;
+the counts-per-revolution value remains subject to one-physical-turn measurement.
+Every 10 ms motor-task iteration samples the signed encoder delta, accumulated count
+and calculated mm/s speed before updating PWM. The current PWM commands remain open
+loop.
 
 For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without

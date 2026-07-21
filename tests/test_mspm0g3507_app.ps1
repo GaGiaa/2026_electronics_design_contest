@@ -153,6 +153,20 @@ Assert-Contains -Path $encoder -Pattern 'ENCODER_FRONT_LEFT_A_IIDX' -Description
 Assert-Contains -Path $encoder -Pattern 'ENCODER_FRONT_RIGHT_A_IIDX' -Description 'Encoder driver must use generated front-right A interrupt definitions'
 Assert-Contains -Path $encoder -Pattern 'ENCODER_REAR_LEFT_A_IIDX' -Description 'Encoder driver must use generated rear-left A interrupt definitions'
 Assert-Contains -Path $encoder -Pattern 'ENCODER_REAR_RIGHT_A_IIDX' -Description 'Encoder driver must use generated rear-right A interrupt definitions'
+Assert-OrderedPatterns -Path $encoder -Patterns @(
+    'case ENCODER_FRONT_LEFT_A_IIDX:',
+    'BOARD_MOTOR_FRONT_LEFT',
+    '\s*,\s*1\);',
+    'case ENCODER_FRONT_RIGHT_A_IIDX:',
+    'BOARD_MOTOR_FRONT_RIGHT',
+    '\s*,\s*-1\);',
+    'case ENCODER_REAR_LEFT_A_IIDX:',
+    'BOARD_MOTOR_REAR_LEFT',
+    '\s*,\s*1\);',
+    'case ENCODER_REAR_RIGHT_A_IIDX:',
+    'BOARD_MOTOR_REAR_RIGHT',
+    '\s*,\s*-1\);'
+) -Description 'Encoder GPIO channels must match the measured physical wheel mapping and direction signs'
 Assert-Contains -Path $syscfg -Pattern 'PB22' -Description 'WS2812 data output must use PB22'
 Assert-Contains -Path $syscfg -Pattern 'HSCLKMUX.*SYSPLL0' -Description 'Application CPU clock must use SYSPLL0'
 Assert-Contains -Path $syscfg -Pattern 'HFXT' -Description 'Application SYSPLL reference must use the HFXT'
@@ -174,14 +188,14 @@ Assert-Contains -Path $syscfg -Pattern 'PA17' -Description 'Rear-right encoder A
 Assert-Contains -Path $syscfg -Pattern 'PA22' -Description 'Rear-right encoder B phase must use PA22'
 Assert-Contains -Path $syscfg -Pattern 'RISE_FALL' -Description 'Encoder A phases must interrupt on both edges'
 Assert-Contains -Path $syscfg -Pattern 'PULL_UP' -Description 'Encoder inputs must use pull-ups'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_LEFT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA16') -Description 'Front-left A must use PA16 dual-edge interrupts'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_LEFT_B', 'PULL_UP', 'PB20') -Description 'Front-left B must use PB20 pull-up input'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_RIGHT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA14') -Description 'Front-right A must use PA14 dual-edge interrupts'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_RIGHT_B', 'PULL_UP', 'PA9') -Description 'Front-right B must use PA9 pull-up input'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_LEFT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA15') -Description 'Rear-left A must use PA15 dual-edge interrupts'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_LEFT_B', 'PULL_UP', 'PB24') -Description 'Rear-left B must use PB24 pull-up input'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_RIGHT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA17') -Description 'Rear-right A must use PA17 dual-edge interrupts'
-Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_RIGHT_B', 'PULL_UP', 'PA22') -Description 'Rear-right B must use PA22 pull-up input'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_LEFT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA15') -Description 'Front-left A must use PA15 dual-edge interrupts'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_LEFT_B', 'PULL_UP', 'PB24') -Description 'Front-left B must use PB24 pull-up input'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_RIGHT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA17') -Description 'Front-right A must use PA17 dual-edge interrupts'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('FRONT_RIGHT_B', 'PULL_UP', 'PA22') -Description 'Front-right B must use PA22 pull-up input'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_LEFT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA14') -Description 'Rear-left A must use PA14 dual-edge interrupts'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_LEFT_B', 'PULL_UP', 'PA9') -Description 'Rear-left B must use PA9 pull-up input'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_RIGHT_A', 'interruptEn\s*=\s*true', 'polarity\s*=\s*"RISE_FALL"', 'PA16') -Description 'Rear-right A must use PA16 dual-edge interrupts'
+Assert-OrderedPatterns -Path $syscfg -Patterns @('REAR_RIGHT_B', 'PULL_UP', 'PB20') -Description 'Rear-right B must use PB20 pull-up input'
 Assert-Contains -Path $syscfg -Pattern 'MOTOR_FRONT_LEFT' -Description 'SysConfig must define the front-left motor PWM'
 Assert-Contains -Path $syscfg -Pattern 'MOTOR_FRONT_RIGHT' -Description 'SysConfig must define the front-right motor PWM'
 Assert-Contains -Path $syscfg -Pattern 'MOTOR_REAR_LEFT' -Description 'SysConfig must define the rear-left motor PWM'
