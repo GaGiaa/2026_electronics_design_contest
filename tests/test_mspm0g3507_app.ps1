@@ -106,6 +106,8 @@ Assert-Contains -Path $main -Pattern 'board_uart_write' -Description 'Telemetry 
 Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(board_uart_tx_task' -Description 'Application must create the dedicated UART transmit task'
 Assert-Contains -Path $main -Pattern 'IMU_TASK_STACK_DEPTH\s+512U' -Description 'IMU task must have a static stack'
 Assert-Contains -Path $main -Pattern 'IMU_SAMPLE_INTERVAL_MS\s+10U' -Description 'IMU task must sample every 10 ms'
+Assert-Contains -Path $main -Pattern 'IMU_TELEMETRY_ENABLE\s+0U' -Description 'IMU telemetry must default to disabled'
+Assert-Contains -Path $main -Pattern '#if IMU_TELEMETRY_ENABLE' -Description 'IMU UART output must be compile-time gated'
 Assert-Contains -Path $main -Pattern 'board_bmi160_init' -Description 'IMU task must initialize the BMI160 driver'
 Assert-Contains -Path $main -Pattern 'board_bmi160_read_sample' -Description 'IMU task must read BMI160 samples'
 Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(imu_task' -Description 'IMU task must use static allocation'

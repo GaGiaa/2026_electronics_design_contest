@@ -25,6 +25,7 @@
 #define ENCODER_TELEMETRY_INTERVAL_MS 100U
 #define ENCODER_TELEMETRY_TASK_STACK_DEPTH 512U
 #define TELEMETRY_TASK_PRIORITY 0U
+#define IMU_TELEMETRY_ENABLE 0U
 #define IMU_TASK_STACK_DEPTH 512U
 #define IMU_TASK_PRIORITY 0U
 #define IMU_SAMPLE_INTERVAL_MS 10U
@@ -232,20 +233,26 @@ static void imu_task(void *argument)
     board_bmi160_status_t status;
     uint8_t chip_id;
     uint32_t consecutive_failures;
+#if IMU_TELEMETRY_ENABLE
     char message[128];
+#endif
 
     (void)argument;
     for (;;) {
+#if IMU_TELEMETRY_ENABLE
         int length;
+#endif
 
         chip_id = 0U;
         status = board_bmi160_init(&chip_id);
+#if IMU_TELEMETRY_ENABLE
         length = snprintf(message, sizeof(message),
                           "bmi160,id=0x%02X,status=%u\r\n",
                           chip_id, (unsigned)status);
         if ((length > 0) && ((size_t)length < sizeof(message))) {
             board_uart_write((const uint8_t *)message, (size_t)length);
         }
+#endif
         if (status != BOARD_BMI160_STATUS_OK) {
             vTaskDelay(pdMS_TO_TICKS(1000U));
         } else {
@@ -255,16 +262,19 @@ static void imu_task(void *argument)
                 status = board_bmi160_read_sample(&sample);
                 if (status != BOARD_BMI160_STATUS_OK) {
                     ++consecutive_failures;
+#if IMU_TELEMETRY_ENABLE
                     length = snprintf(message, sizeof(message),
                                       "bmi160,error=%u\r\n", (unsigned)status);
                     if ((length > 0) && ((size_t)length < sizeof(message))) {
                         board_uart_write((const uint8_t *)message, (size_t)length);
                     }
+#endif
                     if (consecutive_failures >= IMU_REINIT_FAILURE_THRESHOLD) {
                         break;
                     }
                 } else {
                     consecutive_failures = 0U;
+#if IMU_TELEMETRY_ENABLE
                     length = snprintf(message, sizeof(message),
                                       "imu,ax=%+6d,ay=%+6d,az=%+6d,gx=%+6d,gy=%+6d,gz=%+6d\r\n",
                                       sample.accel_x, sample.accel_y, sample.accel_z,
@@ -272,6 +282,7 @@ static void imu_task(void *argument)
                     if ((length > 0) && ((size_t)length < sizeof(message))) {
                         board_uart_write((const uint8_t *)message, (size_t)length);
                     }
+#endif
                 }
                 vTaskDelayUntil(&last_wake_time, interval);
             }

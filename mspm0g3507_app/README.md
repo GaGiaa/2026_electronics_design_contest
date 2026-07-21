@@ -94,3 +94,8 @@ The implementation has passed the static integration check and TI Clang build.
 Hardware validation confirmed `CHIP_ID=0xD1`, approximately 1g on stationary Z
 acceleration, and near-zero stationary gyroscope output. No Flash write is
 performed by the build and test commands.
+
+`main.c` provides the compile-time `IMU_TELEMETRY_ENABLE` switch. It defaults
+to `0U`; set it to `1U` to enable initialization, error, and six-axis IMU UART
+frames. When set to `0U`, only those IMU UART frames are disabled; the IMU task
+continues to initialize BMI160, sample periodically, and retry after failures.
