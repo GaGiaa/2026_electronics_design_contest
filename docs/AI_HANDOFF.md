@@ -379,7 +379,7 @@ Keil 构建脚本也使用相同的 `-EncoderDecodeMode 2` 参数。两个构建
 ### VOFA+ JustFloat 速度环遥测
 
 `mspm0g3507_app/main.c` 的 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 是速度环调参
-专用 UART 编译开关，默认 `1U`。设为 `0U` 时恢复 UART 文本回显，设为 `1U` 后，
+专用 UART 编译开关，默认 `0U`。设为 `1U` 后启用 VOFA 遥测，设为 `0U` 时恢复 UART 文本回显，
 `telemetry_task` 以 10 ms 周期
 通过既有 `board_uart_write()` 静态帧队列发送 VOFA+ JustFloat 二进制帧。每帧为
 三个小端 IEEE-754 `float32` 加帧尾 `00 00 80 7F`，固定 16 字节；字段顺序为当前
@@ -508,8 +508,9 @@ JustFloat 速度环遥测，并保留当前分支的八路灰度采样、四个�
 WS2812、蜂鸣器和静态 UART 帧队列。
 
 冲突处理后的应用入口同时支持 GPIOA/GPIOB GROUP1 中断分发、A 相双沿和 AB 正交 X4
-解码、编码器机械参数派生、VOFA 二进制遥测、按键任务和灰度任务。VOFA 遥测默认开启，
-UART 回显和 BMI160 文本遥测在 VOFA 模式下按编译期开关抑制；未执行 Flash 擦除或烧录。
+解码、编码器机械参数派生、VOFA 二进制遥测、按键任务和灰度任务。当前 VOFA 遥测默认关闭，
+需将 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 设为 `1U`；UART 回显和 BMI160
+文本遥测在 VOFA 模式下按编译期开关抑制；未执行 Flash 擦除或烧录。
 
 本次实际验证命令均返回成功：
 
