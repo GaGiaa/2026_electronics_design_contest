@@ -18,7 +18,7 @@ $testSource = Join-Path $PSScriptRoot 'test_motor_control.c'
 $output = Join-Path $env:TEMP 'mspm0g3507_motor_control_test.exe'
 
 try {
-    $compilerArguments = @('-std=c99', '-Wall', '-Wextra', '-Werror', "-I$appDir", "-I$appDir\motor_pid")
+$compilerArguments = @('-std=c99', '-Wall', '-Wextra', '-Werror', '-DCRSF_REMOTE_CONTROL_ENABLE=0', "-I$appDir", "-I$appDir\motor_pid")
     if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
         $compilerArguments += "-DBOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
     }

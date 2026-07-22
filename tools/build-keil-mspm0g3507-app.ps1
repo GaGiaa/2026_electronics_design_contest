@@ -17,7 +17,9 @@ param(
     [ValidateSet(1, 2)]
     [int] $EncoderDecodeMode,
     [ValidateSet(0, 1)]
-    [int] $RtosMonitorEnable
+    [int] $RtosMonitorEnable,
+    [ValidateSet(0, 1)]
+    [int] $CrsfRemoteControlEnable
 )
 
 Set-StrictMode -Version Latest
@@ -88,6 +90,9 @@ if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
 }
 if ($PSBoundParameters.ContainsKey('RtosMonitorEnable')) {
     $temporaryDefines += "RTOS_MONITOR_ENABLE=$RtosMonitorEnable"
+}
+if ($PSBoundParameters.ContainsKey('CrsfRemoteControlEnable')) {
+    $temporaryDefines += "CRSF_REMOTE_CONTROL_ENABLE=$CrsfRemoteControlEnable"
 }
 if ($temporaryDefines.Count -gt 0) {
     $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)

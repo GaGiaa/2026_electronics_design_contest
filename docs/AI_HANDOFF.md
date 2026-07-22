@@ -154,6 +154,9 @@ powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
 ~~~
 
+Current CRSF transmitter mapping: CH3 (index 2) is forward/reverse from the left stick vertical axis; CH1 (index 0) is differential steering from the right stick horizontal axis.
+This mapping supersedes the earlier CH2/CH4 mapping described in older notes.
+
 构建通过只证明 SysConfig、编译、链接和静态集成检查通过，不代表硬件验收完成。
 
 ## 跨电脑构建迁移记录
@@ -209,6 +212,24 @@ CPU 利用率、空闲率、任务状态、优先级、运行时间占比和栈�
 主机数学测试为 `tests/test_rtos_monitor_math.ps1`，静态集成检查为
 `tests/test_rtos_monitor_static.ps1`。CCS/Keil 构建通过仅表示 SysConfig、编译、
 链接和静态检查通过，不代表 SWD 连接或硬件运行验收完成。
+## CRSF 遥控输入
+
+G3507 应用新增可选 CRSF 接收链路，使用 UART3：PB2 为 TX，PB3 为 RX，
+420000 baud、8-N-1、RX FIFO 中断。接收头 TX 连接 PB3，双方共地；接收头
+必须输出 3.3 V、非反相 UART TTL。此功能只接收 `RC_CHANNELS_PACKED`，不向
+接收头上传任何数据。UART0 仍保持 PA10/PA11，用于原有调试和 VOFA。
+
+编译开关为 `CRSF_REMOTE_CONTROL_ENABLE`，构建脚本参数为
+`-CrsfRemoteControlEnable 0|1`，默认配置由 `crsf_config.h` 决定。当前实测遥控器
+使用 CH3（索引 2）控制前后，CH1（索引 0）控制差速转向；这会覆盖旧记录中的
+CH2/CH4 映射。通道范围为 172..1811，中位 992，死区 5%，默认最大目标速度为
+300 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
+左右混控统一归一化；连续 100 ms 没有有效帧时四轮目标清零。开启 CRSF
+构建时，SWD 单轮调试覆盖路径被编译排除；默认构建保留原行为。
+
+CRSF 原始通道、有效帧计数、CRC/帧错误计数、最后有效帧时间、链路状态和
+UART 接收溢出计数可通过 SWD 观察。主机测试为
+`powershell -ExecutionPolicy Bypass -File tests\test_crsf.ps1`。
 
 ## Git 操作授权规则
 

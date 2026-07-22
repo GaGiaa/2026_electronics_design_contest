@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "app_math.h"
+#include "crsf_config.h"
 
 #define MOTOR_CONTROL_DT_S 0.01f
 #define MOTOR_CONTROL_MAX_DUTY_PERCENT 100.0f
@@ -92,6 +93,7 @@ static motor_control_debug_mode_t g_last_debug_mode;
 static board_motor_wheel_t g_last_debug_wheel;
 static bool g_last_debug_enabled;
 
+#if !CRSF_REMOTE_CONTROL_ENABLE
 static bool debug_mode_is_valid(motor_control_debug_mode_t mode)
 {
     return mode == MOTOR_CONTROL_DEBUG_MODE_STOP ||
@@ -112,6 +114,7 @@ static bool speed_pid_params_are_valid(const PID_Incremental_Param_Config *param
            params->integral_separation_threshold >= 0.0f &&
            params->derivative_filter_N >= 0.0f && params->output_delta_limit >= 0.0f;
 }
+#endif
 
 static float clamp_duty_percent(float duty_percent)
 {
@@ -128,6 +131,7 @@ static bool speed_command_is_stop(float target_speed, float feedback_speed)
     return !isfinite(target_speed) || !isfinite(feedback_speed) || target_speed == 0.0f;
 }
 
+#if !CRSF_REMOTE_CONTROL_ENABLE
 static void reset_all_controllers(void)
 {
     uint32_t wheel;
@@ -137,6 +141,7 @@ static void reset_all_controllers(void)
         PID_Position_Reset(&g_position_pids[wheel]);
     }
 }
+#endif
 
 static void update_status(board_motor_wheel_t wheel, float target_speed,
                           float instant_feedback_speed, float feedback_speed,
@@ -182,15 +187,18 @@ void motor_control_init(void)
 
 void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
 {
+#if !CRSF_REMOTE_CONTROL_ENABLE
     bool debug_active;
     bool debug_configuration_valid;
     bool debug_changed;
+#endif
     uint32_t wheel;
 
     if (samples == NULL) {
         return;
     }
 
+#if !CRSF_REMOTE_CONTROL_ENABLE
     debug_active = g_motor_debug.enable;
     debug_configuration_valid = debug_mode_is_valid(g_motor_debug.mode) &&
                                 g_motor_debug.wheel < BOARD_MOTOR_COUNT &&
@@ -203,6 +211,7 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
     if (debug_changed) {
         reset_all_controllers();
     }
+#endif
 
     for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
         const board_motor_wheel_t wheel_id = (board_motor_wheel_t)wheel;
@@ -210,6 +219,15 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
         float output_duty;
 
         g_speed_pids[wheel].params = g_default_speed_pid_params[wheel];
+#if CRSF_REMOTE_CONTROL_ENABLE
+        if (speed_command_is_stop(target_speed, samples[wheel].speed_mm_per_s)) {
+            PID_Incremental_Reset(&g_speed_pids[wheel]);
+            output_duty = 0.0f;
+        } else {
+            output_duty = clamp_duty_percent(PID_Incremental_Calc(&g_speed_pids[wheel], target_speed,
+                                                                    samples[wheel].speed_mm_per_s));
+        }
+#else
         if (debug_changed) {
             output_duty = 0.0f;
             target_speed = 0.0f;
@@ -248,10 +266,12 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
                                                                         samples[wheel].speed_mm_per_s));
             }
         }
+#endif
         update_status(wheel_id, target_speed, samples[wheel].instant_speed_mm_per_s,
                       samples[wheel].speed_mm_per_s, output_duty);
     }
 
+#if !CRSF_REMOTE_CONTROL_ENABLE
     if (debug_active && debug_configuration_valid && g_motor_debug.wheel < BOARD_MOTOR_COUNT) {
         g_motor_debug.instant_feedback_speed_mm_per_s =
             g_motor_control_status[g_motor_debug.wheel].instant_feedback_speed_mm_per_s;
@@ -276,6 +296,7 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
     g_last_debug_enabled = debug_active;
     g_last_debug_mode = g_motor_debug.mode;
     g_last_debug_wheel = g_motor_debug.wheel;
+#endif
 }
 
 float motor_control_get_output_duty_percent(board_motor_wheel_t wheel)
