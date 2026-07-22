@@ -415,6 +415,11 @@
               <FilePath>..\..\mspm0g3507_app\board_grayscale.c</FilePath>
             </File>
             <File>
+              <FileName>line_tracking.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\line_tracking.c</FilePath>
+            </File>
+            <File>
               <FileName>board_bmi160.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\board_bmi160.c</FilePath>

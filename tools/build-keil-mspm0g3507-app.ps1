@@ -10,6 +10,8 @@ param(
     [int] $ImuTelemetryEnable,
     [ValidateSet(0, 1)]
     [int] $ImuYawEnable,
+    [ValidateSet(0, 1)]
+    [int] $GrayVofaTelemetryEnable,
     [ValidateSet(1, 2)]
     [int] $EncoderDecodeMode
 )
@@ -60,6 +62,9 @@ if ($PSBoundParameters.ContainsKey('ImuTelemetryEnable')) {
 }
 if ($PSBoundParameters.ContainsKey('ImuYawEnable')) {
     $temporaryDefines += "IMU_YAW_ENABLE=$ImuYawEnable"
+}
+if ($PSBoundParameters.ContainsKey('GrayVofaTelemetryEnable')) {
+    $temporaryDefines += "GRAY_VOFA_TELEMETRY_ENABLE=$GrayVofaTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $temporaryDefines += "BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"

@@ -8,8 +8,11 @@
 #define VOFA_JUSTFLOAT_CHANNEL_COUNT 3U
 #define VOFA_JUSTFLOAT_CHANNEL_SIZE 4U
 #define VOFA_JUSTFLOAT_TAIL_SIZE 4U
-#define VOFA_JUSTFLOAT_FRAME_SIZE \
-    ((VOFA_JUSTFLOAT_CHANNEL_COUNT * VOFA_JUSTFLOAT_CHANNEL_SIZE) + VOFA_JUSTFLOAT_TAIL_SIZE)
+#define VOFA_JUSTFLOAT_FRAME_SIZE(channel_count) \
+    (((channel_count) * VOFA_JUSTFLOAT_CHANNEL_SIZE) + VOFA_JUSTFLOAT_TAIL_SIZE)
+
+bool vofa_justfloat_encode(uint8_t *frame, size_t frame_size,
+                           const float *channels, size_t channel_count);
 
 bool vofa_justfloat_encode3(uint8_t *frame, size_t frame_size,
                              float channel0, float channel1, float channel2);
