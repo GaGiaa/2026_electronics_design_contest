@@ -19,56 +19,103 @@
 #include "ti_msp_dl_config.h"
 #include "vofa_justfloat.h"
 
+/* 任务基础配置 */
+/* 普通应用任务的默认优先级。 */
 #define APP_TASK_PRIORITY 1U
+/* 电机控制任务的栈深度，单位为 StackType_t。 */
 #define MOTOR_TASK_STACK_DEPTH 256U
+/* WS2812 灯效任务的栈深度。 */
 #define WS2812_TASK_STACK_DEPTH 256U
+/* UART 接收任务的栈深度。 */
 #define UART_TASK_STACK_DEPTH 256U
+/* UART 发送任务的栈深度。 */
 #define UART_TX_TASK_STACK_DEPTH 256U
+/* 蜂鸣器任务的栈深度。 */
 #define BUZZER_TASK_STACK_DEPTH 128U
+/* 按键扫描任务的栈深度。 */
 #define BUTTON_TASK_STACK_DEPTH 128U
+/* 按键功能开关，0 表示不创建按键任务。 */
 #define BUTTON_FEATURE_ENABLE 0U
+/* UART 接收消息队列的最大元素数量。 */
 #define UART_RX_QUEUE_LENGTH 64U
+/* WS2812 的显示亮度，取值范围由驱动实现约束。 */
 #define WS2812_BRIGHTNESS 16U
+/* 按键扫描任务的执行周期，单位为毫秒。 */
 #define BUTTON_TASK_INTERVAL_MS 10U
+
+/* 遥测任务的默认优先级。 */
 #define TELEMETRY_TASK_PRIORITY 0U
+
+/* 速度 PID 遥测 */
 #ifndef VOFA_SPEED_PID_TELEMETRY_ENABLE
+/* 速度 PID 的 VOFA+ 遥测开关，允许由构建脚本覆盖。 */
 #define VOFA_SPEED_PID_TELEMETRY_ENABLE 0U
 #endif
+/* 速度 PID 遥测发送周期，单位为毫秒。 */
 #define VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS 10U
+/* 速度 PID 遥测任务的栈深度。 */
 #define VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH 256U
+/* 速度 PID 遥测任务的优先级。 */
 #define VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY 0U
+
+/* 灰度遥测 */
 #ifndef GRAY_VOFA_TELEMETRY_ENABLE
+/* 灰度传感器 VOFA+ 遥测开关，允许由构建脚本覆盖。 */
 #define GRAY_VOFA_TELEMETRY_ENABLE 0U
 #endif
+/* 灰度遥测发送周期，单位为毫秒。 */
 #define GRAY_VOFA_TELEMETRY_INTERVAL_MS 100U
+/* 灰度遥测帧中的通道数量。 */
 #define GRAY_VOFA_CHANNEL_COUNT 22U
+
+/* IMU yaw 与采样任务 */
 #ifndef IMU_TELEMETRY_ENABLE
+/* IMU yaw 的 VOFA+ 遥测开关，允许由构建脚本覆盖。 */
 #define IMU_TELEMETRY_ENABLE 0U
 #endif
 #ifndef IMU_YAW_ENABLE
+/* IMU yaw 解算功能开关，允许由构建脚本覆盖。 */
 #define IMU_YAW_ENABLE 0U
 #endif
+/* 车辆左右轮中心之间的实际轮距，单位为毫米。 */
 #define IMU_YAW_TRACK_WIDTH_MM 130.0f
+/* IMU 采样任务的栈深度。 */
 #define IMU_TASK_STACK_DEPTH 512U
+/* IMU 采样任务的优先级。 */
 #define IMU_TASK_PRIORITY 0U
+/* IMU 采样与 yaw 更新周期，单位为毫秒。 */
 #define IMU_SAMPLE_INTERVAL_MS 10U
+/* 连续读取失败达到该次数后重新初始化 BMI160。 */
 #define IMU_REINIT_FAILURE_THRESHOLD 3U
+/* 灰度采样任务的执行周期，单位为毫秒。 */
 #define GRAY_SAMPLE_INTERVAL_MS 10U
+/* 灰度采样任务的栈深度。 */
 #define GRAY_TASK_STACK_DEPTH 512U
 
+/* 遥测互斥检查 */
+/* 速度、IMU 和灰度遥测不能同时占用 UART0。 */
 #if VOFA_SPEED_PID_TELEMETRY_ENABLE && (IMU_TELEMETRY_ENABLE || GRAY_VOFA_TELEMETRY_ENABLE)
 #error "VOFA telemetry modes cannot be enabled together"
 #endif
+/* IMU 遥测和灰度遥测不能同时占用 UART0。 */
 #if IMU_TELEMETRY_ENABLE && GRAY_VOFA_TELEMETRY_ENABLE
 #error "IMU and grayscale telemetry cannot be enabled together"
 #endif
+/* 只有启用 IMU yaw 解算后，才能发送 IMU yaw 遥测。 */
 #if IMU_TELEMETRY_ENABLE && !IMU_YAW_ENABLE
 #error "IMU telemetry requires IMU yaw to be enabled"
 #endif
+
+/* 蜂鸣器 */
+/* 蜂鸣器功能开关，0 表示默认关闭。 */
 #define BUZZER_FEATURE_ENABLE 0U
+/* 蜂鸣器输出频率，单位为赫兹。 */
 #define BUZZER_FREQUENCY_HZ 2000U
+/* 蜂鸣器 PWM 占空比，单位为百分比。 */
 #define BUZZER_DUTY_PERCENT 50U
+/* 蜂鸣器开启持续时间，单位为毫秒。 */
 #define BUZZER_ON_TIME_MS 200U
+/* 蜂鸣器关闭持续时间，单位为毫秒。 */
 #define BUZZER_OFF_TIME_MS 1800U
 
 #if (BUZZER_FREQUENCY_HZ < 1000U) || (BUZZER_FREQUENCY_HZ > 20000U)

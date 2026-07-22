@@ -3,15 +3,32 @@
 #include <math.h>
 #include <stddef.h>
 
+/* 单位换算 */
+/* 圆周率，用于将角速度从弧度每秒换算为角度每秒。 */
 #define BOARD_IMU_YAW_PI 3.14159265358979323846f
+/* BMI160 在 +/-500 dps 量程下的陀螺仪灵敏度，单位为 LSB/dps。 */
 #define BOARD_IMU_YAW_GYRO_LSB_PER_DPS 65.6f
+/* BMI160 在 +/-4 g 量程下的加速度灵敏度，单位为 LSB/g。 */
 #define BOARD_IMU_YAW_ACCEL_LSB_PER_G 8192.0f
+
+/* 传感器方向 */
+/* 陀螺仪 Z 轴符号，按安装方向决定，+1 表示无需反向。 */
 #define BOARD_IMU_YAW_GYRO_Z_SIGN 1.0f
+
+/* 融合权重 */
+/* 陀螺仪角速度在融合结果中的权重。 */
 #define BOARD_IMU_YAW_GYRO_WEIGHT 0.98f
+/* 左右轮差速里程计角速度在融合结果中的权重。 */
 #define BOARD_IMU_YAW_ENCODER_WEIGHT 0.02f
+
+/* 静止判定与零偏跟踪 */
+/* 左右轮速度绝对值均低于该阈值时，允许判定车辆处于静止状态。 */
 #define BOARD_IMU_YAW_STATIONARY_SPEED_MM_PER_S 20.0f
+/* 静止判定时允许的加速度模长下限，单位为 g。 */
 #define BOARD_IMU_YAW_ACCEL_NORM_MIN_G 0.80f
+/* 静止判定时允许的加速度模长上限，单位为 g。 */
 #define BOARD_IMU_YAW_ACCEL_NORM_MAX_G 1.20f
+/* 静止状态下零偏指数跟踪的时间常数，单位为秒。 */
 #define BOARD_IMU_YAW_BIAS_TIME_CONSTANT_S 10.0f
 
 static float gyro_z_to_dps(int16_t raw_value)
