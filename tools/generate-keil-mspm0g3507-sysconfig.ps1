@@ -1,8 +1,10 @@
 [CmdletBinding()]
 param(
     [string] $ProjectRoot,
-    [string] $SdkRoot = 'D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07',
-    [string] $SysConfigRoot = 'D:\Software\ti\ccs2020\sysconfig_1.26.2'
+    [string] $SdkRoot,
+    [string] $SysConfigRoot,
+    [string] $Compiler,
+    [string] $CcsRoot
 )
 
 Set-StrictMode -Version Latest
@@ -12,7 +14,12 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent $PSScriptRoot
 }
 
-$sysConfig = Join-Path $SysConfigRoot 'sysconfig_cli.bat'
+. (Join-Path $PSScriptRoot 'toolchain.ps1')
+$toolchain = Get-ToolchainConfig -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot -Compiler $Compiler -CcsRoot $CcsRoot
+Assert-ToolchainConfig -Config $toolchain -Required @('SdkRoot', 'SysConfig')
+$SdkRoot = $toolchain.SdkRoot
+$SysConfigRoot = $toolchain.SysConfigRoot
+$sysConfig = $toolchain.SysConfig
 $product = Join-Path $SdkRoot '.metadata\product.json'
 $source = Join-Path $ProjectRoot 'mspm0g3507_app\mspm0g3507_app.syscfg'
 $output = Join-Path $ProjectRoot 'keil\mspm0g3507_app\Generated'

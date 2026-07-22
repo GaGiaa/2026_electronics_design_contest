@@ -1,9 +1,11 @@
 [CmdletBinding()]
 param(
     [string] $ProjectRoot,
-    [string] $SdkRoot = 'D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07',
-    [string] $SysConfigRoot = 'D:\Software\ti\ccs2020\sysconfig_1.26.2',
-    [string] $KeilRoot = 'D:\Keil_v5',
+    [string] $SdkRoot,
+    [string] $SysConfigRoot,
+    [string] $Compiler,
+    [string] $CcsRoot,
+    [string] $KeilRoot,
     [ValidateSet(0, 1)]
     [int] $VofaSpeedPidTelemetryEnable,
     [ValidateSet(0, 1)]
@@ -23,17 +25,25 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent $PSScriptRoot
 }
 
+. (Join-Path $PSScriptRoot 'toolchain.ps1')
+$toolchain = Get-ToolchainConfig -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot -Compiler $Compiler -CcsRoot $CcsRoot -KeilRoot $KeilRoot
+Assert-ToolchainConfig -Config $toolchain -Required @('SdkRoot', 'SysConfigRoot', 'KeilRoot', 'Uv4')
+$SdkRoot = $toolchain.SdkRoot
+$SysConfigRoot = $toolchain.SysConfigRoot
+$KeilRoot = $toolchain.KeilRoot
+
 $projectDir = Join-Path $ProjectRoot 'keil\mspm0g3507_app'
-$projectFile = Join-Path $projectDir 'mspm0g3507_app.uvprojx'
+$projectTemplate = Join-Path $projectDir 'mspm0g3507_app.uvprojx'
+$projectFileGenerator = Join-Path $PSScriptRoot 'generate-keil-project.ps1'
 $generator = Join-Path $PSScriptRoot 'generate-keil-mspm0g3507-sysconfig.ps1'
-$uv4 = Join-Path $KeilRoot 'UV4\UV4.exe'
+$uv4 = $toolchain.Uv4
 $objects = Join-Path $projectDir 'Objects'
 $log = Join-Path $objects 'build.log'
 $axf = Join-Path $objects 'mspm0g3507_app.axf'
 $hex = Join-Path $objects 'mspm0g3507_app.hex'
 $map = Join-Path $projectDir 'mspm0g3507_app.map'
 
-foreach ($path in @($projectFile, $generator, $uv4)) {
+foreach ($path in @($projectTemplate, $projectFileGenerator, $generator, $uv4)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Required Keil build path is unavailable: $path"
     }
@@ -49,6 +59,11 @@ $protectedPaths += Get-ChildItem -LiteralPath (Join-Path $ProjectRoot '.vscode')
 $beforeHashes = @{}
 foreach ($path in $protectedPaths) {
     $beforeHashes[$path] = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
+}
+
+$projectFile = & $projectFileGenerator -ProjectRoot $ProjectRoot -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot
+if ([string]::IsNullOrWhiteSpace($projectFile) -or -not (Test-Path -LiteralPath $projectFile -PathType Leaf)) {
+    throw 'Keil project generation failed.'
 }
 
 $projectFileContent = $null

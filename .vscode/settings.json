@@ -1,10 +1,10 @@
 {
-  "C_Cpp.default.compilerPath": "D:/Software/ti/ccs2020/ccs/tools/compiler/ti-cgt-armllvm_4.0.3.LTS/bin/tiarmclang.exe",
+  "C_Cpp.default.compilerPath": "${env:TI_ARM_CLANG}",
   "C_Cpp.default.includePath": [
     "${workspaceFolder}/mspm0l1306_bringup",
     "${workspaceFolder}/mspm0l1306_bringup/Debug",
-    "D:/Software/ti/ccs2020/mspm0_sdk_2_11_00_07/source",
-    "D:/Software/ti/ccs2020/mspm0_sdk_2_11_00_07/source/third_party/CMSIS/Core/Include"
+    "${env:MSPM0_SDK_ROOT}/source",
+    "${env:MSPM0_SDK_ROOT}/source/third_party/CMSIS/Core/Include"
   ],
   "files.exclude": { "**/Debug": true }
 }

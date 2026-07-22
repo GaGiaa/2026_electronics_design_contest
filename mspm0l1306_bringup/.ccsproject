@@ -13,6 +13,5 @@
 	<activeTargetConfiguration value="targetConfigs/MSPM0L1306.ccxml"/>
 	<isTargetConfigurationManual value="false"/>
 	<sourceLookupPath value="${COM_TI_MSPM0_SDK_INSTALL_DIR}/source/ti/driverlib"/>
-	<origin value="D:/desktop/CCS_test/mspm0l1306_bringup"/>
 	<filesToOpen value="mspm0l1306_bringup.syscfg,README.md"/>
 </projectOptions>

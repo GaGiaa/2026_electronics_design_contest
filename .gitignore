@@ -10,6 +10,7 @@
 /keil/mspm0g3507_app/Listings/
 /keil/mspm0g3507_app/*.uvoptx
 /keil/mspm0g3507_app/*.uvguix*
+/keil/mspm0g3507_app/*.local.uvprojx
 /keil/mspm0g3507_app/EventRecorderStub.scvd
 /keil/mspm0g3507_app/*.axf
 /keil/mspm0g3507_app/*.hex

@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [string] $ProjectRoot,
-    [string] $KeilRoot = 'D:\Keil_v5'
+    [string] $KeilRoot,
+    [string] $SdkRoot,
+    [string] $SysConfigRoot,
+    [string] $CcsRoot
 )
 
 Set-StrictMode -Version Latest
@@ -11,8 +14,16 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent $PSScriptRoot
 }
 
-$projectFile = Join-Path $ProjectRoot 'keil\mspm0g3507_app\mspm0g3507_app.uvprojx'
-$uv4 = Join-Path $KeilRoot 'UV4\UV4.exe'
+. (Join-Path $PSScriptRoot 'toolchain.ps1')
+$toolchain = Get-ToolchainConfig -KeilRoot $KeilRoot -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot -CcsRoot $CcsRoot
+Assert-ToolchainConfig -Config $toolchain -Required @('KeilRoot', 'Uv4', 'SdkRoot', 'SysConfigRoot')
+$KeilRoot = $toolchain.KeilRoot
+$uv4 = $toolchain.Uv4
+$generator = Join-Path $PSScriptRoot 'generate-keil-project.ps1'
+$projectFile = & $generator -ProjectRoot $ProjectRoot -SdkRoot $toolchain.SdkRoot -SysConfigRoot $toolchain.SysConfigRoot
+if ([string]::IsNullOrWhiteSpace($projectFile) -or -not (Test-Path -LiteralPath $projectFile -PathType Leaf)) {
+    throw 'Keil project generation failed.'
+}
 
 foreach ($path in @($uv4, $projectFile)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {

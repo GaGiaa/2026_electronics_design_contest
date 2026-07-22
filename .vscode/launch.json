@@ -9,7 +9,7 @@
       "gdbTarget": "localhost:3333",
       "cwd": "${workspaceFolder}/mspm0l1306_bringup",
       "executable": "${workspaceFolder}/mspm0l1306_bringup/Debug/mspm0l1306_bringup.out",
-      "gdbPath": "D:/Software/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb.exe",
+      "gdbPath": "${env:ARM_GDB_PATH}",
       "device": "MSPM0L1306",
       "preLaunchTask": "MSPM0: Build"
     },
@@ -21,7 +21,7 @@
       "gdbTarget": "localhost:3333",
       "cwd": "${workspaceFolder}/mspm0g3507_bringup",
       "executable": "${workspaceFolder}/mspm0g3507_bringup/Debug/mspm0g3507_bringup.out",
-      "gdbPath": "D:/Software/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb.exe",
+      "gdbPath": "${env:ARM_GDB_PATH}",
       "device": "MSPM0G3507",
       "preLaunchTask": "MSPM0G3507: Build"
     },
@@ -33,7 +33,7 @@
       "gdbTarget": "localhost:3333",
       "cwd": "${workspaceFolder}/mspm0g3507_freertos",
       "executable": "${workspaceFolder}/mspm0g3507_freertos/Debug/mspm0g3507_freertos.out",
-      "gdbPath": "D:/Software/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb.exe",
+      "gdbPath": "${env:ARM_GDB_PATH}",
       "device": "MSPM0G3507",
       "preLaunchTask": "MSPM0G3507 FreeRTOS: Build"
     },
@@ -45,7 +45,7 @@
       "gdbTarget": "localhost:3333",
       "cwd": "${workspaceFolder}/mspm0g3507_app",
       "executable": "${workspaceFolder}/mspm0g3507_app/Debug/mspm0g3507_app.out",
-      "gdbPath": "D:/Software/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb.exe",
+      "gdbPath": "${env:ARM_GDB_PATH}",
       "device": "MSPM0G3507",
       "preLaunchTask": "MSPM0G3507 App: Build"
     }
