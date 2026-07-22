@@ -319,12 +319,11 @@ first、Motorola mode 3，PB0 配置为高电平空闲 GPIO CS。上电后驱动
 0x0C 连续读取至加速度数据结束寄存器 0x17 的 12 字节，并按“陀螺仪三轴在前、
 加速度三轴在后”解析六个有符号原始值。
 
-独立静态 FreeRTOS IMU 任务每 10 ms 读取一次数据，并复用目标基线已有的
-`board_uart_write()` 静态帧队列输出：
+独立静态 FreeRTOS IMU 任务每 10 ms 读取一次数据。启用 yaw 遥测时，复用目标基线已有的
+`board_uart_write()` 静态帧队列输出 16 字节 JustFloat 帧：
 
 ```text
-bmi160,id=0xD1,status=0
-imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
+float yaw_deg, float yaw_rate_dps, float gyro_bias_z_dps, 00 00 80 7F
 ```
 
 初始化失败每秒重试，连续三次采样失败后重新初始化。当前已完成目标提交
@@ -333,9 +332,9 @@ imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
 接近 0dps，编码器遥测、IMU 报文和 UART 回显未出现交叉损坏。后续烧录仍需
 遵循明确授权原则。
 
-`main.c` 中的 `IMU_TELEMETRY_ENABLE` 是 IMU 串口输出的编译期开关，默认值为
-`0U`。设为 `1U` 后输出初始化状态、采样错误和六轴原始数据；设为 `0U` 时仅
-关闭这些 UART 报文，IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。
+`main.c` 中的 `IMU_TELEMETRY_ENABLE` 是 yaw JustFloat 输出的编译期开关，默认值为
+`0U`。与 `IMU_YAW_ENABLE=1U` 同时启用后，输出 yaw、yaw 角速度和 Z 轴陀螺零偏三个
+float 通道；IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。
 
 ### 四个低有效按键
 
@@ -379,7 +378,7 @@ Keil 构建脚本也使用相同的 `-EncoderDecodeMode 2` 参数。两个构建
 ### VOFA+ JustFloat 速度环遥测
 
 `mspm0g3507_app/main.c` 的 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 是速度环调参
-专用 UART 编译开关，默认 `1U`。设为 `0U` 时恢复 UART 文本回显，设为 `1U` 后，
+专用 UART 编译开关，默认 `0U`。设为 `1U` 后，
 `telemetry_task` 以 10 ms 周期
 通过既有 `board_uart_write()` 静态帧队列发送 VOFA+ JustFloat 二进制帧。每帧为
 三个小端 IEEE-754 `float32` 加帧尾 `00 00 80 7F`，固定 16 字节；字段顺序为当前
@@ -387,8 +386,8 @@ Keil 构建脚本也使用相同的 `-EncoderDecodeMode 2` 参数。两个构建
 `output_duty_percent`。非法轮位自动降级为前左轮，调试模式未使能时仍按所选轮位输出
 状态。
 
-VOFA 模式独占 UART0 输出：UART 回显任务不会创建，BMI160 初始化、错误和采样文本
-也被编译期抑制，不能在该模式下向串口发送文本或同时使用文本串口监视器。VOFA+ 选择
+VOFA 模式独占 UART0 输出：UART 回显任务不会创建，不能在该模式下向串口发送文本或同时使用
+文本串口监视器。VOFA+ 选择
 JustFloat 后应观察三条曲线以 100 Hz 更新；先低速确认编码器符号，再调整
 `g_motor_debug.speed_pid_params`。电机运动时禁止设置断点。新增
 `mspm0g3507_app/vofa_justfloat.c/.h` 为无硬件依赖编码模块，主机测试覆盖固定帧长、
@@ -475,6 +474,124 @@ Flash。硬件验收仍须先手动转轮确认编码器符号和单圈计数，
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1
+### Optional one-dimensional vehicle yaw estimator
+
+`mspm0g3507_app/board_imu_yaw.c/.h` adds a lightweight relative-yaw
+estimator without adding a FreeRTOS task. `imu_task` supplies the BMI160
+sample and a coherent snapshot of all four encoder speeds every 10 ms. The
+estimator converts the configured +/-500 dps gyro range, calibrates the Z gyro
+bias over 100 stationary samples, and fuses gyro yaw rate with the differential
+encoder yaw rate using 98% gyro and 2% encoder weighting.
+
+`main.c` keeps `IMU_YAW_ENABLE` at `0U` by default. The measured distance
+between the left and right wheel centers is 130 mm, so
+`IMU_YAW_TRACK_WIDTH_MM` is `130.0f`. With `IMU_TELEMETRY_ENABLE=1U` and
+`IMU_YAW_ENABLE=1U`, the IMU task sends a 16-byte JustFloat frame every 10 ms.
+Its channels are `yaw_deg`, `yaw_rate_dps`, and `gyro_bias_z_dps`, followed by
+the standard `00 00 80 7F` tail. The output is a relative yaw normalized to
+`[-180, 180)`; no absolute heading is available from the current six-axis
+sensor alone.
+
+## 给下一位 AI 的当前上下文：车辆 IMU Yaw 功能测试
+
+### 1. 工作区和 Git 状态
+
+- 工作区：`C:\Users\ayou\.codex\worktrees\9409\2026_electronics_design_contest`
+- 当前分支：`develop_1`，显示为 `develop_1...origin/develop_1 [gone]`。
+- 当前工作树不是干净状态。本次 yaw 功能相关修改尚未提交，不能使用
+  `git reset --hard`、`git checkout --` 或其他方式回退现有修改。
+- 已存在的按键功能、BMI160、编码器、蜂鸣器、WS2812、UART 和 Keil 迁移修改都属于当前工程的一部分，继续工作时必须保留。
+- 最近已提交的按键相关提交为 `658f6b8` 和 `8e5fe8c`；yaw 功能目前是未提交修改。
+
+### 2. 用户下一步目标
+
+用户准备测试本次新增的车载 IMU 相对 yaw 功能，并可能把工作交给另一个 AI。
+当前任务重点是硬件测试和问题定位，不要未经用户明确授权就擦除 Flash、烧录、启动调试会话或修改硬件连接。
+
+### 3. 本次新增文件和接口
+
+- `mspm0g3507_app/board_imu_yaw.h`
+  - 暴露 `board_imu_yaw_state_t`。
+  - 暴露 `board_imu_yaw_init(state, track_width_mm)`。
+  - 暴露 `board_imu_yaw_update(state, imu_sample, encoder_samples, dt_s)`。
+- `mspm0g3507_app/board_imu_yaw.c`
+  - 纯算法模块，不依赖 FreeRTOS 或 GPIO。
+  - 当前只使用 BMI160 的 Z 轴陀螺仪计算 yaw 角速度，同时使用加速度模长判断是否静止。
+- `tests/test_board_imu_yaw.c` 和 `tests/test_board_imu_yaw.ps1`
+  - 使用本机 GCC 编译运行算法边界测试。
+- `main.c`、TI Clang 构建脚本、Keil `uvprojx`、静态测试和 README 已同步修改。
+
+### 4. 当前算法和精确参数
+
+BMI160 在 `board_bmi160.c` 中配置为：
+
+- 加速度计：`+/-4g`、100 Hz，换算系数为 `8192 LSB/g`。
+- 陀螺仪：`+/-500 dps`、100 Hz，换算系数为 `65.6 LSB/dps`。
+- `imu_task` 每 10 ms 读取一次样本。
+- `board_bmi160_read_sample()` 的字段顺序已经是 `gyro_x/y/z` 后跟 `accel_x/y/z`，不要重复交换。
+
+Yaw 算法流程：
+
+1. 启动后要求车辆静止，并累计 100 个有效静止样本，约 1 秒。
+2. 静止判断条件：左右平均轮速绝对值均不超过 `20 mm/s`，且加速度模长在 `0.8g` 到 `1.2g` 之间。
+3. 100 个样本的 `gyro_z` 平均值作为 `gyro_bias_z_dps`。
+4. 左右轮速度分别为：
+   - `left = (front_left + rear_left) / 2`
+   - `right = (front_right + rear_right) / 2`
+5. 编码器角速度：
+   - `yaw_rate_encoder = (right - left) / track_width_mm * 180 / pi`
+6. 融合角速度：
+   - `yaw_rate = 0.98 * (gyro_z - gyro_bias_z) + 0.02 * yaw_rate_encoder`
+7. `yaw += yaw_rate * 0.01`，并归一化到 `[-180, 180)`。
+8. 车辆静止时以 10 秒时间常数慢速继续更新陀螺仪 Z 轴零偏。
+
+当前坐标约定是 `+X` 向车头、`+Y` 向车体左侧、`+Z` 向上；正的 Z 轴角速度表示左转。若实体安装方向相反，先修改
+`board_imu_yaw.c` 中的 `BOARD_IMU_YAW_GYRO_Z_SIGN` 为 `-1.0f`，不要立即重写融合算法。
+
+### 5. 必须先确认的编译期开关和参数
+
+`mspm0g3507_app/main.c` 当前默认值：
+
+```c
+#define IMU_TELEMETRY_ENABLE 0U
+#define IMU_YAW_ENABLE 0U
+#define IMU_YAW_TRACK_WIDTH_MM 130.0f
+```
+
+进行 UART yaw 测试时使用构建脚本临时覆盖：
+
+```c
+#define IMU_TELEMETRY_ENABLE 1U
+#define IMU_YAW_ENABLE 1U
+```
+
+`IMU_YAW_TRACK_WIDTH_MM` 已按实测左右轮中心距设置为 `130.0f`。
+`VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认值为 `0U`；VOFA 速度遥测和 IMU yaw
+遥测不能同时启用。
+
+按键功能的 `BUTTON_FEATURE_ENABLE` 当前也为 `0U`；本次 yaw 测试不需要打开它。不要为了测试 yaw 合并或新增 FreeRTOS 任务。
+
+### 6. UART 输出格式
+
+只有 `IMU_TELEMETRY_ENABLE=1U` 且同时开启 yaw 时才输出 IMU JustFloat 报文，
+格式为三个小端 IEEE-754 `float32` 和帧尾 `00 00 80 7F`，固定 16 字节：
+
+```text
+float yaw_deg, float yaw_rate_dps, float gyro_bias_z_dps, 00 00 80 7F
+```
+
+其中：
+
+- 三个 float 通道分别是相对 yaw（度）、yaw 角速度（度/秒）和 Z 轴陀螺零偏（度/秒）。
+- yaw 是相对于启动方向的相对角度，不是绝对北向。
+- 当前六轴 BMI160 没有磁力计，因此长期绝对 yaw 漂移属于设计限制，不应直接判定为驱动故障。
+
+### 7. 已完成的自动验证
+
+以下命令在当前工作区已经通过：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_board_imu_yaw.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
 powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
@@ -533,3 +650,18 @@ MAP 生成。灰度传感器实体接线、编码器方向与单圈计数、低�
 `git push`、创建 Pull Request 或其他向 Git 远程仓库上传/发布的操作。
 普通开发任务只允许修改工作区并运行必要的本地验证；提交、推送或发布前
 必须等待用户明确指令。
+算法测试覆盖：启动零偏、静止不漂移、陀螺仪积分、编码器转向符号、yaw 回绕。
+本次迁移后的 yaw 测试使用 130 mm 左右轮中心距；车辆坐标为 +X 朝车头、+Y 朝车体左侧、+Z 朝上，
+`BOARD_IMU_YAW_GYRO_Z_SIGN` 保持 `1.0f`。默认关闭配置不会输出 yaw；UART 测试通过构建参数临时关闭
+VOFA 并打开 IMU JustFloat yaw 遥测：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1
+```
+
+算法和构建验证不代表实体验收。后续实体顺序为：上电静止至少 2 秒、静止观察 30 秒、手动左右转、直线推行、原地转向，最后记录急转弯或打滑时编码器与陀螺仪角速度差异。当前未执行 Flash 擦除、烧录、探针枚举、GDB 服务或调试连接。
+
+### 2026-07-22 IMU Yaw 实体测试反馈
+
+用户已完成当前版本实体测试，反馈相对 yaw 功能“勉强能用”。当前主要遗留问题是陀螺仪 Z 轴零偏及其长期稳定性，后续应优先审视静止校准样本、零偏慢速更新时间常数和温漂影响；在此之前不应盲目提高编码器融合权重。

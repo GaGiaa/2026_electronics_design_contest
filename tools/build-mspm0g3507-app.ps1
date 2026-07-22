@@ -2,6 +2,10 @@
 param(
     [ValidateSet(0, 1)]
     [int] $VofaSpeedPidTelemetryEnable,
+    [ValidateSet(0, 1)]
+    [int] $ImuTelemetryEnable,
+    [ValidateSet(0, 1)]
+    [int] $ImuYawEnable,
     [ValidateSet(1, 2)]
     [int] $EncoderDecodeMode
 )
@@ -35,6 +39,12 @@ $commonCompilerArguments = @('-c', '@device.opt', '-march=thumbv6m', '-mcpu=cort
 if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
     $commonCompilerArguments += "-DVOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
 }
+if ($PSBoundParameters.ContainsKey('ImuTelemetryEnable')) {
+    $commonCompilerArguments += "-DIMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('ImuYawEnable')) {
+    $commonCompilerArguments += "-DIMU_YAW_ENABLE=$ImuYawEnable"
+}
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $commonCompilerArguments += "-DBOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
 }
@@ -43,6 +53,7 @@ $sources = @(
     @{ Source = (Join-Path $ProjectDir 'encoder_quadrature.c'); Object = 'encoder_quadrature.o' },
     @{ Source = (Join-Path $ProjectDir 'board_buzzer.c'); Object = 'board_buzzer.o' },
     @{ Source = (Join-Path $ProjectDir 'board_bmi160.c'); Object = 'board_bmi160.o' },
+    @{ Source = (Join-Path $ProjectDir 'board_imu_yaw.c'); Object = 'board_imu_yaw.o' },
     @{ Source = (Join-Path $ProjectDir 'board_buttons.c'); Object = 'board_buttons.o' },
     @{ Source = (Join-Path $ProjectDir 'board_grayscale.c'); Object = 'board_grayscale.o' },
     @{ Source = (Join-Path $ProjectDir 'motor_pid\pid.c'); Object = 'motor_pid.o' },
@@ -64,6 +75,6 @@ $sources = @(
 Push-Location $BuildDir
 try {
     foreach ($source in $sources) { Invoke-CheckedCommand -FilePath $Compiler -Arguments ($commonCompilerArguments + @('-o', $source.Object, $source.Source)) -Description "Compiling $($source.Object)" }
-    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\motor_pid", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'encoder_quadrature.o', 'board_buzzer.o', 'board_bmi160.o', 'board_buttons.o', 'board_grayscale.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_uart.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
+    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\motor_pid", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'encoder_quadrature.o', 'board_buzzer.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_uart.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
 }
 finally { Pop-Location }
