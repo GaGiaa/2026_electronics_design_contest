@@ -499,6 +499,34 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 烧录 Flash。如果 Keil 安装在其他目录，可以运行启动脚本时传入 `-KeilRoot`
 参数，或修改脚本中的默认路径。
 
+## 2026-07-22 develop_3 编码器更新合并
+
+已在当前 `develop` 基线执行普通非快进合并，合并提交为
+`f492f8aead889590f583b5fe977ef852bac1624f`，第二父提交为目标
+`9cd4d8e808020cb4072eba0e08487580fb2b8b3`。本次同时纳入其父提交中的 VOFA+
+JustFloat 速度环遥测，并保留当前分支的八路灰度采样、四个低有效按键、BMI160、
+WS2812、蜂鸣器和静态 UART 帧队列。
+
+冲突处理后的应用入口同时支持 GPIOA/GPIOB GROUP1 中断分发、A 相双沿和 AB 正交 X4
+解码、编码器机械参数派生、VOFA 二进制遥测、按键任务和灰度任务。VOFA 遥测默认开启，
+UART 回显和 BMI160 文本遥测在 VOFA 模式下按编译期开关抑制；未执行 Flash 擦除或烧录。
+
+本次实际验证命令均返回成功：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1 -EncoderDecodeMode 1
+powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1 -EncoderDecodeMode 2
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
+```
+
+CCS/TI Clang 构建完成 SysConfig 生成、应用 ELF 编译和链接；Keil 构建完成 AXF、HEX、
+MAP 生成。灰度传感器实体接线、编码器方向与单圈计数、低速 PID 调试、VOFA 硬件验收
+仍属于后续硬件事项。
+
 ## Git 操作授权规则
 
 在本工程中，除非用户明确要求，否则 AI 不得自行执行 `git commit`、
