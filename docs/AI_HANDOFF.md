@@ -379,7 +379,8 @@ Keil 构建脚本也使用相同的 `-EncoderDecodeMode 2` 参数。两个构建
 ### VOFA+ JustFloat 速度环遥测
 
 `mspm0g3507_app/main.c` 的 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 是速度环调参
-专用 UART 编译开关，默认 `1U`。设为 `0U` 时恢复 UART 文本回显，设为 `1U` 后，
+专用 UART 编译开关，默认 `0U`。设为 `1U` 时启用速度环 JustFloat，设为 `0U` 时
+恢复 UART 文本回显；
 `telemetry_task` 以 10 ms 周期
 通过既有 `board_uart_write()` 静态帧队列发送 VOFA+ JustFloat 二进制帧。每帧为
 三个小端 IEEE-754 `float32` 加帧尾 `00 00 80 7F`，固定 16 字节；字段顺序为当前
@@ -439,10 +440,12 @@ PB13/PB1/PB23 配置为 AD0/AD1/AD2 推挽输出。驱动每次切换地址后�
 对每路执行 8 次单次 ADC 转换并取平均，避免重复转换模式下同步等待无法结束。
 原始值、0..4095 归一化值和带滞回的 8 位数字值发布到 `g_grayscale_snapshot`。
 
-应用灰度任务使用静态内存，每 10 ms 采样一次；`GRAY_TELEMETRY_ENABLE` 默认
-为 `0U`，设为 `1U` 后每 100 ms 通过现有串行帧队列输出 `gray,raw=...,norm=...,
-digital=0x..`。当前默认白值为每路 3000、黑值为每路 500，仅是起始标定参数，
-必须在固定实际安装高度后替换为实测值。
+应用灰度任务使用静态内存，每 10 ms 采样一次；`GRAY_VOFA_TELEMETRY_ENABLE`
+默认值为 `0U`，设为 `1U` 后每 100 ms 通过现有串行帧队列输出 22 通道、92 字节的
+VOFA+ JustFloat 帧。通道 `0..7` 为 `raw`，`8..15` 为 `normalized`，之后依次为
+`digital`、`black_mask`、`black_count`、`line_error`、`line_strength` 和
+`sequence`。不再输出 `gray,raw=...` 文本帧；当前白值/黑值数组已经是实测标定值，
+不得替换成未经确认的默认值。
 
 本次已完成灰度静态集成检查、CCS SysConfig/TI Clang 构建和 Keil SysConfig/UV4
 构建。Keil 构建日志为 `0 Error(s), 0 Warning(s)`，并生成 AXF/HEX。尚未完成
@@ -533,3 +536,46 @@ MAP 生成。灰度传感器实体接线、编码器方向与单圈计数、低�
 `git push`、创建 Pull Request 或其他向 Git 远程仓库上传/发布的操作。
 普通开发任务只允许修改工作区并运行必要的本地验证；提交、推送或发布前
 必须等待用户明确指令。
+### 2026-07-22 灰度黑线观察变量
+
+G3507 应用新增 `line_tracking.c/.h`。现有 `digital` 字段继续保留，语义为
+`1=白色`、`0=黑线`。灰度快照新增 `black_mask`、`black_count`、
+`line_strength` 和有符号 `line_error`；`black_mask` 的 bit N 对应 channel[N]，
+bit 为 1 表示该路判定为黑线。
+
+`line_error` 使用 `4095-normalized[i]` 作为黑线强度，权重为
+`{-3500,-2500,-1500,-500,500,1500,2500,3500}`。总黑线强度为零时保留上一帧误差。
+当前数据通过 SWD/Live Expressions 和可选灰度 UART 遥测观察，尚未接入电机目标或 PWM。
+`mspm0g3507_app/main.c` 中的当前逐路标定值为实测值：
+`white={2834,3064,2150,1924,3099,3032,3182,2467}`，
+`black={353,1075,139,189,1027,593,2033,110}`。
+
+新增模块已纳入 CCS 和 Keil 构建。主机侧灰度测试以及 CCS/Keil 静态集成检查已通过。
+仍需在实际传感器上验证白黑归一化值、通道到位图的映射、黑线横向移动时的误差变化，
+以及全白、全黑等特殊状态。
+
+### 2026-07-22 灰度数据改为 VOFA+ JustFloat 遥测
+
+灰度文本遥测已移除，新增独立编译开关 `GRAY_VOFA_TELEMETRY_ENABLE`，默认值为
+`0U`。速度环开关 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 也默认为 `0U`；两个开关
+不能同时为 `1U`，否则 `main.c` 编译报错。默认构建恢复 UART 普通回显；任一
+VOFA 模式启用时，UART 回显和 BMI160 文本输出均关闭。
+
+灰度 VOFA 使用 VOFA+ JustFloat、小端 `float32` 和帧尾 `00 00 80 7F`，每 100 ms
+发送一帧固定 22 通道、92 字节的数据，顺序为：
+
+- `0..7`：`raw[0..7]`
+- `8..15`：`normalized[0..7]`
+- `16`：`digital`，`1=白色`、`0=黑线`
+- `17`：`black_mask`，bit N 对应 channel N，`1=黑线`
+- `18`：`black_count`
+- `19`：`line_error`
+- `20`：`line_strength`
+- `21`：`sequence`
+
+CCS 构建可使用 `-GrayVofaTelemetryEnable 1`，Keil 构建使用同名参数；灰度
+观察配置应显式传入 `-VofaSpeedPidTelemetryEnable 0`。本轮只提供 SWD/Live
+Expressions 和 VOFA+ 观察数据，模拟位置误差尚未驱动电机目标或 PWM。当前
+`main.c` 中的白值/黑值数组是用户完成实际校准后的实测值，不能替换为默认值。
+硬件验收仍需人工确认 22 条曲线、通道位图映射、归一化方向、横向移动时的误差
+变化，以及全白、全黑和丢线状态；构建通过不等于传感器硬件验收通过。

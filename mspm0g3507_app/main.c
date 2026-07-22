@@ -13,6 +13,7 @@
 #include "board_motor.h"
 #include "board_uart.h"
 #include "board_ws2812.h"
+#include "line_tracking.h"
 #include "motor_control.h"
 #include "ti_msp_dl_config.h"
 #include "vofa_justfloat.h"
@@ -30,20 +31,27 @@
 #define BUTTON_TASK_INTERVAL_MS 10U
 #define TELEMETRY_TASK_PRIORITY 0U
 #ifndef VOFA_SPEED_PID_TELEMETRY_ENABLE
-#define VOFA_SPEED_PID_TELEMETRY_ENABLE 1U
+#define VOFA_SPEED_PID_TELEMETRY_ENABLE 0U
 #endif
 #define VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS 10U
 #define VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH 256U
 #define VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY 0U
+#ifndef GRAY_VOFA_TELEMETRY_ENABLE
+#define GRAY_VOFA_TELEMETRY_ENABLE 0U
+#endif
+#define GRAY_VOFA_TELEMETRY_INTERVAL_MS 100U
+#define GRAY_VOFA_CHANNEL_COUNT 22U
 #define IMU_TELEMETRY_ENABLE 0U
 #define IMU_TASK_STACK_DEPTH 512U
 #define IMU_TASK_PRIORITY 0U
 #define IMU_SAMPLE_INTERVAL_MS 10U
 #define IMU_REINIT_FAILURE_THRESHOLD 3U
-#define GRAY_TELEMETRY_ENABLE 0U
 #define GRAY_SAMPLE_INTERVAL_MS 10U
-#define GRAY_TELEMETRY_INTERVAL_MS 100U
 #define GRAY_TASK_STACK_DEPTH 512U
+
+#if VOFA_SPEED_PID_TELEMETRY_ENABLE && GRAY_VOFA_TELEMETRY_ENABLE
+#error "Speed and grayscale VOFA telemetry cannot be enabled together"
+#endif
 
 #define BUZZER_FEATURE_ENABLE 0U
 #define BUZZER_FREQUENCY_HZ 2000U
@@ -63,7 +71,7 @@ static StaticTask_t g_motor_task_buffer;
 static StackType_t g_motor_task_stack[MOTOR_TASK_STACK_DEPTH];
 static StaticTask_t g_ws2812_task_buffer;
 static StackType_t g_ws2812_task_stack[WS2812_TASK_STACK_DEPTH];
-#if !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
 static StaticTask_t g_uart_task_buffer;
 static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
 #endif
@@ -81,7 +89,7 @@ static StaticTask_t g_imu_task_buffer;
 static StackType_t g_imu_task_stack[IMU_TASK_STACK_DEPTH];
 static StaticTask_t g_gray_task_buffer;
 static StackType_t g_gray_task_stack[GRAY_TASK_STACK_DEPTH];
-#if GRAY_TELEMETRY_ENABLE
+#if GRAY_VOFA_TELEMETRY_ENABLE
 static StaticTask_t g_gray_telemetry_task_buffer;
 static StackType_t g_gray_telemetry_task_stack[GRAY_TASK_STACK_DEPTH];
 #endif
@@ -95,6 +103,7 @@ static StaticTask_t g_idle_task_buffer;
 static StackType_t g_idle_task_stack[configIDLE_TASK_STACK_DEPTH];
 volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 volatile board_grayscale_snapshot_t g_grayscale_snapshot;
+static line_tracking_state_t g_line_tracking_state;
 static volatile uint32_t g_grayscale_publish_sequence;
 static volatile uint32_t g_encoder_sample_sequence;
 
@@ -239,7 +248,7 @@ static void button_task(void *argument)
 }
 #endif
 
-#if !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
 static void uart_echo_task(void *argument)
 {
     QueueHandle_t queue = (QueueHandle_t)argument;
@@ -278,7 +287,7 @@ static void telemetry_task(void *argument)
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval = pdMS_TO_TICKS(VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS);
     motor_control_wheel_status_t control[BOARD_MOTOR_COUNT];
-    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(VOFA_JUSTFLOAT_CHANNEL_COUNT)];
 
     (void)argument;
     for (;;) {
@@ -307,19 +316,19 @@ static void imu_task(void *argument)
     board_bmi160_status_t status;
     uint8_t chip_id;
     uint32_t consecutive_failures;
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
     char message[128];
 #endif
 
     (void)argument;
     for (;;) {
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
         int length;
 #endif
 
         chip_id = 0U;
         status = board_bmi160_init(&chip_id);
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
         length = snprintf(message, sizeof(message),
                           "bmi160,id=0x%02X,status=%u\r\n",
                           chip_id, (unsigned)status);
@@ -336,7 +345,7 @@ static void imu_task(void *argument)
                 status = board_bmi160_read_sample(&sample);
                 if (status != BOARD_BMI160_STATUS_OK) {
                     ++consecutive_failures;
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
                     length = snprintf(message, sizeof(message),
                                       "bmi160,error=%u\r\n", (unsigned)status);
                     if ((length > 0) && ((size_t)length < sizeof(message))) {
@@ -348,7 +357,7 @@ static void imu_task(void *argument)
                     }
                 } else {
                     consecutive_failures = 0U;
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
                     length = snprintf(message, sizeof(message),
                                       "imu,ax=%+6d,ay=%+6d,az=%+6d,gx=%+6d,gy=%+6d,gz=%+6d\r\n",
                                       sample.accel_x, sample.accel_y, sample.accel_z,
@@ -378,6 +387,10 @@ static void grayscale_snapshot_copy(board_grayscale_snapshot_t *snapshot)
                 snapshot->normalized[channel] = g_grayscale_snapshot.normalized[channel];
             }
             snapshot->digital = g_grayscale_snapshot.digital;
+            snapshot->black_mask = g_grayscale_snapshot.black_mask;
+            snapshot->black_count = g_grayscale_snapshot.black_count;
+            snapshot->line_strength = g_grayscale_snapshot.line_strength;
+            snapshot->line_error = g_grayscale_snapshot.line_error;
             snapshot->sequence = g_grayscale_snapshot.sequence;
             end_sequence = g_grayscale_publish_sequence;
             if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
@@ -392,45 +405,61 @@ static void gray_task(void *argument)
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval = pdMS_TO_TICKS(GRAY_SAMPLE_INTERVAL_MS);
     board_grayscale_snapshot_t sample;
+    line_tracking_result_t tracking;
     uint32_t channel;
 
     (void)argument;
     for (;;) {
         board_grayscale_sample(&sample);
+        line_tracking_update(&g_line_tracking_state, sample.normalized,
+                             sample.digital, &tracking);
+        sample.black_mask = tracking.black_mask;
+        sample.black_count = tracking.black_count;
+        sample.line_strength = tracking.line_strength;
+        sample.line_error = tracking.line_error;
         ++g_grayscale_publish_sequence;
         for (channel = 0U; channel < BOARD_GRAYSCALE_CHANNEL_COUNT; ++channel) {
             g_grayscale_snapshot.raw[channel] = sample.raw[channel];
             g_grayscale_snapshot.normalized[channel] = sample.normalized[channel];
         }
         g_grayscale_snapshot.digital = sample.digital;
+        g_grayscale_snapshot.black_mask = sample.black_mask;
+        g_grayscale_snapshot.black_count = sample.black_count;
+        g_grayscale_snapshot.line_strength = sample.line_strength;
+        g_grayscale_snapshot.line_error = sample.line_error;
         g_grayscale_snapshot.sequence = sample.sequence;
         ++g_grayscale_publish_sequence;
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }
 
-#if GRAY_TELEMETRY_ENABLE
-static void gray_telemetry_task(void *argument)
+#if GRAY_VOFA_TELEMETRY_ENABLE
+static void gray_vofa_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
-    const TickType_t interval = pdMS_TO_TICKS(GRAY_TELEMETRY_INTERVAL_MS);
+    const TickType_t interval = pdMS_TO_TICKS(GRAY_VOFA_TELEMETRY_INTERVAL_MS);
     board_grayscale_snapshot_t snapshot;
-    char message[256];
+    float channels[GRAY_VOFA_CHANNEL_COUNT];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(GRAY_VOFA_CHANNEL_COUNT)];
+    uint32_t channel;
 
     (void)argument;
     for (;;) {
-        int length;
-
         grayscale_snapshot_copy(&snapshot);
-        length = snprintf(message, sizeof(message),
-                          "gray,raw=%u,%u,%u,%u,%u,%u,%u,%u,norm=%u,%u,%u,%u,%u,%u,%u,%u,digital=0x%02X\r\n",
-                          snapshot.raw[0], snapshot.raw[1], snapshot.raw[2], snapshot.raw[3],
-                          snapshot.raw[4], snapshot.raw[5], snapshot.raw[6], snapshot.raw[7],
-                          snapshot.normalized[0], snapshot.normalized[1], snapshot.normalized[2],
-                          snapshot.normalized[3], snapshot.normalized[4], snapshot.normalized[5],
-                          snapshot.normalized[6], snapshot.normalized[7], snapshot.digital);
-        if ((length > 0) && ((size_t)length < sizeof(message))) {
-            board_uart_write((const uint8_t *)message, (size_t)length);
+        for (channel = 0U; channel < BOARD_GRAYSCALE_CHANNEL_COUNT; ++channel) {
+            channels[channel] = (float)snapshot.raw[channel];
+            channels[BOARD_GRAYSCALE_CHANNEL_COUNT + channel] =
+                (float)snapshot.normalized[channel];
+        }
+        channels[16U] = (float)snapshot.digital;
+        channels[17U] = (float)snapshot.black_mask;
+        channels[18U] = (float)snapshot.black_count;
+        channels[19U] = (float)snapshot.line_error;
+        channels[20U] = (float)snapshot.line_strength;
+        channels[21U] = (float)snapshot.sequence;
+        if (vofa_justfloat_encode(frame, sizeof(frame), channels,
+                                  GRAY_VOFA_CHANNEL_COUNT)) {
+            board_uart_write(frame, sizeof(frame));
         }
         vTaskDelayUntil(&last_wake_time, interval);
     }
@@ -459,9 +488,9 @@ int main(void)
 {
     QueueHandle_t uart_queue;
     static const uint16_t grayscale_white[BOARD_GRAYSCALE_CHANNEL_COUNT] =
-        {3000U, 3000U, 3000U, 3000U, 3000U, 3000U, 3000U, 3000U};
+        {2834U, 3064U, 2150U, 1924U, 3099U, 3032U, 3182U, 2467U};
     static const uint16_t grayscale_black[BOARD_GRAYSCALE_CHANNEL_COUNT] =
-        {500U, 500U, 500U, 500U, 500U, 500U, 500U, 500U};
+        {353U, 1075U, 139U, 189U, 1027U, 593U, 2033U, 110U};
 
     SYSCFG_DL_init();
 #if BUTTON_FEATURE_ENABLE
@@ -469,6 +498,7 @@ int main(void)
 #endif
     board_encoder_init();
     board_grayscale_init(grayscale_white, grayscale_black);
+    line_tracking_init(&g_line_tracking_state, 0);
     motor_control_init();
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
     board_buzzer_init(BUZZER_FREQUENCY_HZ, BUZZER_DUTY_PERCENT);
@@ -481,7 +511,7 @@ int main(void)
     configASSERT(xTaskCreateStatic(button_task, "buttons", BUTTON_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_button_task_stack, &g_button_task_buffer) != NULL);
 #endif
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx", UART_TX_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_uart_tx_task_stack, &g_uart_tx_task_buffer) != NULL);
-#if !VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
 #endif
 #if VOFA_SPEED_PID_TELEMETRY_ENABLE
@@ -489,8 +519,8 @@ int main(void)
 #endif
     configASSERT(xTaskCreateStatic(imu_task, "imu", IMU_TASK_STACK_DEPTH, NULL, IMU_TASK_PRIORITY, g_imu_task_stack, &g_imu_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(gray_task, "gray", GRAY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_gray_task_stack, &g_gray_task_buffer) != NULL);
-#if GRAY_TELEMETRY_ENABLE
-    configASSERT(xTaskCreateStatic(gray_telemetry_task, "gray_tele", GRAY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_gray_telemetry_task_stack, &g_gray_telemetry_task_buffer) != NULL);
+#if GRAY_VOFA_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(gray_vofa_task, "gray_vofa", GRAY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_gray_telemetry_task_stack, &g_gray_telemetry_task_buffer) != NULL);
 #endif
 #if BUZZER_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(buzzer_task, "buzzer", BUZZER_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_buzzer_task_stack, &g_buzzer_task_buffer) != NULL);

@@ -201,7 +201,7 @@ static void test_nonfinite_debug_duty_stops_output(void)
 
 static void test_vofa_justfloat_encodes_three_float_channels(void)
 {
-    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(VOFA_JUSTFLOAT_CHANNEL_COUNT)];
     static const uint8_t expected[] = {
         0x00U, 0x00U, 0xC0U, 0x3FU,
         0x00U, 0x00U, 0x10U, 0xC0U,

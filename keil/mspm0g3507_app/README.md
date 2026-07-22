@@ -34,6 +34,23 @@ The project uses the SDK GCC Cortex-M0 FreeRTOS port in the local
 wchar ABI settings (`vShortEn=1`, `vShortWch=1`) to match the SDK Keil DriverLib
 archive.
 
+Both VOFA telemetry modes default to disabled (`VOFA_SPEED_PID_TELEMETRY_ENABLE=0U`
+and `GRAY_VOFA_TELEMETRY_ENABLE=0U`). To build the grayscale JustFloat
+configuration, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 `
+  -VofaSpeedPidTelemetryEnable 0 -GrayVofaTelemetryEnable 1
+```
+
+The grayscale mode sends a 22-channel, 92-byte frame every 100 ms at 115200 baud.
+Channels 0..7 are `raw`, 8..15 are `normalized`, then 16=`digital`,
+17=`black_mask`, 18=`black_count`, 19=`line_error`, 20=`line_strength`, and
+21=`sequence`. All values are little-endian `float32`; the JustFloat tail is
+`00 00 80 7F`. Speed and grayscale VOFA modes are mutually exclusive. The
+grayscale `line_error` is observation-only and does not drive motor targets or
+PWM. Build success does not constitute physical sensor acceptance.
+
 ## Open from VS Code
 
 Run the VS Code task `MSPM0G3507 App: Open Keil Project` to launch
@@ -70,6 +87,10 @@ left floating and the sensor powered from a stable separate 5 V supply. Keil
 generates the ADC and GPIO configuration from the CCS-owned SysConfig source;
 do not edit `Generated/` manually. Physical sensor acceptance is separate from
 the Keil build and requires checking all eight address selections.
+The snapshot keeps `digital` for compatibility (`1=white`, `0=black`) and adds
+`black_mask` (`bit N=1` means channel N is black), `black_count`,
+`line_strength`, and signed `line_error`. The analog line error uses the
+normalized values and is observation-only until a later motor-control change.
 The driver exposes `g_grayscale_adc_timeout_count` for SWD diagnostics. After
 downloading a new AXF, a changing `g_grayscale_snapshot.sequence` confirms
 sampling progress; a changing timeout counter means ADC0 is not reporting the

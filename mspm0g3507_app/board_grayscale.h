@@ -9,7 +9,13 @@
 typedef struct {
     uint16_t raw[BOARD_GRAYSCALE_CHANNEL_COUNT];
     uint16_t normalized[BOARD_GRAYSCALE_CHANNEL_COUNT];
+    /* Existing hysteresis result: 1 means white, 0 means black. */
     uint8_t digital;
+    /* Derived line observation: bit N corresponds to channel N; 1 means black. */
+    uint8_t black_mask;
+    uint8_t black_count;
+    uint32_t line_strength;
+    int32_t line_error;
     uint32_t sequence;
 } board_grayscale_snapshot_t;
 

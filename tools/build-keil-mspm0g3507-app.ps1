@@ -4,6 +4,10 @@ param(
     [string] $SdkRoot = 'D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07',
     [string] $SysConfigRoot = 'D:\Software\ti\ccs2020\sysconfig_1.26.2',
     [string] $KeilRoot = 'D:\Keil_v5',
+    [ValidateSet(0, 1)]
+    [int] $VofaSpeedPidTelemetryEnable,
+    [ValidateSet(0, 1)]
+    [int] $GrayVofaTelemetryEnable,
     [ValidateSet(1, 2)]
     [int] $EncoderDecodeMode
 )
@@ -45,16 +49,29 @@ foreach ($path in $protectedPaths) {
 
 $projectFileContent = $null
 $projectFileBytes = $null
-if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
+if ($PSBoundParameters.ContainsKey('EncoderDecodeMode') -or
+    $PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable') -or
+    $PSBoundParameters.ContainsKey('GrayVofaTelemetryEnable')) {
     $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)
     $projectFileContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $projectFile
-    $projectFileWithMode = $projectFileContent -replace '<Define>__MSPM0G3507__</Define>', "<Define>__MSPM0G3507__,BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode</Define>"
-    if ($projectFileWithMode -eq $projectFileContent) {
+    $defines = @('__MSPM0G3507__')
+    if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
+        $defines += "BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
+    }
+    if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
+        $defines += "VOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
+    }
+    if ($PSBoundParameters.ContainsKey('GrayVofaTelemetryEnable')) {
+        $defines += "GRAY_VOFA_TELEMETRY_ENABLE=$GrayVofaTelemetryEnable"
+    }
+    $defineText = $defines -join ','
+    $projectFileWithDefines = $projectFileContent -replace '<Define>__MSPM0G3507__</Define>', "<Define>$defineText</Define>"
+    if ($projectFileWithDefines -eq $projectFileContent) {
         throw 'Keil project does not have the expected application define block.'
     }
     [System.IO.File]::WriteAllText(
         $projectFile,
-        $projectFileWithMode,
+        $projectFileWithDefines,
         (New-Object System.Text.UTF8Encoding($false)))
 }
 

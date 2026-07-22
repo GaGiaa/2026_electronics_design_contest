@@ -64,21 +64,34 @@ motor is moving.
 
 For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without
-adding breakpoints. For speed-loop tuning, set the compile-time
-`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `main.c` from `0U` to `1U` and select
-JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 16-byte frame
-every 10 ms. Its three float32 channels follow `g_motor_debug.wheel` and are ordered
-as `target_speed_mm_per_s`, `feedback_speed_mm_per_s`, and
-`output_duty_percent`; the frame ends in `00 00 80 7F`.
+adding breakpoints. Both VOFA telemetry switches default to `0U`. For speed-loop
+tuning, build with `-VofaSpeedPidTelemetryEnable 1`, then select JustFloat in
+VOFA+. The lower-priority telemetry task sends one fixed 16-byte frame every 10 ms.
+Its three float32 channels follow `g_motor_debug.wheel` and are ordered as
+`target_speed_mm_per_s`, `feedback_speed_mm_per_s`, and `output_duty_percent`; the
+frame ends in `00 00 80 7F`.
 
-VOFA mode owns UART0 output: the UART echo task is not created and BMI160 text
-telemetry is suppressed, even if `IMU_TELEMETRY_ENABLE` is `1U`. Do not send text
-to UART0 while VOFA mode is enabled. Frames are still queued through
-`board_uart_write()` and emitted by the dedicated UART TX task, so the motor task
-and encoder ISR never block on the UART. If `g_motor_debug.wheel` is invalid, the
-telemetry task safely sends the front-left wheel status. For initial validation, use
-the debugger without breakpoints to turn one wheel by hand and confirm count sign
-and isolation before driving the chassis at low duty.
+For grayscale observation, build with `-VofaSpeedPidTelemetryEnable 0
+-GrayVofaTelemetryEnable 1` and select JustFloat at 115200 baud. The gray task
+sends a 22-channel, 92-byte little-endian float32 frame every 100 ms:
+
+| Channel | Value |
+| --- | --- |
+| 0..7 | `raw[0..7]` |
+| 8..15 | `normalized[0..7]` |
+| 16 | `digital` (`1=white`, `0=black`) |
+| 17 | `black_mask` (`bit N` maps to `channel[N]`, `1=black`) |
+| 18 | `black_count` |
+| 19 | `line_error` |
+| 20 | `line_strength` |
+| 21 | `sequence` |
+
+The frame tail is `00 00 80 7F`. Speed and grayscale VOFA telemetry are mutually
+exclusive and enabling both is a compile-time error. In either VOFA mode UART
+echo and BMI160 text output are suppressed. The grayscale fields are observation
+only; this change does not modify motor targets or PWM output. For initial
+validation, move a black line across the sensor and confirm that `normalized`,
+`black_mask`, `line_error`, and `sequence` change together.
 
 PA2 drives a passive buzzer through TIMG8 CCP1. `main.c` provides the
 compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,
@@ -141,12 +154,23 @@ ground and power the sensor from a stable separate 5 V supply.
 `board_grayscale.c/.h` selects channels in address order: channel 0 is 000 and
 channel 7 is 111. Every channel waits approximately 1 us after address change
 and averages eight single 12-bit ADC conversions. The driver exposes raw and
-0..4095 normalized arrays plus an eight-bit hysteresis result.
+0..4095 normalized arrays plus an eight-bit hysteresis result. `digital` uses
+1 for white and 0 for black. The application derives `black_mask`, where bit N
+corresponds to channel N and 1 means black, together with `black_count`,
+`line_strength`, and the signed integer `line_error`.
 
-`main.c` uses starting calibration arrays of white=3000 and black=500 for all
-channels. These are placeholders for the actual installation; replace them
-with measured per-channel values after fixing sensor height and position.
-`GRAY_TELEMETRY_ENABLE` defaults to `0U`. Set it to `1U` to emit one serialized
-`gray,raw=...,norm=...,digital=0x..` line every 100 ms. The volatile
-`g_grayscale_snapshot` is available for SWD observation even when telemetry is
-disabled. Build success does not constitute physical sensor acceptance.
+`main.c` uses the measured per-channel calibration values:
+
+```text
+white = {2834, 3064, 2150, 1924, 3099, 3032, 3182, 2467}
+black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
+```
+
+`line_error` is calculated from normalized analog values using blackness
+`4095-normalized[i]` and weights `{-3500,-2500,-1500,-500,500,1500,2500,3500}`.
+When total blackness is zero it holds the previous error. It is currently an
+observation input only; it does not change motor targets or PWM output.
+`GRAY_VOFA_TELEMETRY_ENABLE` defaults to `0U`. Set it through the build script to
+emit the binary frame described above. The volatile `g_grayscale_snapshot` is
+available for SWD observation even when telemetry is disabled. Build success does
+not constitute physical sensor acceptance.
