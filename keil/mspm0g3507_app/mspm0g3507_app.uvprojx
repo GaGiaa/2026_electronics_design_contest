@@ -420,6 +420,11 @@
               <FilePath>..\..\mspm0g3507_app\board_bmi160.c</FilePath>
             </File>
             <File>
+              <FileName>board_imu_yaw.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\board_imu_yaw.c</FilePath>
+            </File>
+            <File>
               <FileName>board_motor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\board_motor.c</FilePath>

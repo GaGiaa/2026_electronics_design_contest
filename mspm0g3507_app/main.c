@@ -7,6 +7,7 @@
 
 #include "board_encoder.h"
 #include "board_bmi160.h"
+#include "board_imu_yaw.h"
 #include "board_buttons.h"
 #include "board_buzzer.h"
 #include "board_grayscale.h"
@@ -35,11 +36,25 @@
 #define VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS 10U
 #define VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH 256U
 #define VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY 0U
+#ifndef IMU_TELEMETRY_ENABLE
 #define IMU_TELEMETRY_ENABLE 0U
+#endif
+#ifndef IMU_YAW_ENABLE
+#define IMU_YAW_ENABLE 0U
+#endif
+#define IMU_YAW_TRACK_WIDTH_MM 130.0f
 #define IMU_TASK_STACK_DEPTH 512U
 #define IMU_TASK_PRIORITY 0U
 #define IMU_SAMPLE_INTERVAL_MS 10U
 #define IMU_REINIT_FAILURE_THRESHOLD 3U
+
+#if VOFA_SPEED_PID_TELEMETRY_ENABLE && IMU_TELEMETRY_ENABLE
+#error "IMU telemetry and VOFA telemetry cannot be enabled together"
+#endif
+#if IMU_TELEMETRY_ENABLE && !IMU_YAW_ENABLE
+#error "IMU telemetry requires IMU yaw to be enabled"
+#endif
+
 #define GRAY_TELEMETRY_ENABLE 0U
 #define GRAY_SAMPLE_INTERVAL_MS 10U
 #define GRAY_TELEMETRY_INTERVAL_MS 100U
@@ -272,6 +287,26 @@ static void motor_control_snapshot_copy(motor_control_wheel_status_t control[BOA
     }
 }
 
+static void encoder_samples_snapshot_copy(board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
+{
+    uint32_t begin_sequence;
+    uint32_t end_sequence;
+    uint32_t wheel;
+
+    for (;;) {
+        begin_sequence = g_encoder_sample_sequence;
+        if ((begin_sequence & 1U) == 0U) {
+            for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
+                samples[wheel] = g_encoder_samples[wheel];
+            }
+            end_sequence = g_encoder_sample_sequence;
+            if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
+                break;
+            }
+        }
+    }
+}
+
 #if VOFA_SPEED_PID_TELEMETRY_ENABLE
 static void telemetry_task(void *argument)
 {
@@ -307,26 +342,21 @@ static void imu_task(void *argument)
     board_bmi160_status_t status;
     uint8_t chip_id;
     uint32_t consecutive_failures;
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
-    char message[128];
+#if IMU_YAW_ENABLE
+    board_imu_yaw_state_t yaw_state;
+    board_encoder_sample_t encoder_samples[BOARD_MOTOR_COUNT];
+#endif
+#if IMU_TELEMETRY_ENABLE
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
 #endif
 
     (void)argument;
-    for (;;) {
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
-        int length;
+#if IMU_YAW_ENABLE
+    board_imu_yaw_init(&yaw_state, IMU_YAW_TRACK_WIDTH_MM);
 #endif
-
+    for (;;) {
         chip_id = 0U;
         status = board_bmi160_init(&chip_id);
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
-        length = snprintf(message, sizeof(message),
-                          "bmi160,id=0x%02X,status=%u\r\n",
-                          chip_id, (unsigned)status);
-        if ((length > 0) && ((size_t)length < sizeof(message))) {
-            board_uart_write((const uint8_t *)message, (size_t)length);
-        }
-#endif
         if (status != BOARD_BMI160_STATUS_OK) {
             vTaskDelay(pdMS_TO_TICKS(1000U));
         } else {
@@ -336,25 +366,19 @@ static void imu_task(void *argument)
                 status = board_bmi160_read_sample(&sample);
                 if (status != BOARD_BMI160_STATUS_OK) {
                     ++consecutive_failures;
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
-                    length = snprintf(message, sizeof(message),
-                                      "bmi160,error=%u\r\n", (unsigned)status);
-                    if ((length > 0) && ((size_t)length < sizeof(message))) {
-                        board_uart_write((const uint8_t *)message, (size_t)length);
-                    }
-#endif
                     if (consecutive_failures >= IMU_REINIT_FAILURE_THRESHOLD) {
                         break;
                     }
                 } else {
                     consecutive_failures = 0U;
-#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
-                    length = snprintf(message, sizeof(message),
-                                      "imu,ax=%+6d,ay=%+6d,az=%+6d,gx=%+6d,gy=%+6d,gz=%+6d\r\n",
-                                      sample.accel_x, sample.accel_y, sample.accel_z,
-                                      sample.gyro_x, sample.gyro_y, sample.gyro_z);
-                    if ((length > 0) && ((size_t)length < sizeof(message))) {
-                        board_uart_write((const uint8_t *)message, (size_t)length);
+#if IMU_YAW_ENABLE
+                    encoder_samples_snapshot_copy(encoder_samples);
+                    board_imu_yaw_update(&yaw_state, &sample, encoder_samples,
+                                         (float)IMU_SAMPLE_INTERVAL_MS / 1000.0f);
+#endif
+#if IMU_YAW_ENABLE
+                    if (vofa_justfloat_encode3(frame, sizeof(frame), yaw_state.yaw_deg, yaw_state.yaw_rate_dps, yaw_state.gyro_bias_z_dps)) {
+                        board_uart_write(frame, sizeof(frame));
                     }
 #endif
                 }

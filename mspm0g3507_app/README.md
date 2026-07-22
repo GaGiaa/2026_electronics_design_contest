@@ -65,15 +65,15 @@ motor is moving.
 For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without
 adding breakpoints. For speed-loop tuning, set the compile-time
-`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `main.c` from `0U` to `1U` and select
+`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `main.c` from its default `0U` to `1U` and select
 JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 16-byte frame
 every 10 ms. Its three float32 channels follow `g_motor_debug.wheel` and are ordered
 as `target_speed_mm_per_s`, `feedback_speed_mm_per_s`, and
 `output_duty_percent`; the frame ends in `00 00 80 7F`.
 
-VOFA mode owns UART0 output: the UART echo task is not created and BMI160 text
-telemetry is suppressed, even if `IMU_TELEMETRY_ENABLE` is `1U`. Do not send text
-to UART0 while VOFA mode is enabled. Frames are still queued through
+When VOFA mode is enabled, it owns UART0 output: the UART echo task is not
+created. IMU yaw telemetry and speed-loop VOFA telemetry are compile-time
+mutually exclusive. Do not send text to UART0 while VOFA mode is enabled. Frames are still queued through
 `board_uart_write()` and emitted by the dedicated UART TX task, so the motor task
 and encoder ISR never block on the UART. If `g_motor_debug.wheel` is invalid, the
 telemetry task safely sends the front-left wheel status. For initial validation, use
@@ -104,9 +104,9 @@ test and waits 1 ms after each register write. It also verifies the error,
 power-mode, ODR, bandwidth, and range registers before reporting success. A
 static FreeRTOS task reads the 12-byte acceleration-plus-
 gyroscope register block (`0x0C` through `0x17`, gyro first) every 10 ms. The SPI controller uses Motorola mode 3 to match
-the Bosch reference example. It reports `bmi160,id=...` during initialization
-and compact `imu,ax=...,ay=...,az=...,gx=...,gy=...,gz=...` lines through the
-existing static UART frame queue. SPI transactions have bounded timeouts;
+the Bosch reference example. IMU yaw telemetry, when enabled with
+`IMU_YAW_ENABLE`, uses the existing static UART frame queue for JustFloat frames.
+SPI transactions have bounded timeouts;
 initialization retries after one second and three consecutive read failures
 trigger reinitialization.
 
@@ -116,9 +116,11 @@ acceleration, and near-zero stationary gyroscope output. No Flash write is
 performed by the build and test commands.
 
 `main.c` provides the compile-time `IMU_TELEMETRY_ENABLE` switch. It defaults
-to `0U`; set it to `1U` to enable initialization, error, and six-axis IMU UART
-frames. When set to `0U`, only those IMU UART frames are disabled; the IMU task
-continues to initialize BMI160, sample periodically, and retry after failures.
+to `0U`; when enabled together with `IMU_YAW_ENABLE`, it sends one 16-byte
+JustFloat frame every 10 ms through the existing UART frame queue. The three
+float32 channels are `yaw_deg`, `yaw_rate_dps`, and `gyro_bias_z_dps`, followed
+by the standard `00 00 80 7F` tail. BMI160 initialization and sampling continue
+regardless of this output switch.
 
 PA7, PB12, PA8, and PA30 are four external-pull-up, active-low button inputs.
 The independent static `button_task` scans them every 10 ms and confirms a
@@ -150,3 +152,28 @@ with measured per-channel values after fixing sensor height and position.
 `gray,raw=...,norm=...,digital=0x..` line every 100 ms. The volatile
 `g_grayscale_snapshot` is available for SWD observation even when telemetry is
 disabled. Build success does not constitute physical sensor acceptance.
+
+The optional one-dimensional vehicle yaw estimator is implemented in
+`board_imu_yaw.c/.h` and runs inside the existing 10 ms `imu_task`; it does not
+create another FreeRTOS task. It converts the BMI160 Z gyro using the configured
+`+/-500 dps` range, estimates the startup gyro bias during 100 stationary
+samples, and fuses gyro yaw rate with the left/right differential encoder rate
+using 98% gyro and 2% encoder weighting. The initial track width is configured
+by `IMU_YAW_TRACK_WIDTH_MM` in `main.c`; the measured left/right wheel-center
+distance is 130 mm. The default
+`IMU_YAW_ENABLE` value is `0U`; set it to `1U` to enable the estimator.
+The estimator assumes the vehicle frame is `+X` forward, `+Y` left, `+Z` up,
+with positive Z gyro rate meaning a left turn. Change
+`BOARD_IMU_YAW_GYRO_Z_SIGN` to `-1.0f` if the installed sensor has the opposite
+Z direction.
+
+When both `IMU_YAW_ENABLE` and `IMU_TELEMETRY_ENABLE` are `1U`, the IMU task
+sends the three-channel JustFloat yaw frame described above. The yaw is
+relative to the startup heading and is normalized to `[-180, 180)`; a six-axis
+IMU cannot provide an absolute yaw reference without a magnetometer or another
+external heading source.
+
+The default `VOFA_SPEED_PID_TELEMETRY_ENABLE` value is `0U`. For the yaw UART
+test, build with `-VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1
+-ImuYawEnable 1`; VOFA speed telemetry and IMU yaw telemetry cannot be enabled
+together.

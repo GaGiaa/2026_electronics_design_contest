@@ -74,3 +74,14 @@ The driver exposes `g_grayscale_adc_timeout_count` for SWD diagnostics. After
 downloading a new AXF, a changing `g_grayscale_snapshot.sequence` confirms
 sampling progress; a changing timeout counter means ADC0 is not reporting the
 MEM0 result-complete flag.
+
+The optional `board_imu_yaw.c` estimator is compiled into the shared
+application project and runs within the existing IMU task when
+`IMU_YAW_ENABLE` is changed from its default `0U` to `1U`. It uses the BMI160 Z
+gyro, startup gyro-bias calibration, and differential left/right encoder speed
+with the `IMU_YAW_TRACK_WIDTH_MM` value from `main.c`. The measured left/right
+wheel-center distance is 130 mm and the vehicle frame is +X forward, +Y left,
++Z up. Enable `IMU_TELEMETRY_ENABLE` as well to observe the yaw fields
+over UART. The output is a 16-byte JustFloat frame with channels
+`yaw_deg`, `yaw_rate_dps`, and `gyro_bias_z_dps`. For the UART yaw test, use the Keil build overrides
+`-VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1`.
