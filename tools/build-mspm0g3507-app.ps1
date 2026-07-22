@@ -1,5 +1,9 @@
 [CmdletBinding()]
 param(
+    [string] $SdkRoot,
+    [string] $SysConfigRoot,
+    [string] $Compiler,
+    [string] $CcsRoot,
     [ValidateSet(0, 1)]
     [int] $VofaSpeedPidTelemetryEnable,
     [ValidateSet(0, 1)]
@@ -20,9 +24,12 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $ProjectDir = Join-Path $ProjectRoot 'mspm0g3507_app'
 $BuildDir = Join-Path $ProjectDir 'Debug'
-$SdkRoot = 'D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07'
-$SysConfig = 'D:\Software\ti\ccs2020\sysconfig_1.26.2\sysconfig_cli.bat'
-$Compiler = 'D:\Software\ti\ccs2020\ccs\tools\compiler\ti-cgt-armllvm_4.0.3.LTS\bin\tiarmclang.exe'
+. (Join-Path $PSScriptRoot 'toolchain.ps1')
+$toolchain = Get-ToolchainConfig -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot -Compiler $Compiler -CcsRoot $CcsRoot
+Assert-ToolchainConfig -Config $toolchain -Required @('SdkRoot', 'SysConfig', 'Compiler')
+$SdkRoot = $toolchain.SdkRoot
+$SysConfig = $toolchain.SysConfig
+$Compiler = $toolchain.Compiler
 $FreeRtosRoot = Join-Path $SdkRoot 'kernel\freertos\Source'
 $FreeRtosPort = Join-Path $FreeRtosRoot 'portable\TI_ARM_CLANG\ARM_CM0'
 

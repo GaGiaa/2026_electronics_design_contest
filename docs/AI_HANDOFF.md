@@ -33,20 +33,25 @@
 G3507 应用工程为 `mspm0g3507_app/`，Keil MDK 工程为 `keil/mspm0g3507_app/`；
 FreeRTOS 基线工程为 `mspm0g3507_freertos/`。主要工具如下：
 
-- CCS：`D:\Software\ti\ccs2020`
-- MSPM0 SDK：`D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07`
-- SysConfig：`D:\Software\ti\ccs2020\sysconfig_1.26.2`
-- TI Clang：`D:\Software\ti\ccs2020\ccs\tools\compiler\ti-cgt-armllvm_4.0.3.LTS\bin\tiarmclang.exe`
-- Keil：`D:\Keil_v5`；调试器：Horco CMSIS-DAP v2
+- CCS：20.2 或工程要求的兼容版本
+- MSPM0 SDK：2.11.00.07
+- SysConfig：1.26.2
+- TI Clang：4.0.3.LTS
+- Keil：MDK 5.43a / Arm Compiler 6.24；调试器：本机可见的 CMSIS-DAP
 - pyOCD：`tools/.venv`，版本约束 `>=0.45,<0.46`
+
+外部工具路径通过 `MSPM0_SDK_ROOT`、`SYSCONFIG_ROOT`、`TI_ARM_CLANG`、
+`CCS_ROOT`、`KEIL_ROOT` 和 `ARM_GDB_PATH` 配置，也可以作为构建脚本参数传入。
+首次配置可运行 `tools/configure-toolchain.ps1 -PersistUserEnvironment`，脚本会
+自动搜索常见安装位置并保存当前用户环境变量。不要把这些变量的本机绝对值提交到仓库。
 
 ## 构建与安全边界
 
 ~~~powershell
-& 'D:\Software\ti\ccs2020\ccs\utils\bin\gmake.exe' -C mspm0l1306_bringup\Debug all
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0l1306.ps1
 powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
-powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-freertos.ps1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 ~~~
 
 G3507 CCS ELF 为 `mspm0g3507_app/Debug/mspm0g3507_app.out`；Keil 输出为
@@ -150,6 +155,23 @@ powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
 ~~~
 
 构建通过只证明 SysConfig、编译、链接和静态集成检查通过，不代表硬件验收完成。
+
+## 跨电脑构建迁移记录
+
+本次迁移新增 `tools/toolchain.ps1` 和 `tools/configure-toolchain.ps1`，构建脚本支持显式参数和以下环境变量：
+`MSPM0_SDK_ROOT`、`SYSCONFIG_ROOT`、`TI_ARM_CLANG`、`CCS_ROOT`、`KEIL_ROOT`、
+`ARM_GDB_PATH`。解析器会自动搜索自定义盘符下的 CCS、Keil 和 GDB 安装；VS Code
+配置不再保存本机工具路径；两个 CCS `origin` 字段也已删除。
+
+Keil 的 `mspm0g3507_app.uvprojx` 现在是模板，构建或打开任务会生成被 Git 忽略的
+`mspm0g3507_app.local.uvprojx`。模板只保留仓库相对路径和
+`@MSPM0_SDK_ROOT@` 标记，不能直接把模板当作已经配置好的本机工程使用。
+
+当前验证结果：PowerShell 语法检查通过；便携性、IMU、灰度、VOFA、PID、G3507 app、
+FreeRTOS 和 Keil 静态测试通过；G3507 bring-up、FreeRTOS、app 的 TI Clang 构建通过；
+Keil UV4 构建生成 AXF、HEX、MAP 且日志为 0 error / 0 warning。L1306 本轮未执行真实编译，
+因为当前工作区没有 CCS 导入后生成的 `mspm0l1306_bringup/Debug` make 目录；需要在本机
+CCS workspace 导入并生成 Debug 配置后运行 `tools/build-mspm0l1306.ps1`。
 
 ## 待完成硬件验收
 

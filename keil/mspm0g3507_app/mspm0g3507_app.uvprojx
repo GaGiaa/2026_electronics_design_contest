@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>__MSPM0G3507__</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\mspm0g3507_app;..\..\mspm0g3507_app\motor_pid;.\Generated;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\source;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\source\third_party\CMSIS\Core\Include;D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
+              <IncludePath>..\..\mspm0g3507_app;..\..\mspm0g3507_app\motor_pid;.\Generated;@MSPM0_SDK_ROOT@\source;@MSPM0_SDK_ROOT@\source\third_party\CMSIS\Core\Include;@MSPM0_SDK_ROOT@\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -507,17 +507,17 @@
             <File>
               <FileName>list.c</FileName>
               <FileType>1</FileType>
-              <FilePath>D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\kernel\freertos\Source\list.c</FilePath>
+              <FilePath>@MSPM0_SDK_ROOT@\kernel\freertos\Source\list.c</FilePath>
             </File>
             <File>
               <FileName>queue.c</FileName>
               <FileType>1</FileType>
-              <FilePath>D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\kernel\freertos\Source\queue.c</FilePath>
+              <FilePath>@MSPM0_SDK_ROOT@\kernel\freertos\Source\queue.c</FilePath>
             </File>
             <File>
               <FileName>tasks.c</FileName>
               <FileType>1</FileType>
-              <FilePath>D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\kernel\freertos\Source\tasks.c</FilePath>
+              <FilePath>@MSPM0_SDK_ROOT@\kernel\freertos\Source\tasks.c</FilePath>
             </File>
             <File>
               <FileName>port.c</FileName>
@@ -537,7 +537,7 @@
             <File>
               <FileName>driverlib.a</FileName>
               <FileType>4</FileType>
-              <FilePath>D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07\source\ti\driverlib\lib\keil\m0p\mspm0g1x0x_g3x0x\driverlib.a</FilePath>
+              <FilePath>@MSPM0_SDK_ROOT@\source\ti\driverlib\lib\keil\m0p\mspm0g1x0x_g3x0x\driverlib.a</FilePath>
             </File>
           </Files>
         </Group>

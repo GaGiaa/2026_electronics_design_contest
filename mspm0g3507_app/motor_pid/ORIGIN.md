@@ -1,8 +1,6 @@
-# PID source origin
+# PID 源码来源
 
-This directory is a controlled copy of the platform-independent PID core from
-`D:\desktop\2026RC\Control\single_motor_test\Libraries\MotorLib`.
+本目录是从外部 MotorLib PID 实现中整理出的、与平台无关的 PID 核心代码副本。
 
-Only the PID implementation and its clamp helper are used by this MSPM0 PWM
-motor application. CAN protocols, STM32 HAL adapters, DJI code, and RobStride
-code are deliberately not copied.
+本 MSPM0 PWM 电机应用只使用 PID 实现及其限幅辅助函数。
+CAN 协议、STM32 HAL 适配层、DJI 代码和 RobStride 代码均未复制到本工程。

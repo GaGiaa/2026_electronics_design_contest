@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string] $ProjectRoot
+    [string] $ProjectRoot,
+    [string] $KeilRoot
 )
 
 Set-StrictMode -Version Latest
@@ -9,6 +10,10 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent $PSScriptRoot
 }
+
+. (Join-Path $ProjectRoot 'tools\toolchain.ps1')
+$toolchain = Get-ToolchainConfig -KeilRoot $KeilRoot
+Assert-ToolchainConfig -Config $toolchain -Required @('KeilRoot')
 
 function Assert-Path {
     param(
@@ -61,16 +66,17 @@ $projectDir = Join-Path $ProjectRoot 'keil\mspm0g3507_app'
 $projectFile = Join-Path $projectDir 'mspm0g3507_app.uvprojx'
 $buildScript = Join-Path $ProjectRoot 'tools\build-keil-mspm0g3507-app.ps1'
 $generator = Join-Path $ProjectRoot 'tools\generate-keil-mspm0g3507-sysconfig.ps1'
+$projectGenerator = Join-Path $ProjectRoot 'tools\generate-keil-project.ps1'
 $readme = Join-Path $projectDir 'README.md'
 $portDir = Join-Path $projectDir 'freertos_port\ARM_CM0'
 $scatter = Join-Path $projectDir 'mspm0g3507.sct'
 $startup = Join-Path $projectDir 'startup_mspm0g350x_uvision.s'
 $gitIgnore = Join-Path $ProjectRoot '.gitignore'
 $handoff = Join-Path $ProjectRoot 'docs\AI_HANDOFF.md'
-$packDir = 'D:\Keil_v5\ARM\PACK\TexasInstruments\MSPM0G1X0X_G3X0X_DFP\1.3.1'
+$packDir = Join-Path $toolchain.KeilRoot 'ARM\PACK\TexasInstruments\MSPM0G1X0X_G3X0X_DFP\1.3.1'
 
 foreach ($path in @(
-        $projectDir, $projectFile, $buildScript, $generator, $readme, $portDir, $scatter,
+        $projectDir, $projectFile, $buildScript, $generator, $projectGenerator, $readme, $portDir, $scatter,
         $startup, $gitIgnore, $handoff,
         (Join-Path $portDir 'port.c'),
         (Join-Path $portDir 'portasm.c'),
@@ -117,7 +123,10 @@ Assert-Contains -Path $projectFile -Pattern 'Generated\\ti_msp_dl_config\.c' -De
 Assert-Contains -Path $projectFile -Pattern 'freertos_port\\ARM_CM0\\port\.c' -Description 'local Keil FreeRTOS port'
 Assert-NotContains -Path $projectFile -Pattern 'TI_ARM_CLANG' -Description 'Keil project must not use the TI Clang port'
 Assert-Contains -Path $generator -Pattern '--compiler keil' -Description 'Keil SysConfig compiler selection'
-Assert-Contains -Path $buildScript -Pattern 'UV4\.exe' -Description 'Keil batch build invocation'
+Assert-Contains -Path $projectFile -Pattern '@MSPM0_SDK_ROOT@' -Description 'Keil project SDK path template marker'
+Assert-Contains -Path $projectGenerator -Pattern 'mspm0g3507_app\.local\.uvprojx' -Description 'Keil local project generation'
+Assert-Contains -Path $buildScript -Pattern '\.Uv4' -Description 'Keil batch build invocation'
+Assert-Contains -Path (Join-Path $ProjectRoot 'tools\open-keil-mspm0g3507-app.ps1') -Pattern 'Get-ToolchainConfig' -Description 'Keil opener toolchain resolution'
 Assert-Contains -Path $buildScript -Pattern 'mspm0g3507_app\.uvprojx' -Description 'Keil project build target'
 Assert-Contains -Path $buildScript -Pattern 'EncoderDecodeMode' -Description 'Keil build must support an explicit encoder decode mode'
 Assert-Contains -Path $buildScript -Pattern 'VofaSpeedPidTelemetryEnable' -Description 'Keil build must support a temporary VOFA override'
@@ -132,7 +141,7 @@ Assert-Contains -Path $buildScript -Pattern 'GRAY_VOFA_TELEMETRY_ENABLE=' -Descr
 Assert-Contains -Path $readme -Pattern 'GRAY_VOFA_TELEMETRY_ENABLE' -Description 'gray VOFA telemetry documentation'
 Assert-Contains -Path $readme -Pattern '22' -Description 'gray VOFA channel count documentation'
 Assert-Contains -Path $readme -Pattern 'CMSIS-DAP' -Description 'debugger documentation'
-Assert-Contains -Path $readme -Pattern '2dd0719d' -Description 'probe UID documentation'
+Assert-Contains -Path $readme -Pattern 'Probe UID' -Description 'local probe selection documentation'
 Assert-Contains -Path $gitIgnore -Pattern '/keil/mspm0g3507_app/Generated/' -Description 'generated output ignore rule'
 Assert-Contains -Path $gitIgnore -Pattern '/keil/mspm0g3507_app/Objects/' -Description 'Keil object output ignore rule'
 Assert-Contains -Path $handoff -Pattern 'Keil MDK' -Description 'handoff migration record'
