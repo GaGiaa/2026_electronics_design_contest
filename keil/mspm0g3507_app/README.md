@@ -34,6 +34,17 @@ The project uses the SDK GCC Cortex-M0 FreeRTOS port in the local
 wchar ABI settings (`vShortEn=1`, `vShortWch=1`) to match the SDK Keil DriverLib
 archive.
 
+## Open from VS Code
+
+Run the VS Code task `MSPM0G3507 App: Open Keil Project` to launch
+`D:\Keil_v5\UV4\UV4.exe` with
+`keil\mspm0g3507_app\mspm0g3507_app.uvprojx`. The task only opens the project;
+it does not generate SysConfig files, build, download, or program Flash.
+
+The launcher is `tools\open-keil-mspm0g3507-app.ps1`. If Keil is installed in
+another directory, pass `-KeilRoot` when running the script or update its
+default path.
+
 ## Debug and download
 
 The project is configured for CMSIS-DAP/SWD with `DriverSelection=4096`.

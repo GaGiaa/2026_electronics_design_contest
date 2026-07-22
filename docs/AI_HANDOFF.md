@@ -452,3 +452,21 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 
 灰度传感器的实际接线、逐路地址响应、白黑标定、UART 实测，以及电机编码器方向/单圈计数、
 低速逐轮 PID 调试仍属于后续硬件验收事项；未完成这些项目时不得宣称实体功能验收完成。
+
+### VS Code Keil 工程快捷打开
+
+使用 VS Code 任务 `MSPM0G3507 App: Open Keil Project` 可以直接启动 Keil
+并打开工程。该任务运行 `tools/open-keil-mspm0g3507-app.ps1`，默认使用
+`D:\Keil_v5\UV4\UV4.exe`，打开的工程为
+`keil/mspm0g3507_app/mspm0g3507_app.uvprojx`。
+
+该任务只负责打开工程，不会运行 SysConfig、不执行构建、不下载固件，也不会
+烧录 Flash。如果 Keil 安装在其他目录，可以运行启动脚本时传入 `-KeilRoot`
+参数，或修改脚本中的默认路径。
+
+## Git 操作授权规则
+
+在本工程中，除非用户明确要求，否则 AI 不得自行执行 `git commit`、
+`git push`、创建 Pull Request 或其他向 Git 远程仓库上传/发布的操作。
+普通开发任务只允许修改工作区并运行必要的本地验证；提交、推送或发布前
+必须等待用户明确指令。

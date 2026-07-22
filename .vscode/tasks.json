@@ -31,6 +31,21 @@
       "problemMatcher": ["$gcc"]
     },
     {
+      "label": "MSPM0G3507 App: Open Keil Project",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\open-keil-mspm0g3507-app.ps1",
+        "-ProjectRoot",
+        "${workspaceFolder}"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "MSPM0G3507: Install pyOCD tools",
       "type": "shell",
       "command": "powershell",
