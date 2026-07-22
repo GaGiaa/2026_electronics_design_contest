@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string] $ProjectRoot
+    [string] $ProjectRoot,
+    [ValidateSet(1, 2)]
+    [int] $EncoderDecodeMode
 )
 
 Set-StrictMode -Version Latest
@@ -16,8 +18,13 @@ $testSource = Join-Path $PSScriptRoot 'test_motor_control.c'
 $output = Join-Path $env:TEMP 'mspm0g3507_motor_control_test.exe'
 
 try {
-    & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$appDir" "-I$appDir\motor_pid" `
+    $compilerArguments = @('-std=c99', '-Wall', '-Wextra', '-Werror', "-I$appDir", "-I$appDir\motor_pid")
+    if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
+        $compilerArguments += "-DBOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
+    }
+    & $gcc @compilerArguments `
         (Join-Path $appDir 'motor_control.c') `
+        (Join-Path $appDir 'encoder_quadrature.c') `
         (Join-Path $appDir 'motor_pid\pid.c') `
         (Join-Path $appDir 'vofa_justfloat.c') `
         $testSource '-lm' '-o' $output

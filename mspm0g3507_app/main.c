@@ -76,7 +76,19 @@ static StackType_t g_idle_task_stack[configIDLE_TASK_STACK_DEPTH];
 volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 static volatile uint32_t g_encoder_sample_sequence;
 void UART_0_INST_IRQHandler(void) { board_uart_irq_handler(); }
-void GROUP1_IRQHandler(void) { board_encoder_gpioa_irq_handler(); }
+void GROUP1_IRQHandler(void)
+{
+    switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
+    case ENCODER_GPIOA_INT_IIDX:
+        board_encoder_gpioa_irq_handler();
+        break;
+    case ENCODER_GPIOB_INT_IIDX:
+        board_encoder_gpiob_irq_handler();
+        break;
+    default:
+        break;
+    }
+}
 
 static void motor_task(void *argument)
 {

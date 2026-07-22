@@ -395,6 +395,11 @@
               <FilePath>..\..\mspm0g3507_app\board_encoder.c</FilePath>
             </File>
             <File>
+              <FileName>encoder_quadrature.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\encoder_quadrature.c</FilePath>
+            </File>
+            <File>
               <FileName>board_buzzer.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\board_buzzer.c</FilePath>

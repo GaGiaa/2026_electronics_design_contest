@@ -34,9 +34,16 @@ logical mapping in `mspm0g3507_app.syscfg` is front-left from PA15/PB24,
 front-right from PA17/PA22 (direction inverted), rear-left from PA14/PA9, and
 rear-right from PA16/PB20 (direction inverted). Inputs use
 pull-ups; each A phase interrupts on both edges and the B phase determines
-direction. `board_encoder` still defaults to 1040 A-phase edges per wheel
-revolution (twice the reference single-edge 520 count) and a 48 mm wheel diameter;
-the counts-per-revolution value remains subject to one-physical-turn measurement.
+direction. `board_encoder` declares the wheel motor mechanics explicitly: a 13-line
+encoder on the motor shaft and a 20:1 gearbox derive 260 output-shaft lines per
+wheel revolution. The default `BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE` counts
+both A-phase edges and therefore derives 520 counts per output-shaft revolution.
+Set the compile-time `BOARD_ENCODER_DECODE_MODE` to
+`BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4` to count both edges of both AB
+phases through the quadrature state decoder; it then derives 1040 counts per output
+shaft revolution. Rebuild and flash after changing the mode, then verify one manual
+output-shaft turn at low speed before using the speed loop. The wheel diameter is
+48 mm.
 Every 10 ms motor-task iteration samples the signed encoder delta, accumulated count
 and calculated mm/s speed before updating PWM. It runs one incremental PID speed
 controller per wheel. `motor_pid/` is a controlled copy of only the platform-

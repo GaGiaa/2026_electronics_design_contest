@@ -6,6 +6,8 @@
 
 提交 Git 时必须使用简洁中文标题和详细中文正文，正文应说明功能变化、涉及的工具或硬件，以及实际验证证据。
 
+本文件后续新增、修改或补充的所有交接内容必须使用中文；代码标识符、命令、路径、协议名称和必要技术术语除外。不得在本文件中新增英文叙述段落。
+
 仓库同时维护 MSPM0L1306 和 MSPM0G3507 两个独立 CCS 工程。不得将两者的 SysConfig 生成文件、ELF、CMSIS-Pack、pyOCD 参数或引脚配置混用。
 
 ## 工程索引
@@ -154,9 +156,9 @@ PB4/PB5，逻辑后左使用 PA28/PA31 且正反方向反相，逻辑后右使�
 
 `mspm0g3507_app/board_encoder.*` 提供四轮 AB 相增量编码器的独立驱动，逻辑轮位的 A/B
 输入依次为：前左 PA16/PB20、前右 PA14/PA9、后左 PA15/PB24、后右 PA17/PA22。八个输入
-均为上拉，四个 A 相配置双沿 GPIO 中断，B 相仅在 A 相边沿时读取以判定方向；GPIO 中断不调用
-FreeRTOS API。默认以参考电机的单沿 520 计数为依据，采用 A 相双沿的
-`BOARD_ENCODER_COUNTS_PER_REVOLUTION=1040` 与 `BOARD_ENCODER_WHEEL_DIAMETER_MM=48`。
+均为上拉。当前默认 A 相双沿模式下，只有 A 相产生双沿 GPIO 中断，B 相仅在 A 相边沿时读取以
+判定方向；可选 AB 四倍频模式下，八个 A/B 输入均使用双沿中断。GPIO ISR 不调用 FreeRTOS API。
+机械参数与最终计数值由后文的 `board_encoder.h` 配置统一定义，不再保留手写的 1040 常量。
 
 电机静态任务仍以 10 ms 周期运行，且每轮均先通过 `board_encoder_sample()` 原子取得并清零本周期
 有符号计数，再按原有开环方向和占空比命令更新 PWM。采样结构包含 `delta_counts`、
@@ -164,7 +166,7 @@ FreeRTOS API。默认以参考电机的单沿 520 计数为依据，采用 A 相
 通过 `tests/test_mspm0g3507_app.ps1` 静态集成检查，并通过
 `tools/build-mspm0g3507-app.ps1` 的 SysConfig 生成、TI Clang 编译和 ELF 链接。已执行 app ELF
 烧录；用户已确认烧录后的 UART 遥测和串口回显恢复正常。编码器计数正负方向和完整一圈脉冲数仍须
-逐轮低占空比确认，并据此校准 1040 常量。
+逐轮低占空比确认，并据此校准机械参数或解码方式。
 
 ### 编码器观测与遥测
 
@@ -224,8 +226,8 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
    符号和一圈脉冲数；确认后再设置一个轮子的低占空比。
 2. 持续接收 UART0 PA10/PA11 的 100 ms `enc` 报文，确认回显与遥测不交错。若需连续主机输入，
    重点观察 `board_uart_rx_overflow_count()` 是否保持不变。
-3. 以实测完整一圈计数校准 `BOARD_ENCODER_COUNTS_PER_REVOLUTION`；当前默认是 A 相双沿的 1040，
-   不是硬件 QEI 四倍计数。
+3. 以实测完整一圈计数确认 `BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION`、
+   `BOARD_ENCODER_GEAR_RATIO` 与所选解码模式；当前默认 A 相双沿应为 520，AB 四倍频应为 1040。
 
 已知设计边界：MSPM0G3507 这块硬件只有一个可用定时器 QEI，当前八根参考编码器线也不能组成
 四组同一 `TIMGx` 的 CCP0/CCP1，因此本版本明确采用 GPIO 中断。不要在没有重新分配硬件引脚和
@@ -253,7 +255,8 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 
 生成的 `ENCODER_*` 宏现在直接表示上述逻辑轮位；
 `board_encoder_gpioa_irq_handler()` 只应用两路已校准的方向符号。PWM 电机映射保持不变。
-在完成每个车轮已知圈数的实测前，`BOARD_ENCODER_COUNTS_PER_REVOLUTION` 仍保持为 1040。
+当前机械配置为 13 线、20:1，默认 A 相双沿派生 520 counts/rev；如选择 AB 四倍频则派生
+1040 counts/rev。更换电机或减速箱后只更新机械参数，不直接修改派生计数宏。
 
 ## G3507 Keil MDK 迁移
 
@@ -333,6 +336,23 @@ imu,ax=-123,ay=456,az=8192,gx=2,gy=-1,gz=0
 `main.c` 中的 `IMU_TELEMETRY_ENABLE` 是 IMU 串口输出的编译期开关，默认值为
 `0U`。设为 `1U` 后输出初始化状态、采样错误和六轴原始数据；设为 `0U` 时仅
 关闭这些 UART 报文，IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。
+
+### 编码器机械参数与解码模式
+
+`board_encoder.h` 是四个匹配车轮电机的统一配置入口。`BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION=13U`
+和 `BOARD_ENCODER_GEAR_RATIO=20U` 推导出
+`BOARD_ENCODER_OUTPUT_SHAFT_LINES_PER_REVOLUTION=260U`。不要将 520 或 1040 作为独立的机械常量直接写入。
+
+默认的 `BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE` 对 A 相的两个边沿计数，仅在判定方向时读取 B 相，
+推导出输出轴每转 520 counts。可选的
+`BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4` 会为所有 A/B 输入启用双沿中断，并使用四状态转移表解码，
+推导出输出轴每转 1040 counts。MSPM0 的 GPIOA/GPIOB 共用 GROUP1 IRQ，由该中断分发处理两个端口；非法的双位状态转移会被忽略。
+
+无需修改源代码即可验证 X4 模式，执行
+`powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1 -EncoderDecodeMode 2`。
+Keil 构建脚本也使用相同的 `-EncoderDecodeMode 2` 参数。两个构建脚本都不会写入 Flash。
+切换解码模式或更换电机后，应在低速下手动旋转一个输出轴，在调整 PID 前确认每个物理转约有 +520（默认模式）或 +1040（X4 模式）个有符号计数。
+电机运动时不要设置断点。
 
 ### VOFA+ JustFloat 速度环遥测
 
