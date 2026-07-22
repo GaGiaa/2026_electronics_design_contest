@@ -460,6 +460,21 @@
               <FilePath>..\..\mspm0g3507_app\board_uart.c</FilePath>
             </File>
             <File>
+              <FileName>board_crsf_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\board_crsf_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>crsf_protocol.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\crsf_protocol.c</FilePath>
+            </File>
+            <File>
+              <FileName>crsf_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\crsf_control.c</FilePath>
+            </File>
+            <File>
               <FileName>board_ws2812.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\board_ws2812.c</FilePath>

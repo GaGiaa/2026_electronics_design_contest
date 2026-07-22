@@ -213,3 +213,35 @@ observation input only; it does not change motor targets or PWM output.
 emit the binary frame described above. The volatile `g_grayscale_snapshot` is
 available for SWD observation even when telemetry is disabled. Build success does
 not constitute physical sensor acceptance.
+
+## CRSF remote control
+
+The optional CRSF remote-control path uses UART3 at 420000 baud, 8-N-1, with
+PB3 as RX and PB2 as TX. Connect the receiver TX output to PB3 and share MCU
+ground. The firmware only receives CRSF data; it never uploads telemetry or
+other frames to the receiver. The receiver output must be 3.3 V, non-inverted
+UART TTL.
+
+Build the remote-control variant with
+`tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 1`. The default build
+keeps CRSF control disabled. CH3 (channel index 2) controls forward/reverse
+and CH1 (channel index 0) controls differential steering. The standard CRSF
+range 172..1811 is mapped around 992 with a 5 percent deadband. The default
+maximum wheel target is 300 mm/s and can be changed with
+`CRSF_MAX_SPEED_MM_PER_S`.
+
+The four targets use left/right differential mixing and are normalized together
+when the combined command exceeds the configured maximum. If no valid packed
+RC frame arrives for 100 ms, all four targets are set to zero. Direction signs
+can be adjusted with `CRSF_FORWARD_SIGN` and `CRSF_TURN_SIGN`. When the CRSF
+compile-time switch is enabled, the SWD single-wheel debug override is compiled
+out for that build; UART0 remains available for existing debug and VOFA output.
+
+For SWD observation, expand the volatile `g_crsf_debug` structure. Its fields are
+`channels.channels[0..15]`, `link_active`, `last_valid_time_ms`,
+`valid_frame_count`, `crc_error_count`, `frame_error_count`, and
+`rx_overflow_count`. `channels.channels[2]` is CH3 and
+`channels.channels[0]` is CH1.
+
+Host protocol and mixer tests are in `tests/test_crsf.ps1`. Hardware acceptance
+must first be performed with the wheels lifted or the motor supply disconnected.

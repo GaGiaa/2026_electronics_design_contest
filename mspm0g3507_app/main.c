@@ -10,10 +10,13 @@
 #include "board_imu_yaw.h"
 #include "board_buttons.h"
 #include "board_buzzer.h"
+#include "board_crsf_uart.h"
 #include "board_grayscale.h"
 #include "board_motor.h"
 #include "board_uart.h"
 #include "board_ws2812.h"
+#include "crsf_control.h"
+#include "crsf_protocol.h"
 #include "line_tracking.h"
 #include "motor_control.h"
 #include "ti_msp_dl_config.h"
@@ -38,6 +41,7 @@
 #define BUTTON_FEATURE_ENABLE 0U
 /* UART 接收消息队列的最大元素数量。 */
 #define UART_RX_QUEUE_LENGTH 64U
+#define CRSF_TASK_STACK_DEPTH 256U
 /* WS2812 的显示亮度，取值范围由驱动实现约束。 */
 #define WS2812_BRIGHTNESS 16U
 /* 按键扫描任务的执行周期，单位为毫秒。 */
@@ -156,6 +160,10 @@ static StackType_t g_gray_telemetry_task_stack[GRAY_TASK_STACK_DEPTH];
 static StaticTask_t g_buzzer_task_buffer;
 static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
 #endif
+#if CRSF_REMOTE_CONTROL_ENABLE
+static StaticTask_t g_crsf_task_buffer;
+static StackType_t g_crsf_task_stack[CRSF_TASK_STACK_DEPTH];
+#endif
 static StaticQueue_t g_uart_queue_buffer;
 static uint8_t g_uart_queue_storage[UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
 static StaticTask_t g_idle_task_buffer;
@@ -165,6 +173,19 @@ volatile board_grayscale_snapshot_t g_grayscale_snapshot;
 static line_tracking_state_t g_line_tracking_state;
 static volatile uint32_t g_grayscale_publish_sequence;
 static volatile uint32_t g_encoder_sample_sequence;
+#if CRSF_REMOTE_CONTROL_ENABLE
+typedef struct {
+    crsf_channels_t channels;
+    bool link_active;
+    uint32_t last_valid_time_ms;
+    uint32_t valid_frame_count;
+    uint32_t crc_error_count;
+    uint32_t frame_error_count;
+    uint32_t rx_overflow_count;
+} crsf_debug_state_t;
+
+volatile crsf_debug_state_t g_crsf_debug;
+#endif
 
 #if BUTTON_FEATURE_ENABLE
 typedef struct {
@@ -191,6 +212,7 @@ static const button_message_t g_button_up_messages[BOARD_BUTTON_COUNT] = {
 #endif
 
 void UART_0_INST_IRQHandler(void) { board_uart_irq_handler(); }
+void UART_3_INST_IRQHandler(void) { board_crsf_uart_irq_handler(); }
 void GROUP1_IRQHandler(void)
 {
     switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
@@ -205,11 +227,61 @@ void GROUP1_IRQHandler(void)
     }
 }
 
+#if CRSF_REMOTE_CONTROL_ENABLE
+static void crsf_snapshot_copy(crsf_control_input_t *input)
+{
+    uint32_t channel;
+
+    taskENTER_CRITICAL();
+    input->valid = g_crsf_debug.valid_frame_count != 0U;
+    input->last_valid_time_ms = g_crsf_debug.last_valid_time_ms;
+    for (channel = 0U; channel < CRSF_CHANNEL_COUNT; ++channel) {
+        input->channels[channel] = g_crsf_debug.channels.channels[channel];
+    }
+    taskEXIT_CRITICAL();
+}
+
+static void crsf_task(void *argument)
+{
+    crsf_parser_t parser;
+    crsf_channels_t channels;
+    uint8_t byte;
+
+    (void)argument;
+    board_crsf_uart_enable_rx_interrupt();
+    crsf_parser_init(&parser);
+    for (;;) {
+        if (board_crsf_uart_read_byte(&byte)) {
+            do {
+                if (crsf_parser_feed(&parser, byte, &channels)) {
+                    uint32_t now = (uint32_t)xTaskGetTickCount();
+
+                    taskENTER_CRITICAL();
+                    g_crsf_debug.channels = channels;
+                    g_crsf_debug.last_valid_time_ms = now;
+                    ++g_crsf_debug.valid_frame_count;
+                    taskEXIT_CRITICAL();
+                }
+                g_crsf_debug.crc_error_count = parser.crc_error_count;
+                g_crsf_debug.frame_error_count = parser.frame_error_count;
+                g_crsf_debug.rx_overflow_count = board_crsf_uart_rx_overflow_count();
+            } while (board_crsf_uart_read_byte(&byte));
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(1U));
+        }
+    }
+}
+#endif
+
 static void motor_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval = pdMS_TO_TICKS(10U);
     board_encoder_sample_t samples[BOARD_MOTOR_COUNT];
+#if CRSF_REMOTE_CONTROL_ENABLE
+    crsf_control_input_t crsf_input;
+    float crsf_targets[BOARD_MOTOR_COUNT];
+#endif
 
     (void)argument;
     for (;;) {
@@ -222,6 +294,20 @@ static void motor_task(void *argument)
         g_encoder_samples[BOARD_MOTOR_FRONT_RIGHT] = samples[BOARD_MOTOR_FRONT_RIGHT];
         g_encoder_samples[BOARD_MOTOR_REAR_LEFT] = samples[BOARD_MOTOR_REAR_LEFT];
         g_encoder_samples[BOARD_MOTOR_REAR_RIGHT] = samples[BOARD_MOTOR_REAR_RIGHT];
+#if CRSF_REMOTE_CONTROL_ENABLE
+        crsf_snapshot_copy(&crsf_input);
+        g_crsf_debug.link_active = crsf_control_mix(&crsf_input,
+                                                    (uint32_t)xTaskGetTickCount(),
+                                                    crsf_targets);
+        g_motor_speed_targets_mm_s[BOARD_MOTOR_FRONT_LEFT] =
+            crsf_targets[BOARD_MOTOR_FRONT_LEFT];
+        g_motor_speed_targets_mm_s[BOARD_MOTOR_FRONT_RIGHT] =
+            crsf_targets[BOARD_MOTOR_FRONT_RIGHT];
+        g_motor_speed_targets_mm_s[BOARD_MOTOR_REAR_LEFT] =
+            crsf_targets[BOARD_MOTOR_REAR_LEFT];
+        g_motor_speed_targets_mm_s[BOARD_MOTOR_REAR_RIGHT] =
+            crsf_targets[BOARD_MOTOR_REAR_RIGHT];
+#endif
         motor_control_step(samples);
         ++g_encoder_sample_sequence;
 
@@ -581,6 +667,11 @@ int main(void)
     configASSERT(xTaskCreateStatic(button_task, "buttons", BUTTON_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_button_task_stack, &g_button_task_buffer) != NULL);
 #endif
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx", UART_TX_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_uart_tx_task_stack, &g_uart_tx_task_buffer) != NULL);
+#if CRSF_REMOTE_CONTROL_ENABLE
+    configASSERT(xTaskCreateStatic(crsf_task, "crsf", CRSF_TASK_STACK_DEPTH,
+                                   NULL, APP_TASK_PRIORITY,
+                                   g_crsf_task_stack, &g_crsf_task_buffer) != NULL);
+#endif
 #if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE && !IMU_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
 #endif
