@@ -7,7 +7,10 @@
 #include "board_bmi160.h"
 #include "board_encoder.h"
 
+/* 启动阶段用于计算陀螺仪 Z 轴零偏的静止样本数。 */
 #define BOARD_IMU_YAW_STARTUP_CALIBRATION_SAMPLES 100U
+/* 连续满足静止条件的样本数，达到后锁定 yaw 输出。 */
+#define BOARD_IMU_YAW_STATIONARY_CONFIRM_SAMPLES 5U
 
 typedef struct {
     float yaw_deg;
@@ -16,6 +19,7 @@ typedef struct {
     float track_width_mm;
     float gyro_bias_sum_dps;
     uint32_t calibration_samples;
+    uint32_t stationary_samples;
     bool calibrated;
 } board_imu_yaw_state_t;
 

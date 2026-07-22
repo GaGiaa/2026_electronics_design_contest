@@ -29,7 +29,7 @@
 /* 静止判定时允许的加速度模长上限，单位为 g。 */
 #define BOARD_IMU_YAW_ACCEL_NORM_MAX_G 1.20f
 /* 静止状态下零偏指数跟踪的时间常数，单位为秒。 */
-#define BOARD_IMU_YAW_BIAS_TIME_CONSTANT_S 10.0f
+#define BOARD_IMU_YAW_BIAS_TIME_CONSTANT_S 2.0f
 
 static float gyro_z_to_dps(int16_t raw_value)
 {
@@ -106,6 +106,7 @@ void board_imu_yaw_init(board_imu_yaw_state_t *state, float track_width_mm)
     state->track_width_mm = track_width_mm;
     state->gyro_bias_sum_dps = 0.0f;
     state->calibration_samples = 0U;
+    state->stationary_samples = 0U;
     state->calibrated = false;
 }
 
@@ -117,6 +118,7 @@ void board_imu_yaw_update(board_imu_yaw_state_t *state,
     float gyro_z_dps;
     float encoder_rate_dps;
     bool stationary;
+    bool stationary_confirmed;
 
     if ((state == NULL) || (imu_sample == NULL) || (encoder_samples == NULL) ||
         (dt_s <= 0.0f)) {
@@ -125,6 +127,15 @@ void board_imu_yaw_update(board_imu_yaw_state_t *state,
 
     gyro_z_dps = gyro_z_to_dps(imu_sample->gyro_z);
     stationary = vehicle_is_stationary(imu_sample, encoder_samples);
+    if (stationary) {
+        if (state->stationary_samples < BOARD_IMU_YAW_STATIONARY_CONFIRM_SAMPLES) {
+            ++state->stationary_samples;
+        }
+    } else {
+        state->stationary_samples = 0U;
+    }
+    stationary_confirmed =
+        state->stationary_samples >= BOARD_IMU_YAW_STATIONARY_CONFIRM_SAMPLES;
 
     if (!state->calibrated) {
         if (stationary) {
@@ -141,13 +152,17 @@ void board_imu_yaw_update(board_imu_yaw_state_t *state,
         return;
     }
 
-    if (stationary) {
+    if (stationary_confirmed) {
         float bias_alpha = dt_s / BOARD_IMU_YAW_BIAS_TIME_CONSTANT_S;
         if (bias_alpha > 1.0f) {
             bias_alpha = 1.0f;
         }
         state->gyro_bias_z_dps +=
             bias_alpha * (gyro_z_dps - state->gyro_bias_z_dps);
+
+        /* 静止后保持当前航向，避免残余零偏继续被积分。 */
+        state->yaw_rate_dps = 0.0f;
+        return;
     }
 
     encoder_rate_dps = encoder_yaw_rate_dps(state, encoder_samples);
