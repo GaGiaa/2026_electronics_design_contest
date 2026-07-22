@@ -1,6 +1,9 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
+#include "app_config.h"
+#include "rtos_monitor.h"
+
 #define configCPU_CLOCK_HZ                         (80000000UL)
 #define configTICK_RATE_HZ                          1000U
 #define configENABLE_MPU                            0
@@ -11,6 +14,21 @@
 #define configMAX_TASK_NAME_LEN                     16U
 #define configTICK_TYPE_WIDTH_IN_BITS               TICK_TYPE_WIDTH_32_BITS
 #define configUSE_TICKLESS_IDLE                     0
+#if RTOS_MONITOR_ENABLE
+#define configUSE_TRACE_FACILITY                    1
+#define configGENERATE_RUN_TIME_STATS               1
+#define configRUN_TIME_COUNTER_TYPE                 uint32_t
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()    rtos_monitor_runtime_timer_init()
+#define portGET_RUN_TIME_COUNTER_VALUE()            rtos_monitor_runtime_timer_now()
+#define INCLUDE_uxTaskGetStackHighWaterMark         1
+#define INCLUDE_xTaskGetIdleTaskHandle              1
+#else
+#define configUSE_TRACE_FACILITY                    0
+#define configGENERATE_RUN_TIME_STATS               0
+#define INCLUDE_uxTaskGetStackHighWaterMark         0
+#define INCLUDE_xTaskGetIdleTaskHandle              0
+#endif
+#define configUSE_STATS_FORMATTING_FUNCTIONS        0
 #define configUSE_TIMERS                            0
 #define configUSE_EVENT_GROUPS                      0
 #define configUSE_STREAM_BUFFERS                    0

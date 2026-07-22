@@ -18,6 +18,8 @@ const PWMFrontRight = PWM.addInstance();
 const PWMRearLeft = PWM.addInstance();
 const PWMRearRight = PWM.addInstance();
 const PWMBuzzer = PWM.addInstance();
+const TIMER = scripting.addModule("/ti/driverlib/TIMER", {}, false);
+const RTOSMonitorTimer = TIMER.addInstance();
 const SPI = scripting.addModule("/ti/driverlib/SPI", {}, false);
 const SPI1 = SPI.addInstance();
 const SPI2 = SPI.addInstance();
@@ -172,6 +174,16 @@ PWMBuzzer.pwmMode = "EDGE_ALIGN_UP";
 PWMBuzzer.timerCount = 20000;
 PWMBuzzer.peripheral.$assign = "TIMG8";
 PWMBuzzer.peripheral.ccp1Pin.$assign = "PA2";
+
+RTOSMonitorTimer.$name = "RTOS_MONITOR_TIMER";
+RTOSMonitorTimer.timerClkSrc = "BUSCLK";
+RTOSMonitorTimer.timerClkDiv = 8;
+RTOSMonitorTimer.timerClkPrescale = 1;
+RTOSMonitorTimer.timerMode = "PERIODIC_UP";
+RTOSMonitorTimer.timerStartTimer = false;
+RTOSMonitorTimer.timerPeriod = "429.4967295 s";
+RTOSMonitorTimer.interrupts = [];
+RTOSMonitorTimer.peripheral.$assign = "TIMG12";
 
 SPI1.$name = "SPI_WS2812";
 SPI1.targetBitRate = 2666667;

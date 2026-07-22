@@ -213,3 +213,30 @@ observation input only; it does not change motor targets or PWM output.
 emit the binary frame described above. The volatile `g_grayscale_snapshot` is
 available for SWD observation even when telemetry is disabled. Build success does
 not constitute physical sensor acceptance.
+
+## FreeRTOS CPU and task monitor
+
+The optional `rtos_monitor` module is disabled by default and does not use
+UART0. Build the CCS or Keil app with `-RtosMonitorEnable 1` to enable a static
+monitor task that updates `g_rtos_monitor_snapshot` every 1000 ms for SWD
+observation. The snapshot contains total CPU and idle percentages, task names,
+states, priorities, runtime percentages, runtime in microseconds, and stack
+high-water marks in `StackType_t` words. `sequence` is odd while a snapshot is
+being published and even after the update is complete.
+
+For manual configuration, edit `app_config.h` and set
+`RTOS_MONITOR_ENABLE` to `1U`. `main.c` and `FreeRTOSConfig.h` both include this
+shared header, so there is only one source-level switch. The build parameter is
+still useful for automated or temporary builds and overrides the header default
+without changing the file.
+
+The runtime counter uses the unconnected `TIMG12` timer. The timer runs at
+10 MHz from BUSCLK divided by 8; this is the highest stable free-running rate
+available without changing the existing timer assignments. `timer_hz` in the
+snapshot records the actual rate. Runtime time includes interrupt execution in
+the task that was interrupted, so the first version does not report a separate
+ISR percentage. The counter is 32-bit and the monitor uses unsigned deltas for
+each sampling window. However, the bundled FreeRTOS kernel does not fully
+protect its per-task cumulative runtime counters from timer wrap. At 10 MHz
+the counter wraps after approximately 429 seconds, so long continuous runs
+may make per-task values inaccurate after that point.

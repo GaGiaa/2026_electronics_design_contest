@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "app_config.h"
 #include <FreeRTOS.h>
 #include <queue.h>
 #include <task.h>
@@ -16,6 +17,7 @@
 #include "board_ws2812.h"
 #include "line_tracking.h"
 #include "motor_control.h"
+#include "rtos_monitor.h"
 #include "ti_msp_dl_config.h"
 #include "vofa_justfloat.h"
 
@@ -42,6 +44,11 @@
 #define WS2812_BRIGHTNESS 16U
 /* 按键扫描任务的执行周期，单位为毫秒。 */
 #define BUTTON_TASK_INTERVAL_MS 10U
+
+#if RTOS_MONITOR_ENABLE
+/* RTOS 监控任务的静态栈深度，单位为 StackType_t。 */
+#define RTOS_MONITOR_TASK_STACK_DEPTH 512U
+#endif
 
 /* 遥测任务的默认优先级。 */
 #define TELEMETRY_TASK_PRIORITY 0U
@@ -155,6 +162,10 @@ static StackType_t g_gray_telemetry_task_stack[GRAY_TASK_STACK_DEPTH];
 #if BUZZER_FEATURE_ENABLE
 static StaticTask_t g_buzzer_task_buffer;
 static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
+#endif
+#if RTOS_MONITOR_ENABLE
+static StaticTask_t g_rtos_monitor_task_buffer;
+static StackType_t g_rtos_monitor_task_stack[RTOS_MONITOR_TASK_STACK_DEPTH];
 #endif
 static StaticQueue_t g_uart_queue_buffer;
 static uint8_t g_uart_queue_storage[UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
@@ -594,6 +605,13 @@ int main(void)
 #endif
 #if BUZZER_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(buzzer_task, "buzzer", BUZZER_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_buzzer_task_stack, &g_buzzer_task_buffer) != NULL);
+#endif
+#if RTOS_MONITOR_ENABLE
+    configASSERT(xTaskCreateStatic(rtos_monitor_task, "rtos_monitor",
+                                   RTOS_MONITOR_TASK_STACK_DEPTH, NULL,
+                                   TELEMETRY_TASK_PRIORITY,
+                                   g_rtos_monitor_task_stack,
+                                   &g_rtos_monitor_task_buffer) != NULL);
 #endif
     vTaskStartScheduler();
     taskDISABLE_INTERRUPTS();

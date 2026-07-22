@@ -13,7 +13,9 @@ param(
     [ValidateSet(0, 1)]
     [int] $GrayVofaTelemetryEnable,
     [ValidateSet(1, 2)]
-    [int] $EncoderDecodeMode
+    [int] $EncoderDecodeMode,
+    [ValidateSet(0, 1)]
+    [int] $RtosMonitorEnable
 )
 
 Set-StrictMode -Version Latest
@@ -68,6 +70,9 @@ if ($PSBoundParameters.ContainsKey('GrayVofaTelemetryEnable')) {
 }
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $temporaryDefines += "BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
+}
+if ($PSBoundParameters.ContainsKey('RtosMonitorEnable')) {
+    $temporaryDefines += "RTOS_MONITOR_ENABLE=$RtosMonitorEnable"
 }
 if ($temporaryDefines.Count -gt 0) {
     $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)

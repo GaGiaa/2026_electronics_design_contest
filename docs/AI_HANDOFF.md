@@ -162,6 +162,32 @@ powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
 
 未完成上述项目时，不得仅凭构建结果宣称实体功能验收完成。
 
+## FreeRTOS CPU 与任务监控
+
+G3507 app 新增可选 `rtos_monitor.c/.h`。通过 CCS 或 Keil 构建参数
+`-RtosMonitorEnable 1` 开启，默认值为 `0U`。监控不占用 UART0，使用静态
+FreeRTOS 任务每 1000 ms 更新 `g_rtos_monitor_snapshot`，可通过 SWD 观察总
+CPU 利用率、空闲率、任务状态、优先级、运行时间占比和栈余量。
+
+手动配置时只修改 `mspm0g3507_app/app_config.h` 中的
+`RTOS_MONITOR_ENABLE`。`main.c` 和 `FreeRTOSConfig.h` 共用这个配置头，避免
+出现两个源文件开关不一致。构建参数仍可临时覆盖头文件默认值。
+
+统计接口启用了 `configUSE_TRACE_FACILITY`、`configGENERATE_RUN_TIME_STATS`
+和 `INCLUDE_uxTaskGetStackHighWaterMark`。`TIMG12` 被配置为无引脚、无中断的
+32 位自由运行计数器，实际时基为 BUSCLK/8，即 10 MHz；快照的 `timer_hz`
+记录实际频率。由于 G3507 的 TIMG12 不支持普通 prescaler，未强行伪造 1 MHz
+时基。任务运行时间包含中断期间的时间，中断不会单独列项。
+
+监控窗口使用无符号差值处理计时器回绕，但当前 SDK 自带 FreeRTOS 内核的
+任务累计运行时间没有完整的 32 位回绕保护。10 MHz 时基约 429 秒回绕一次，
+连续运行超过该时间后，任务级累计运行时间可能失真；这属于后续长期运行监控
+需要单独处理的遗留风险。
+
+主机数学测试为 `tests/test_rtos_monitor_math.ps1`，静态集成检查为
+`tests/test_rtos_monitor_static.ps1`。CCS/Keil 构建通过仅表示 SysConfig、编译、
+链接和静态检查通过，不代表 SWD 连接或硬件运行验收完成。
+
 ## Git 操作授权规则
 
 除非用户明确要求，AI 不得自行执行 `git commit`、`git push`、创建 Pull Request 或
