@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "board_encoder.h"
+#include "encoder_quadrature.h"
 #include "motor_control.h"
 #include "pid.h"
+#include "vofa_justfloat.h"
 
 static void expect_close(float actual, float expected, float tolerance, const char *message)
 {
@@ -196,6 +199,79 @@ static void test_nonfinite_debug_duty_stops_output(void)
                  "nonfinite debug PWM must be rejected as a stop command");
 }
 
+static void test_vofa_justfloat_encodes_three_float_channels(void)
+{
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
+    static const uint8_t expected[] = {
+        0x00U, 0x00U, 0xC0U, 0x3FU,
+        0x00U, 0x00U, 0x10U, 0xC0U,
+        0x00U, 0x00U, 0x48U, 0x42U,
+        0x00U, 0x00U, 0x80U, 0x7FU,
+    };
+    size_t index;
+
+    expect_true(vofa_justfloat_encode3(frame, sizeof(frame), 1.5f, -2.25f, 50.0f),
+                "JustFloat encoder must accept a correctly sized frame buffer");
+    for (index = 0U; index < sizeof(expected); ++index) {
+        expect_true(frame[index] == expected[index],
+                    "JustFloat frame must use little-endian float32 channels and the VOFA tail");
+    }
+    expect_true(!vofa_justfloat_encode3(frame, sizeof(frame) - 1U, 0.0f, 0.0f, 0.0f),
+                "JustFloat encoder must reject a frame buffer with the wrong fixed length");
+}
+
+static void test_encoder_configuration_derives_counts_from_mechanics_and_mode(void)
+{
+    expect_true(BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION == 13U,
+                "encoder motor-line configuration must expose the 13-line encoder");
+    expect_true(BOARD_ENCODER_GEAR_RATIO == 20U,
+                "encoder mechanics must expose the 20:1 gearbox ratio");
+    expect_true(BOARD_ENCODER_OUTPUT_SHAFT_LINES_PER_REVOLUTION == 260U,
+                "output shaft lines must be derived from motor lines and gear ratio");
+    expect_true(BOARD_ENCODER_A_PHASE_DUAL_EDGE_MULTIPLIER == 2U,
+                "A-phase dual-edge decoding must have a two-count multiplier");
+    expect_true(BOARD_ENCODER_AB_PHASE_QUADRATURE_X4_MULTIPLIER == 4U,
+                "AB quadrature decoding must have a four-count multiplier");
+#if BOARD_ENCODER_DECODE_MODE == BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE
+    expect_true(BOARD_ENCODER_COUNTS_PER_REVOLUTION == 520U,
+                "A-phase dual-edge decoding must derive 520 counts per output revolution");
+#else
+    expect_true(BOARD_ENCODER_COUNTS_PER_REVOLUTION == 1040U,
+                "AB quadrature X4 decoding must derive 1040 counts per output revolution");
+#endif
+}
+
+static void test_quadrature_decoder_tracks_valid_edges_and_rejects_invalid_transitions(void)
+{
+    board_encoder_quadrature_t decoder;
+
+    board_encoder_quadrature_init(&decoder, false, false);
+    expect_true(board_encoder_quadrature_update(&decoder, true, false) == 1,
+                "quadrature decoder must count the first forward transition");
+    expect_true(board_encoder_quadrature_update(&decoder, true, true) == 1,
+                "quadrature decoder must count each forward transition");
+    expect_true(board_encoder_quadrature_update(&decoder, false, true) == 1,
+                "quadrature decoder must preserve forward direction across the cycle");
+    expect_true(board_encoder_quadrature_update(&decoder, false, false) == 1,
+                "quadrature decoder must complete a forward cycle with four counts");
+
+    board_encoder_quadrature_init(&decoder, false, false);
+    expect_true(board_encoder_quadrature_update(&decoder, false, true) == -1,
+                "quadrature decoder must count reverse transitions negatively");
+    expect_true(board_encoder_quadrature_update(&decoder, true, true) == -1,
+                "quadrature decoder must preserve reverse direction across the cycle");
+    expect_true(board_encoder_quadrature_update(&decoder, true, false) == -1,
+                "quadrature decoder must keep reverse sign for every valid edge");
+    expect_true(board_encoder_quadrature_update(&decoder, false, false) == -1,
+                "quadrature decoder must complete a reverse cycle with four counts");
+
+    board_encoder_quadrature_init(&decoder, false, false);
+    expect_true(board_encoder_quadrature_update(&decoder, true, true) == 0,
+                "quadrature decoder must ignore illegal two-bit transitions");
+    expect_true(board_encoder_quadrature_update(&decoder, true, true) == 0,
+                "quadrature decoder must ignore unchanged states");
+}
+
 int main(void)
 {
     test_incremental_pid_accumulates_and_resets();
@@ -207,6 +283,9 @@ int main(void)
     test_invalid_debug_speed_parameters_stop_all_wheels();
     test_zero_speed_target_resets_accumulated_output();
     test_nonfinite_debug_duty_stops_output();
+    test_vofa_justfloat_encodes_three_float_channels();
+    test_encoder_configuration_derives_counts_from_mechanics_and_mode();
+    test_quadrature_decoder_tracks_valid_edges_and_rejects_invalid_transitions();
     puts("PASS: motor PID and control tests passed.");
     return EXIT_SUCCESS;
 }

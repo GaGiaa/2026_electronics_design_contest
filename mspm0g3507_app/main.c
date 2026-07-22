@@ -15,6 +15,7 @@
 #include "board_ws2812.h"
 #include "motor_control.h"
 #include "ti_msp_dl_config.h"
+#include "vofa_justfloat.h"
 
 #define APP_TASK_PRIORITY 1U
 #define MOTOR_TASK_STACK_DEPTH 256U
@@ -27,10 +28,13 @@
 #define UART_RX_QUEUE_LENGTH 64U
 #define WS2812_BRIGHTNESS 16U
 #define BUTTON_TASK_INTERVAL_MS 10U
-#define ENCODER_TELEMETRY_ENABLE 0U
-#define ENCODER_TELEMETRY_INTERVAL_MS 100U
-#define ENCODER_TELEMETRY_TASK_STACK_DEPTH 512U
 #define TELEMETRY_TASK_PRIORITY 0U
+#ifndef VOFA_SPEED_PID_TELEMETRY_ENABLE
+#define VOFA_SPEED_PID_TELEMETRY_ENABLE 1U
+#endif
+#define VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS 10U
+#define VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH 256U
+#define VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY 0U
 #define IMU_TELEMETRY_ENABLE 0U
 #define IMU_TASK_STACK_DEPTH 512U
 #define IMU_TASK_PRIORITY 0U
@@ -59,17 +63,19 @@ static StaticTask_t g_motor_task_buffer;
 static StackType_t g_motor_task_stack[MOTOR_TASK_STACK_DEPTH];
 static StaticTask_t g_ws2812_task_buffer;
 static StackType_t g_ws2812_task_stack[WS2812_TASK_STACK_DEPTH];
+#if !VOFA_SPEED_PID_TELEMETRY_ENABLE
 static StaticTask_t g_uart_task_buffer;
 static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
+#endif
 static StaticTask_t g_uart_tx_task_buffer;
 static StackType_t g_uart_tx_task_stack[UART_TX_TASK_STACK_DEPTH];
 #if BUTTON_FEATURE_ENABLE
 static StaticTask_t g_button_task_buffer;
 static StackType_t g_button_task_stack[BUTTON_TASK_STACK_DEPTH];
 #endif
-#if ENCODER_TELEMETRY_ENABLE
+#if VOFA_SPEED_PID_TELEMETRY_ENABLE
 static StaticTask_t g_telemetry_task_buffer;
-static StackType_t g_telemetry_task_stack[ENCODER_TELEMETRY_TASK_STACK_DEPTH];
+static StackType_t g_telemetry_task_stack[VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH];
 #endif
 static StaticTask_t g_imu_task_buffer;
 static StackType_t g_imu_task_stack[IMU_TASK_STACK_DEPTH];
@@ -117,7 +123,19 @@ static const button_message_t g_button_up_messages[BOARD_BUTTON_COUNT] = {
 #endif
 
 void UART_0_INST_IRQHandler(void) { board_uart_irq_handler(); }
-void GROUP1_IRQHandler(void) { board_encoder_gpioa_irq_handler(); }
+void GROUP1_IRQHandler(void)
+{
+    switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
+    case ENCODER_GPIOA_INT_IIDX:
+        board_encoder_gpioa_irq_handler();
+        break;
+    case ENCODER_GPIOB_INT_IIDX:
+        board_encoder_gpiob_irq_handler();
+        break;
+    default:
+        break;
+    }
+}
 
 static void motor_task(void *argument)
 {
@@ -221,6 +239,7 @@ static void button_task(void *argument)
 }
 #endif
 
+#if !VOFA_SPEED_PID_TELEMETRY_ENABLE
 static void uart_echo_task(void *argument)
 {
     QueueHandle_t queue = (QueueHandle_t)argument;
@@ -231,6 +250,7 @@ static void uart_echo_task(void *argument)
         }
     }
 }
+#endif
 
 static void motor_control_snapshot_copy(motor_control_wheel_status_t control[BOARD_MOTOR_COUNT])
 {
@@ -252,54 +272,27 @@ static void motor_control_snapshot_copy(motor_control_wheel_status_t control[BOA
     }
 }
 
-#if ENCODER_TELEMETRY_ENABLE
+#if VOFA_SPEED_PID_TELEMETRY_ENABLE
 static void telemetry_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
-    const TickType_t interval = pdMS_TO_TICKS(ENCODER_TELEMETRY_INTERVAL_MS);
+    const TickType_t interval = pdMS_TO_TICKS(VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS);
     motor_control_wheel_status_t control[BOARD_MOTOR_COUNT];
-    char message[512];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
 
     (void)argument;
     for (;;) {
-        int length;
+        board_motor_wheel_t wheel = g_motor_debug.wheel;
 
         motor_control_snapshot_copy(control);
-        length = snprintf(message, sizeof(message),
-                          "ctl,fl=%ld,%ld,%ld,%ld,%ld,%ld,fr=%ld,%ld,%ld,%ld,%ld,%ld,rl=%ld,%ld,%ld,%ld,%ld,%ld,rr=%ld,%ld,%ld,%ld,%ld,%ld,dbg=%u,%u,%u,%ld,%ld,%ld,%ld\r\n",
-                          (long)control[BOARD_MOTOR_FRONT_LEFT].target_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_FRONT_LEFT].feedback_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_FRONT_LEFT].pid_p_out,
-                          (long)control[BOARD_MOTOR_FRONT_LEFT].pid_i_out,
-                          (long)control[BOARD_MOTOR_FRONT_LEFT].pid_d_out,
-                          (long)control[BOARD_MOTOR_FRONT_LEFT].output_duty_percent,
-                          (long)control[BOARD_MOTOR_FRONT_RIGHT].target_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_FRONT_RIGHT].feedback_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_FRONT_RIGHT].pid_p_out,
-                          (long)control[BOARD_MOTOR_FRONT_RIGHT].pid_i_out,
-                          (long)control[BOARD_MOTOR_FRONT_RIGHT].pid_d_out,
-                          (long)control[BOARD_MOTOR_FRONT_RIGHT].output_duty_percent,
-                          (long)control[BOARD_MOTOR_REAR_LEFT].target_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_REAR_LEFT].feedback_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_REAR_LEFT].pid_p_out,
-                          (long)control[BOARD_MOTOR_REAR_LEFT].pid_i_out,
-                          (long)control[BOARD_MOTOR_REAR_LEFT].pid_d_out,
-                          (long)control[BOARD_MOTOR_REAR_LEFT].output_duty_percent,
-                          (long)control[BOARD_MOTOR_REAR_RIGHT].target_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_REAR_RIGHT].feedback_speed_mm_per_s,
-                          (long)control[BOARD_MOTOR_REAR_RIGHT].pid_p_out,
-                          (long)control[BOARD_MOTOR_REAR_RIGHT].pid_i_out,
-                          (long)control[BOARD_MOTOR_REAR_RIGHT].pid_d_out,
-                          (long)control[BOARD_MOTOR_REAR_RIGHT].output_duty_percent,
-                          (unsigned)g_motor_debug.enable,
-                          (unsigned)g_motor_debug.mode,
-                          (unsigned)g_motor_debug.wheel,
-                          (long)g_motor_debug.target_duty_percent,
-                          (long)g_motor_debug.target_speed_mm_per_s,
-                          (long)g_motor_debug.feedback_speed_mm_per_s,
-                          (long)g_motor_debug.output_duty_percent);
-        if ((length > 0) && ((size_t)length < sizeof(message))) {
-            board_uart_write((const uint8_t *)message, (size_t)length);
+        if (wheel >= BOARD_MOTOR_COUNT) {
+            wheel = BOARD_MOTOR_FRONT_LEFT;
+        }
+        if (vofa_justfloat_encode3(frame, sizeof(frame),
+                                   control[wheel].target_speed_mm_per_s,
+                                   control[wheel].feedback_speed_mm_per_s,
+                                   control[wheel].output_duty_percent)) {
+            board_uart_write(frame, sizeof(frame));
         }
         vTaskDelayUntil(&last_wake_time, interval);
     }
@@ -314,19 +307,19 @@ static void imu_task(void *argument)
     board_bmi160_status_t status;
     uint8_t chip_id;
     uint32_t consecutive_failures;
-#if IMU_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
     char message[128];
 #endif
 
     (void)argument;
     for (;;) {
-#if IMU_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
         int length;
 #endif
 
         chip_id = 0U;
         status = board_bmi160_init(&chip_id);
-#if IMU_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
         length = snprintf(message, sizeof(message),
                           "bmi160,id=0x%02X,status=%u\r\n",
                           chip_id, (unsigned)status);
@@ -343,7 +336,7 @@ static void imu_task(void *argument)
                 status = board_bmi160_read_sample(&sample);
                 if (status != BOARD_BMI160_STATUS_OK) {
                     ++consecutive_failures;
-#if IMU_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
                     length = snprintf(message, sizeof(message),
                                       "bmi160,error=%u\r\n", (unsigned)status);
                     if ((length > 0) && ((size_t)length < sizeof(message))) {
@@ -355,7 +348,7 @@ static void imu_task(void *argument)
                     }
                 } else {
                     consecutive_failures = 0U;
-#if IMU_TELEMETRY_ENABLE
+#if IMU_TELEMETRY_ENABLE && !VOFA_SPEED_PID_TELEMETRY_ENABLE
                     length = snprintf(message, sizeof(message),
                                       "imu,ax=%+6d,ay=%+6d,az=%+6d,gx=%+6d,gy=%+6d,gz=%+6d\r\n",
                                       sample.accel_x, sample.accel_y, sample.accel_z,
@@ -488,9 +481,11 @@ int main(void)
     configASSERT(xTaskCreateStatic(button_task, "buttons", BUTTON_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_button_task_stack, &g_button_task_buffer) != NULL);
 #endif
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx", UART_TX_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_uart_tx_task_stack, &g_uart_tx_task_buffer) != NULL);
+#if !VOFA_SPEED_PID_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH, uart_queue, APP_TASK_PRIORITY, g_uart_task_stack, &g_uart_task_buffer) != NULL);
-#if ENCODER_TELEMETRY_ENABLE
-    configASSERT(xTaskCreateStatic(telemetry_task, "telemetry", ENCODER_TELEMETRY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_telemetry_task_stack, &g_telemetry_task_buffer) != NULL);
+#endif
+#if VOFA_SPEED_PID_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(telemetry_task, "telemetry", VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH, NULL, VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY, g_telemetry_task_stack, &g_telemetry_task_buffer) != NULL);
 #endif
     configASSERT(xTaskCreateStatic(imu_task, "imu", IMU_TASK_STACK_DEPTH, NULL, IMU_TASK_PRIORITY, g_imu_task_stack, &g_imu_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(gray_task, "gray", GRAY_TASK_STACK_DEPTH, NULL, TELEMETRY_TASK_PRIORITY, g_gray_task_stack, &g_gray_task_buffer) != NULL);

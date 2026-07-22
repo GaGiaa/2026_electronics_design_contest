@@ -34,9 +34,16 @@ logical mapping in `mspm0g3507_app.syscfg` is front-left from PA15/PB24,
 front-right from PA17/PA22 (direction inverted), rear-left from PA14/PA9, and
 rear-right from PA16/PB20 (direction inverted). Inputs use
 pull-ups; each A phase interrupts on both edges and the B phase determines
-direction. `board_encoder` still defaults to 1040 A-phase edges per wheel
-revolution (twice the reference single-edge 520 count) and a 48 mm wheel diameter;
-the counts-per-revolution value remains subject to one-physical-turn measurement.
+direction. `board_encoder` declares the wheel motor mechanics explicitly: a 13-line
+encoder on the motor shaft and a 20:1 gearbox derive 260 output-shaft lines per
+wheel revolution. The default `BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE` counts
+both A-phase edges and therefore derives 520 counts per output-shaft revolution.
+Set the compile-time `BOARD_ENCODER_DECODE_MODE` to
+`BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4` to count both edges of both AB
+phases through the quadrature state decoder; it then derives 1040 counts per output
+shaft revolution. Rebuild and flash after changing the mode, then verify one manual
+output-shaft turn at low speed before using the speed loop. The wheel diameter is
+48 mm.
 Every 10 ms motor-task iteration samples the signed encoder delta, accumulated count
 and calculated mm/s speed before updating PWM. It runs one incremental PID speed
 controller per wheel. `motor_pid/` is a controlled copy of only the platform-
@@ -57,25 +64,21 @@ motor is moving.
 
 For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without
-adding breakpoints. A lower-priority telemetry task also transmits one line every
-100 ms through UART0. Each wheel is reported as
-`target_mm_s,feedback_mm_s,p,i,d,duty_percent`:
+adding breakpoints. For speed-loop tuning, set the compile-time
+`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `main.c` from `0U` to `1U` and select
+JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 16-byte frame
+every 10 ms. Its three float32 channels follow `g_motor_debug.wheel` and are ordered
+as `target_speed_mm_per_s`, `feedback_speed_mm_per_s`, and
+`output_duty_percent`; the frame ends in `00 00 80 7F`.
 
-```text
-ctl,fl=200,181,2,0,0,2,fr=0,0,0,0,0,0,rl=0,0,0,0,0,0,rr=0,0,0,0,0,0,dbg=0,0,0,0,0,0,0
-```
-
-All values are truncated to signed integers in the serial frame. UART echo and telemetry
-enqueue whole messages to a static frame queue, and one transmit task owns the
-hardware FIFO so bytes from different messages cannot interleave. Telemetry does
-not run in the encoder ISR or motor task. For initial validation,
-use the debugger without breakpoints to turn one wheel by hand and confirm count
-sign and isolation before driving the chassis at low duty.
-
-`main.c` provides the compile-time `ENCODER_TELEMETRY_ENABLE` switch. It defaults
-to `0U`; set it to `1U` to enable the periodic `ctl` UART frames and telemetry
-task. Encoder sampling in the motor task, the debugger-visible sample snapshot,
-IMU output, UART echo, and the UART transmit task remain enabled.
+VOFA mode owns UART0 output: the UART echo task is not created and BMI160 text
+telemetry is suppressed, even if `IMU_TELEMETRY_ENABLE` is `1U`. Do not send text
+to UART0 while VOFA mode is enabled. Frames are still queued through
+`board_uart_write()` and emitted by the dedicated UART TX task, so the motor task
+and encoder ISR never block on the UART. If `g_motor_debug.wheel` is invalid, the
+telemetry task safely sends the front-left wheel status. For initial validation, use
+the debugger without breakpoints to turn one wheel by hand and confirm count sign
+and isolation before driving the chassis at low duty.
 
 PA2 drives a passive buzzer through TIMG8 CCP1. `main.c` provides the
 compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,

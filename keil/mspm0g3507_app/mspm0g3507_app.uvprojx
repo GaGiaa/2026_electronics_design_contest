@@ -395,6 +395,11 @@
               <FilePath>..\..\mspm0g3507_app\board_encoder.c</FilePath>
             </File>
             <File>
+              <FileName>encoder_quadrature.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\encoder_quadrature.c</FilePath>
+            </File>
+            <File>
               <FileName>board_buzzer.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\board_buzzer.c</FilePath>
@@ -423,6 +428,11 @@
               <FileName>motor_control.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\motor_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>vofa_justfloat.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\vofa_justfloat.c</FilePath>
             </File>
             <File>
               <FileName>pid.c</FileName>

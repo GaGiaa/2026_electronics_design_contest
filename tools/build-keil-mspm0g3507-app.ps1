@@ -3,7 +3,9 @@ param(
     [string] $ProjectRoot,
     [string] $SdkRoot = 'D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07',
     [string] $SysConfigRoot = 'D:\Software\ti\ccs2020\sysconfig_1.26.2',
-    [string] $KeilRoot = 'D:\Keil_v5'
+    [string] $KeilRoot = 'D:\Keil_v5',
+    [ValidateSet(1, 2)]
+    [int] $EncoderDecodeMode
 )
 
 Set-StrictMode -Version Latest
@@ -41,21 +43,43 @@ foreach ($path in $protectedPaths) {
     $beforeHashes[$path] = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
 }
 
-& $generator -ProjectRoot $ProjectRoot -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot
-if ($LASTEXITCODE -ne 0) {
-    throw 'Keil SysConfig generation failed.'
+$projectFileContent = $null
+$projectFileBytes = $null
+if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
+    $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)
+    $projectFileContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $projectFile
+    $projectFileWithMode = $projectFileContent -replace '<Define>__MSPM0G3507__</Define>', "<Define>__MSPM0G3507__,BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode</Define>"
+    if ($projectFileWithMode -eq $projectFileContent) {
+        throw 'Keil project does not have the expected application define block.'
+    }
+    [System.IO.File]::WriteAllText(
+        $projectFile,
+        $projectFileWithMode,
+        (New-Object System.Text.UTF8Encoding($false)))
 }
 
-New-Item -ItemType Directory -Force -Path $objects | Out-Null
-Push-Location $projectDir
 try {
-    & $uv4 -b $projectFile -j0 -o $log
+    & $generator -ProjectRoot $ProjectRoot -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot
     if ($LASTEXITCODE -ne 0) {
-        throw "Keil UV4 build failed (exit code $LASTEXITCODE). See $log"
+        throw 'Keil SysConfig generation failed.'
+    }
+
+    New-Item -ItemType Directory -Force -Path $objects | Out-Null
+    Push-Location $projectDir
+    try {
+        & $uv4 -b $projectFile -j0 -o $log
+        if ($LASTEXITCODE -ne 0) {
+            throw "Keil UV4 build failed (exit code $LASTEXITCODE). See $log"
+        }
+    }
+    finally {
+        Pop-Location
     }
 }
 finally {
-    Pop-Location
+    if ($null -ne $projectFileBytes) {
+        [System.IO.File]::WriteAllBytes($projectFile, $projectFileBytes)
+    }
 }
 
 foreach ($path in @($axf, $hex, $map)) {
