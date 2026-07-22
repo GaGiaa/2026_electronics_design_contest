@@ -25,6 +25,7 @@ try {
     & $gcc @compilerArguments `
         (Join-Path $appDir 'motor_control.c') `
         (Join-Path $appDir 'encoder_quadrature.c') `
+        (Join-Path $appDir 'encoder_speed_filter.c') `
         (Join-Path $appDir 'motor_pid\pid.c') `
         (Join-Path $appDir 'vofa_justfloat.c') `
         $testSource '-lm' '-o' $output

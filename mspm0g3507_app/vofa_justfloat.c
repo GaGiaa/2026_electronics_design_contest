@@ -40,8 +40,20 @@ bool vofa_justfloat_encode(uint8_t *frame, size_t frame_size,
 bool vofa_justfloat_encode3(uint8_t *frame, size_t frame_size,
                              float channel0, float channel1, float channel2)
 {
-    const float channels[VOFA_JUSTFLOAT_CHANNEL_COUNT] = {
+    const float channels[3U] = {
         channel0, channel1, channel2
+    };
+
+    return vofa_justfloat_encode(frame, frame_size, channels,
+                                 3U);
+}
+
+bool vofa_justfloat_encode4(uint8_t *frame, size_t frame_size,
+                             float channel0, float channel1, float channel2,
+                             float channel3)
+{
+    const float channels[VOFA_JUSTFLOAT_CHANNEL_COUNT] = {
+        channel0, channel1, channel2, channel3
     };
 
     return vofa_justfloat_encode(frame, frame_size, channels,

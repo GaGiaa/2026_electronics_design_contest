@@ -329,8 +329,9 @@ static void telemetry_task(void *argument)
         if (wheel >= BOARD_MOTOR_COUNT) {
             wheel = BOARD_MOTOR_FRONT_LEFT;
         }
-        if (vofa_justfloat_encode3(frame, sizeof(frame),
+        if (vofa_justfloat_encode4(frame, sizeof(frame),
                                    control[wheel].target_speed_mm_per_s,
+                                   control[wheel].instant_feedback_speed_mm_per_s,
                                    control[wheel].feedback_speed_mm_per_s,
                                    control[wheel].output_duty_percent)) {
             board_uart_write(frame, sizeof(frame));
@@ -353,12 +354,13 @@ static void imu_task(void *argument)
     board_encoder_sample_t encoder_samples[BOARD_MOTOR_COUNT];
 #endif
 #if IMU_TELEMETRY_ENABLE && IMU_YAW_ENABLE
-    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(VOFA_JUSTFLOAT_CHANNEL_COUNT)];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(3U)];
 #endif
 
     (void)argument;
 #if IMU_YAW_ENABLE
     board_imu_yaw_init(&yaw_state, IMU_YAW_TRACK_WIDTH_MM);
+#endif
     for (;;) {
         chip_id = 0U;
         status = board_bmi160_init(&chip_id);

@@ -48,7 +48,7 @@ static void test_encode_rejects_invalid_buffers(void)
 
 static void test_encode3_compatibility_remains(void)
 {
-    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(VOFA_JUSTFLOAT_CHANNEL_COUNT)] = {0U};
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE_3] = {0U};
 
     assert(vofa_justfloat_encode3(frame, sizeof(frame), 1.0f, 2.0f, 3.0f));
     assert(frame[0U] == 0x00U);

@@ -11,6 +11,10 @@ typedef struct {
     float kd;
     float output_limit;
     float deadband;
+    float integral_output_limit;
+    float integral_separation_threshold;
+    float derivative_filter_N;
+    float output_delta_limit;
 } PID_Incremental_Param_Config;
 
 typedef struct {
@@ -33,13 +37,20 @@ typedef struct {
 typedef struct {
     PID_Incremental_Param_Config params;
     float dt_s;
+    float inverse_dt_s;
     float error;
     float last_error;
     float prev_error;
+    float last_feedback;
+    float prev_feedback;
+    float integral_output;
+    float filtered_derivative;
     float p_out;
     float i_out;
     float d_out;
     float output;
+    bool has_feedback_history;
+    bool integral_saturated;
 } PID_Incremental;
 
 typedef struct {

@@ -381,17 +381,20 @@ Keil 构建脚本也使用相同的 `-EncoderDecodeMode 2` 参数。两个构建
 专用 UART 编译开关，默认 `0U`。设为 `1U` 时启用速度环 JustFloat，设为 `0U` 时恢复 UART 文本回显；
 `telemetry_task` 以 10 ms 周期
 通过既有 `board_uart_write()` 静态帧队列发送 VOFA+ JustFloat 二进制帧。每帧为
-三个小端 IEEE-754 `float32` 加帧尾 `00 00 80 7F`，固定 16 字节；字段顺序为当前
-`g_motor_debug.wheel` 的 `target_speed_mm_per_s`、`feedback_speed_mm_per_s` 与
+四个小端 IEEE-754 `float32` 加帧尾 `00 00 80 7F`，固定 20 字节；字段顺序为当前
+`g_motor_debug.wheel` 的 `target_speed_mm_per_s`、原始
+`instant_feedback_speed_mm_per_s`、滤波后的 `feedback_speed_mm_per_s` 与
 `output_duty_percent`。非法轮位自动降级为前左轮，调试模式未使能时仍按所选轮位输出
 状态。
 
-VOFA 模式独占 UART0 输出：UART 回显任务不会创建，不能在该模式下向串口发送文本或同时使用
-文本串口监视器。VOFA+ 选择
-JustFloat 后应观察三条曲线以 100 Hz 更新；先低速确认编码器符号，再调整
-`g_motor_debug.speed_pid_params`。电机运动时禁止设置断点。新增
+VOFA 模式独占 UART0 输出：UART 回显任务不会创建，BMI160 初始化、错误和采样文本
+也被编译期抑制，不能在该模式下向串口发送文本或同时使用文本串口监视器。VOFA+ 选择
+JustFloat 后应观察四条曲线以 100 Hz 更新；先低速确认编码器符号，再调整
+`g_default_speed_pid_params` 中对应轮子的参数。若需要临时使用 SWD PID 覆盖，必须同时将
+`g_motor_debug.use_speed_pid_override` 设为 `true`，再调整 `g_motor_debug.speed_pid_params`。
+电机运动时禁止设置断点。新增
 `mspm0g3507_app/vofa_justfloat.c/.h` 为无硬件依赖编码模块，主机测试覆盖固定帧长、
-三个已知浮点的字节序与帧尾；尚未执行 Flash 写入或 VOFA 硬件验收。
+四个已知浮点的字节序与帧尾；尚未执行 Flash 写入或 VOFA 硬件验收。
 
 ### 四轮 PWM 速度闭环与 SWD 单轮调试
 
@@ -399,6 +402,12 @@ JustFloat 后应观察三条曲线以 100 Hz 更新；先低速确认编码器�
 mm/s；`volatile float g_motor_speed_targets_mm_s[4]` 是 SWD 可写的正常四轮目标，
 启动均为 0。控制器输出 -100% 至 100% 的带符号 PWM；
 `board_motor_set_signed_duty()` 仍使用既有双 PWM H 桥和后左反相校准。
+
+编码器速度反馈现在保留每个 10 ms 周期的原始 `delta_counts`，并使用五个样本的
+滑动计数窗口生成 50 ms 有效平均值。窗口每 10 ms 更新一次，启动阶段按当前已有样本数
+平均，不等待窗口填满；`board_encoder_sample_t.speed_mm_per_s` 是 PID 使用的滤波速度，
+`instant_speed_mm_per_s` 用于观察单周期量化跳变。计数窗口在 `board_encoder_init()` 中
+复位，计数和 Q8 平均使用整数，速度换算使用预计算比例。
 
 `volatile motor_control_debug_t g_motor_debug` 是单电机 SWD 调试入口。可通过
 Live Expressions/Watch 设置 `enable`、`wheel`、`mode`、`target_duty_percent`、
@@ -411,6 +420,22 @@ Live Expressions/Watch 设置 `enable`、`wheel`、`mode`、`target_duty_percent
 受控复制的 PID-only 核心，只含增量式与位置式 PID 和夹紧函数；外部 MotorLib
 未修改，且没有复制 CAN、STM32 HAL、DJI 或 RobStride 协议。位置式 PID 已编译与
 测试，但在每轮 `BOARD_ENCODER_COUNTS_PER_REVOLUTION` 实测前不开放位置控制。
+
+增量式速度 PID 新增 `integral_output_limit`、`integral_separation_threshold`、
+`derivative_filter_N` 和 `output_delta_limit` 参数。积分在误差分离阈值外停止，输出饱和
+时冻结同方向积分，误差反向时释放；微分使用反馈二阶差分并可进行一阶滤波；输出变化率
+限制按每个 10 ms 周期生效。当前默认参数保持 `ki=0`、`kd=0`，调速时应先调 PI，确认
+反馈稳定后再启用微分。目标和 SWD 参数接口仍使用 `float`，编码器统计、滑动窗口和固定
+比例处理使用整数或预计算常量，以减少 Cortex-M0+ 软件浮点负担。
+
+四个轮子的默认速度 PID 参数现在位于 `mspm0g3507_app/motor_control.c` 的
+`g_default_speed_pid_params[BOARD_MOTOR_COUNT]` 数组中，数组下标依次使用
+`BOARD_MOTOR_FRONT_LEFT`、`BOARD_MOTOR_FRONT_RIGHT`、`BOARD_MOTOR_REAR_LEFT` 和
+`BOARD_MOTOR_REAR_RIGHT`。调参时分别修改对应元素。SWD 单轮 SPEED 调试默认会随
+`g_motor_debug.wheel` 使用对应轮子的默认参数；只有将
+`g_motor_debug.use_speed_pid_override` 设为 `true` 时，才会使用
+`g_motor_debug.speed_pid_params` 覆盖当前选中轮子。切换调试轮位会复位全部速度 PID，
+并让新轮子在一个 10 ms 周期内保持 0% 输出。
 
 新增验证命令：
 
@@ -646,6 +671,17 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 CCS/TI Clang 构建完成 SysConfig 生成、应用 ELF 编译和链接；Keil 构建完成 AXF、HEX、
 MAP 生成。灰度传感器实体接线、编码器方向与单圈计数、低速 PID 调试、VOFA 硬件验收
 仍属于后续硬件事项。
+
+### 2026-07-22 编码器量化与速度环 PID 优化
+
+本次新增无硬件依赖的 `encoder_speed_filter.c/.h`，并将其接入 TI 与 Keil 工程。主机
+测试覆盖五点滑动窗口的启动、连续计数、亚计数平均和正反向变化；增量式 PID 测试覆盖
+积分分离、积分限幅、反馈微分、抗饱和和输出变化率限制。VOFA+ JustFloat 遥测扩展为
+20 字节四通道帧，依次输出目标速度、原始速度、滤波速度和输出占空比。
+
+已执行并通过默认模式和 AB 四倍频模式的主机测试、静态集成检查、TI 构建及 Keil 构建。
+本次未执行 Flash 烧录、编码器实物整圈计数验收或低速 PID 硬件调试；后续应在低速单轮
+条件下比较 20 ms、30 ms 和 50 ms 窗口的延迟与 PWM 抖动。
 
 ## Git 操作授权规则
 

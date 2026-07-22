@@ -40,6 +40,7 @@
 typedef struct {
     int32_t delta_counts;
     int32_t total_counts;
+    float instant_speed_mm_per_s;
     float speed_mm_per_s;
 } board_encoder_sample_t;
 
