@@ -1,750 +1,168 @@
 # MSPM0 核心板工程交接索引
 
+最后更新：2026-07-22
+
 ## 使用规则
 
-任何 AI 在查看、修改、构建、调试或烧录本仓库前，必须完整阅读本文件。每次任务完成前更新本文档，记录实际修改、验证结果、硬件或工具事实与遗留风险。
+任何 AI 在查看、修改、构建、调试或烧录本仓库前，必须先完整阅读本文档。任务完成后必须
+更新实际修改、验证结果、硬件事实和遗留风险。正文使用中文；代码标识符、命令、路径和
+协议名称保持原样。不得混用 L1306 与 G3507 的 SysConfig、ELF、CMSIS-Pack 或引脚配置。
 
-提交 Git 时必须使用简洁中文标题和详细中文正文，正文应说明功能变化、涉及的工具或硬件，以及实际验证证据。
+除非用户明确授权，不得执行 Flash 擦除、烧录、探针枚举、GDB 服务或会暂停运行中电机的
+调试操作。
 
-本文件后续新增、修改或补充的所有交接内容必须使用中文；代码标识符、命令、路径、协议名称和必要技术术语除外。不得在本文件中新增英文叙述段落。
+## 当前 Git 状态
 
-仓库同时维护 MSPM0L1306 和 MSPM0G3507 两个独立 CCS 工程。不得将两者的 SysConfig 生成文件、ELF、CMSIS-Pack、pyOCD 参数或引脚配置混用。
+当前分支为 `develop`，当前合并结果为 `7d98698`。三个分支按以下顺序使用普通非快进
+合并完成：
 
-## 工程索引
+- 基线 `d2a97dc`：关闭 VOFA 速度遥测默认开关；
+- `af02c42`：合并 `develop_1`，加入 IMU Yaw 算法和 JustFloat 遥测；
+- `8181750`：合并 `develop_2`，加入灰度线跟踪和灰度 VOFA 遥测；
+- `7d98698`：合并 `develop_3`，加入编码器速度滤波、四轮速度 PID 和四通道速度遥测。
 
-| 核心板 | CCS 工程 | 芯片与封装 | LED | UART0 | Debug ELF |
-| --- | --- | --- | --- | --- | --- |
-| L1306 | `mspm0l1306_bringup/` | MSPM0L1306, VQFN-32 (RHB) | PA3 | PA8 TX, PA9 RX | `mspm0l1306_bringup/Debug/mspm0l1306_bringup.out` |
-| G3507 | `mspm0g3507_bringup/` | MSPM0G3507, LQFP-64 (PM) | PB22 | PA10 TX, PA11 RX | `mspm0g3507_bringup/Debug/mspm0g3507_bringup.out` |
+本文档整理与功能合并分开保存，便于后续追踪和交接。
 
-两套固件均使用 `LED_TOGGLE_INTERVAL_MS` 控制电平翻转间隔，默认值为 2000 ms。G3507 的 UART0 连到板载 CH340；使用前在主机上确认实际串口号。两块板均使用 PA19 作为 SWDIO、PA20 作为 SWCLK，并使用 3.3 V 逻辑电平。
+## 工程与工具链
 
-## 工具链
+| 核心板 | CCS 工程 | 芯片与封装 | LED | UART0 |
+| --- | --- | --- | --- | --- |
+| L1306 | `mspm0l1306_bringup/` | MSPM0L1306，VQFN-32 | PA3 | PA8 TX，PA9 RX |
+| G3507 | `mspm0g3507_bringup/` | MSPM0G3507，LQFP-64 | PB22 | PA10 TX，PA11 RX |
 
-- CCS: `D:\Software\ti\ccs2020`，用于 CCS 工程导入和 SysConfig 图形编辑。
-- MSPM0 SDK: `D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07`。
-- SysConfig: `D:\Software\ti\ccs2020\sysconfig_1.26.2`。
-- TI Clang: `D:\Software\ti\ccs2020\ccs\tools\compiler\ti-cgt-armllvm_4.0.3.LTS\bin\tiarmclang.exe`。
-- ARM GDB: `D:\Software\STM32CubeCLT_1.18.0\GNU-tools-for-STM32\bin\arm-none-eabi-gdb.exe`。
-- pyOCD: 安装到 `tools/.venv`，版本约束为 `>=0.45,<0.46`。
-- 调试器: Horco CMSIS-DAP v2。CCS 20.2 不会将其识别为 XDS 调试器；烧录与 SWD 调试使用 pyOCD。
+G3507 应用工程为 `mspm0g3507_app/`，Keil MDK 工程为 `keil/mspm0g3507_app/`；
+FreeRTOS 基线工程为 `mspm0g3507_freertos/`。主要工具如下：
 
-## L1306 操作
+- CCS：`D:\Software\ti\ccs2020`
+- MSPM0 SDK：`D:\Software\ti\ccs2020\mspm0_sdk_2_11_00_07`
+- SysConfig：`D:\Software\ti\ccs2020\sysconfig_1.26.2`
+- TI Clang：`D:\Software\ti\ccs2020\ccs\tools\compiler\ti-cgt-armllvm_4.0.3.LTS\bin\tiarmclang.exe`
+- Keil：`D:\Keil_v5`；调试器：Horco CMSIS-DAP v2
+- pyOCD：`tools/.venv`，版本约束 `>=0.45,<0.46`
 
-构建:
+## 构建与安全边界
 
-```powershell
+~~~powershell
 & 'D:\Software\ti\ccs2020\ccs\utils\bin\gmake.exe' -C mspm0l1306_bringup\Debug all
-```
-
-首次安装调试工具:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\install-debug-tools.ps1
-```
-
-pyOCD 操作使用 `tools/flash-and-debug.ps1`，其 `List`、`GdbServer` 和 `Load` 分别对应枚举、启动服务和擦除写入。L1306 必须使用 `tools/pyocd-mspm0l1306.py`，它在 CoreSight 发现前设置 AP0 ROM-table 地址；`GdbServer` 与 `Load` 必须保留该脚本。TI Clang 的 `.out` 为 ELF，`Load` 必须显式传递 `--format elf`。
-
-VS Code 任务和调试配置分别是 `MSPM0: Build` 与 `MSPM0L1306: Attach to pyOCD`。
-
-## G3507 操作
-
-构建:
-
-```powershell
-.\tools\build-mspm0g3507.ps1
-```
-
-该脚本生成 G3507 专用的 `Debug/ti_msp_dl_config.*`，编译固件并链接 G3507 ELF。不要手工编辑 `Debug/` 中的生成文件。
-
-首次安装调试工具:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\install-g3507-debug-tools.ps1
-```
-
-G3507 使用 `TexasInstruments.MSPM0G1X0X_G3X0X_DFP.1.3.1.pack` 和 `tools/flash-and-debug-g3507.ps1`。该 Pack 自带 G 系列的调试元数据，禁止传入 L1306 专用 `pyocd-mspm0l1306.py`。VS Code 任务以 `MSPM0G3507:` 开头，F5 配置为 `MSPM0G3507: Attach to pyOCD`。
-
-## 烧录安全边界
-
-两个烧录脚本的 `Load` 都会执行 `--erase chip` 并写入目标 Flash。执行前必须明确告知并获得用户同意。构建、`List` 和 `GdbServer` 不会写入 Flash；F5 只连接已启动的 `localhost:3333` GDB server。
-
-## 已验证状态
-
-- L1306: 已验证 CCS Debug 构建、L1306 SysConfig 与 pyOCD 脚本配置；未执行探针枚举、GDB 服务、硬件串口测试或 Flash 写入。
-- G3507: 已验证 PB22、UART0 PA10/PA11 的 SysConfig 生成；`tools/build-mspm0g3507.ps1` 已完成 TI Clang 编译和 ELF 链接；G 系列 CMSIS-Pack 已安装且 pyOCD 已列出 `mspm0g3507` 目标。
-- G3507: 未执行探针枚举、GDB 服务、Flash 写入、LED 实测或串口回显测试。
-
-## Git 与文件卫生
-
-不得提交 `mspm0l1306_bringup/Debug/`、`mspm0g3507_bringup/Debug/`、`tools/.venv/`、`tools/packs/`、Python 缓存、VS Code 本地状态或操作系统临时文件。完整规则以 `.gitignore` 为准。
-
-## G3507 FreeRTOS 工程
-
-`mspm0g3507_freertos/` 是 G3507 裸机工程之外的独立 FreeRTOS 基线，必须与
-`mspm0g3507_bringup/` 共存。它使用同一块天猛星核心板的 `PB22` 用户 LED 与
-UART0 `PA10` TX、`PA11` RX，但不复用裸机工程的 SysConfig 生成文件或 ELF。
-
-构建命令：
-
-```powershell
-.\tools\build-mspm0g3507-freertos.ps1
-```
-
-构建脚本从 SDK 2.11.00.07 的只读 FreeRTOS 内核和 TI ARM Clang Cortex-M0+
-移植层编译，工程本地 `FreeRTOSConfig.h` 固定为 1 kHz 抢占式 tick，开启静态
-对象分配和栈溢出检查，禁用动态对象分配及软件定时器。应用创建两个静态任务：
-LED 任务通过 `vTaskDelayUntil()` 使用 `LED_TOGGLE_INTERVAL_MS` 翻转电平；
-UART 回显任务阻塞接收静态队列。UART RX ISR 必须使用 `xQueueSendFromISR()`；
-不得恢复裸机的 `SysTick_Handler` 或 `EchoQueue`。
-
-RTOS ELF 为 `mspm0g3507_freertos/Debug/mspm0g3507_freertos.out`。VS Code
-构建任务为 `MSPM0G3507 FreeRTOS: Build`，调试配置为
-`MSPM0G3507 FreeRTOS: Attach to pyOCD`。启动 GDB server 仍使用原有 G3507
-脚本；要写入 RTOS ELF 必须显式传入 `-Firmware freertos`：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\flash-and-debug-g3507.ps1 -Action Load -Firmware freertos
-```
-
-该命令会 `--erase chip`，执行前必须取得用户明确同意。已验证 SysConfig 生成、
-TI Clang 编译、FreeRTOS 内核链接和静态集成检查；尚未执行探针枚举、Flash 写入、
-PB22 LED 实测或 UART 回显实测。
-
-## G3507 正式应用工程
-
-`mspm0g3507_app/` 是 G3507 的长期 FreeRTOS 应用工程，与 bring-up 和
-`mspm0g3507_freertos/` 基线独立。UART0 保持 PA10 TX、PA11 RX、115200 8-N-1，
-接收 FIFO 在中断中排空，并通过静态队列回显。PB22 经 3.3 V 至 5 V 电平转换器驱动
-4 颗标准 800 kHz WS2812；MCU、转换器和 LED 5 V 电源必须共地。
-
-构建命令：
-
-```powershell
-.\tools\build-mspm0g3507-app.ps1
-powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
-```
-
-应用 ELF 为 `mspm0g3507_app/Debug/mspm0g3507_app.out`。默认动画每 500 ms
-只点亮一颗灯珠，按红、绿、蓝、白及灯珠 1 至 4 的顺序循环，通道亮度为 16。
-WS2812 使用 SPI1 PICO 输出到 PB22，SPI 目标速率为 2.666667 MHz，编码为
-`0=100`、`1=110`；PB9 是未连接的 SPI 时钟输出。每帧含 36 字节编码数据和 24 字节
-低电平锁存数据。发送期间关闭中断，发送后 PB22 保持低电平至少 80 us，未占用
-SysTick 或替换 FreeRTOS 时钟处理。烧录该 ELF 需要显式传入 `-Firmware app`，且
-`Load` 会擦除目标 Flash，未经用户明确授权不得执行。
-
-已完成静态集成检查和 TI Clang 构建验证；尚未执行探针枚举、GDB 服务、Flash 写入、
-LED 实测或 UART 连续回显实测。
-
-应用工程已配置 40 MHz HFXT 经 SYSPLL 的 80 MHz CPU 时钟，FreeRTOS 的
-`configCPU_CLOCK_HZ` 同步为 80 MHz；ULPCLK 经 UDIV /2 保持在 40 MHz 以下。
-底盘电机使用双 PWM 输入；按当前底盘校准后的逻辑轮位为：前左 PA29/PB27、前右
-PB4/PB5、后左 PA28/PA31、后右 PA12/PA13。四组定时器均为 40 MHz 时钟与 4000
-计数周期，输出 10 kHz。
-`main.c` 中每轮都有方向和占空比宏，默认占空比为 `0%`，因此安全停转；静态电机任务每
-10 ms 应用命令。正转为 IN1 PWM/IN2 低，反转为 IN1 低/IN2 PWM，停止时两路均低。
-已通过静态集成检查、SysConfig 生成和 TI Clang 构建；未执行 Flash 写入或硬件电机测试。
-
-### 电机轮位校准
-
-`board_motor` 的逻辑轮位已按当前底盘接线校准：逻辑前左使用 PA29/PB27，逻辑前右使用
-PB4/PB5，逻辑后左使用 PA28/PA31 且正反方向反相，逻辑后右使用 PA12/PA13。
-因此，四个逻辑轮位的 `BOARD_MOTOR_DIRECTION_FORWARD` 都表示车辆前进方向。重新接线或
-更换电机驱动板后，必须重新进行单轮校准。
-
-### 四轮编码器采样
-
-`mspm0g3507_app/board_encoder.*` 提供四轮 AB 相增量编码器的独立驱动，逻辑轮位的 A/B
-输入依次为：前左 PA16/PB20、前右 PA14/PA9、后左 PA15/PB24、后右 PA17/PA22。八个输入
-均为上拉。当前默认 A 相双沿模式下，只有 A 相产生双沿 GPIO 中断，B 相仅在 A 相边沿时读取以
-判定方向；可选 AB 四倍频模式下，八个 A/B 输入均使用双沿中断。GPIO ISR 不调用 FreeRTOS API。
-机械参数与最终计数值由后文的 `board_encoder.h` 配置统一定义，不再保留手写的 1040 常量。
-
-电机静态任务仍以 10 ms 周期运行，且每轮均先通过 `board_encoder_sample()` 原子取得并清零本周期
-有符号计数，再按原有开环方向和占空比命令更新 PWM。采样结构包含 `delta_counts`、
-`total_counts` 和 `speed_mm_per_s`；本次未引入 PI 闭环或改变默认 0% 停转。已于 2026-07-21
-通过 `tests/test_mspm0g3507_app.ps1` 静态集成检查，并通过
-`tools/build-mspm0g3507-app.ps1` 的 SysConfig 生成、TI Clang 编译和 ELF 链接。已执行 app ELF
-烧录；用户已确认烧录后的 UART 遥测和串口回显恢复正常。编码器计数正负方向和完整一圈脉冲数仍须
-逐轮低占空比确认，并据此校准机械参数或解码方式。
-
-### 编码器观测与遥测
-
-应用的 `main.c` 导出 `volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT]`，
-由 10 ms 电机任务在完成四轮采样后写入。SWD 调试时可在 Live Expressions/Watch 中观察该全局数组，
-但禁止在电机运动中设置断点，以免暂停 PWM、FreeRTOS 时基和编码器边沿处理。推荐先在不驱动或低占空比
-条件下手动逐轮转动，确认单轮隔离、正反向计数符号和一圈脉冲数。
-
-低优先级遥测任务每 100 ms 经 UART0 输出一行 `enc` CSV 数据；每轮字段顺序是
-`delta_counts,total_counts,speed_mm_per_s`，速度以截断后的整数 mm/s 表示。UART 回显和遥测均通过
-`board_uart_write()` 入队，内部使用静态帧队列；专用 `board_uart_tx_task` 独占 UART FIFO，
-确保完整报文不会互相交错。工程仍禁用动态内存分配，遥测不得移动到 GPIO ISR 或 10 ms 电机任务中。
-`main.c` 的 `ENCODER_TELEMETRY_ENABLE` 默认是 `0U`；改为 `1U` 会在编译期启用
-`telemetry_task`、其静态栈和 `enc` 报文，同时保留电机任务中的编码器采样、调试器快照、
-IMU 输出、UART 回显和 UART TX 任务。
-首次硬件测试时，GDB 确认 `telemetry` 任务触发了 `vApplicationStackOverflowHook()`；原因是包含多次
-格式化调用的遥测任务仅有 256 words 栈。已将 `ENCODER_TELEMETRY_TASK_STACK_DEPTH` 增至 512U，
-并由 `tests/test_mspm0g3507_app.ps1` 固定检查。重新构建、烧录后，用户已确认 100 ms `enc` 遥测和
-UART 回显均正常。
-
-### 当前工作树交接状态
-
-本次工作位于 `develop_1` 分支，本次新增/修改内容如下：
-
-- `mspm0g3507_app/board_encoder.c/.h`：四轮 GPIO 编码器驱动。参考工程只用于提取引脚和 520
-  计数参数；新驱动未复用参考代码。A 相使用双沿 GPIOA 中断，B 相在边沿时读取判向；引脚为
-  前左 PA16/PB20、前右 PA14/PA9、后左 PA15/PB24、后右 PA17/PA22。驱动使用 SysConfig
-  生成的 `ENCODER_*` 宏，不要手工编辑 `Debug/ti_msp_dl_config.*`。
-- `mspm0g3507_app/main.c`：`motor_task` 仍为 10 ms，循环顺序固定为四轮编码器采样、再四轮
-  PWM 输出。`g_encoder_samples[BOARD_MOTOR_COUNT]` 是可通过 SWD Watch/Live Expressions 观察的
-  `volatile` 全局数组；序列号用于遥测任务读取一致快照。遥测任务栈为 512 words，避免格式化
-  编码器报文时触发 FreeRTOS 栈溢出。
-- UART 观测：`telemetry_task` 优先级 0、周期 100 ms，输出格式为
-  `enc,fl=delta,total,speed,fr=delta,total,speed,rl=delta,total,speed,rr=delta,total,speed`，
-  速度为截断整数 mm/s。`board_uart_write()` 将整帧复制到 8 槽静态发送队列；
-  `board_uart_tx_task` 优先级 1 独占发送 FIFO，回显任务和遥测任务不直接操作 FIFO，避免之前
-  “遥测持锁轮询 FIFO 导致回显接收队列溢出”的问题。
-- `mspm0g3507_app/FreeRTOSConfig.h`：动态内存仍为禁用状态；不需要 `configUSE_MUTEXES`。
-- `tests/test_mspm0g3507_app.ps1`：已覆盖编码器文件、八个引脚、A 相双沿/B 相上拉、任务顺序、
-  快照全局变量、遥测任务、静态 UART 帧队列和构建脚本接入。
-- `tools/build-mspm0g3507-app.ps1`：已加入 `board_encoder.c`，SysConfig 生成文件仍由脚本生成。
-
-最近验证证据：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
-powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
-```
-
-两条命令在当前 512-word telemetry 栈版本均返回成功。构建只产生/更新被忽略的
-`mspm0g3507_app/Debug/` 产物。SysConfig 仍会输出既有的 Flash 状态位和 PWM/低功耗保持提示，
-这些不是本次构建失败。随后已烧录该 app ELF，用户确认 UART 遥测和回显均恢复正常。
-
-下一步优先级：
-
-1. 保持四路占空比 0%，通过 SWD 手动转轮，观察 `g_encoder_samples` 的单轮隔离、正反
-   符号和一圈脉冲数；确认后再设置一个轮子的低占空比。
-2. 持续接收 UART0 PA10/PA11 的 100 ms `enc` 报文，确认回显与遥测不交错。若需连续主机输入，
-   重点观察 `board_uart_rx_overflow_count()` 是否保持不变。
-3. 以实测完整一圈计数确认 `BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION`、
-   `BOARD_ENCODER_GEAR_RATIO` 与所选解码模式；当前默认 A 相双沿应为 520，AB 四倍频应为 1040。
-
-已知设计边界：MSPM0G3507 这块硬件只有一个可用定时器 QEI，当前八根参考编码器线也不能组成
-四组同一 `TIMGx` 的 CCP0/CCP1，因此本版本明确采用 GPIO 中断。不要在没有重新分配硬件引脚和
-确认定时器资源前，把四路 GPIO 驱动改成“四个 QEI”或盲目改成 Timer Capture；Timer Capture
-本身不能自动完成 AB 相方向解码。
-### PA2 无源蜂鸣器
-
-`mspm0g3507_app/` 将 PA2 配置为 TIMG8 CCP1 硬件 PWM 输出。`main.c` 的
-`BUZZER_FEATURE_ENABLE`、`BUZZER_FREQUENCY_HZ`、`BUZZER_DUTY_PERCENT`、
-`BUZZER_ON_TIME_MS` 和 `BUZZER_OFF_TIME_MS` 为编译期配置宏；默认分别为
-关闭、2000 Hz、50%、200 ms 和 1800 ms。启用时新增一个静态 FreeRTOS 任务循环
-响/停，禁用时驱动初始化后保持 PA2 低电平且不创建任务。已验证 SysConfig 生成、
-静态集成测试与 TI Clang 构建；尚未进行 Flash 写入或蜂鸣器硬件实测。蜂鸣器驱动
-电路必须与 MCU 共地。
-
-### 编码器通道校准更新
-
-通过手动转轮硬件校准，已确定以下物理引脚到逻辑轮位的编码器映射，
-并已直接写入 `mspm0g3507_app.syscfg`：
-
-- 逻辑前左轮：PA15/PB24；
-- 逻辑前右轮：PA17/PA22，方向取反；
-- 逻辑后左轮：PA14/PA9；
-- 逻辑后右轮：PA16/PB20，方向取反。
-
-生成的 `ENCODER_*` 宏现在直接表示上述逻辑轮位；
-`board_encoder_gpioa_irq_handler()` 只应用两路已校准的方向符号。PWM 电机映射保持不变。
-当前机械配置为 13 线、20:1，默认 A 相双沿派生 520 counts/rev；如选择 AB 四倍频则派生
-1040 counts/rev。更换电机或减速箱后只更新机械参数，不直接修改派生计数宏。
-
-## G3507 Keil MDK 迁移
-
-`keil/mspm0g3507_app/` 是现有 `mspm0g3507_app/` 应用的独立 Keil MDK 工程。
-Keil 工程通过相对路径共享应用的 C/H 文件和原始 SysConfig 源文件；不会修改 CCS
-的 `.project`、`.cproject`、原始 `.syscfg`、原始构建脚本或 VS Code 调试配置。
-
-该工程以 `MSPM0G3507` 为目标，使用 Arm Compiler 6、SDK 提供的 Keil 启动文件和
-scatter 文件，以及本地 FreeRTOS `GCC/ARM_CM0` 移植层副本。本地移植层用于保持
-Keil 构建边界与 TI Clang 移植层分离。由于 SDK Keil 版 `driverlib.a` 使用特定 ABI，
-Keil 编译器必须启用短枚举和短 wchar（`vShortEn=1`、`vShortWch=1`），否则会出现
-`wchart-16`/`wchart-32` 以及 packed-enum/enum-is-int ABI 冲突。
-
-SysConfig 使用 `--compiler keil` 生成到 `keil/mspm0g3507_app/Generated/`；
-原始 `mspm0g3507_app/Debug/` 不会被使用或修改。Keil 工程选择 CMSIS-DAP
-（`DriverSelection=4096`）、`MSPM0G1X0X_G3X0X_MAIN_128KB.FLM` 算法和
-`MSPM0G350X.svd`。构建脚本为 `tools/build-keil-mspm0g3507-app.ps1`，
-只生成位于 `keil/mspm0g3507_app/Objects/` 的调试 AXF，不会编程 Flash。
-
-静态检查和临时 AC6 编译/链接检查已覆盖 SysConfig Keil 输出、应用源码、FreeRTOS
-内核、本地 M0 移植层、启动文件、scatter 文件和 DriverLib。CMSIS-Pack 压缩包包含
-MSPM0G3507 器件、MSPM0G350X SVD，以及 128 KB、64 KB、32 KB 主 Flash 算法。
-
-2026-07-21 的验证命令均已完成：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
-powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
-powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
-```
-
-UV4 报告 `0 Error(s), 0 Warning(s)`，并生成调试 AXF/HEX；MAP 文件生成在 Keil 工程
-目录旁。`fromelf` 已确认调试段、`motor_task` 函数符号以及带类型信息的
-`g_encoder_samples[4]` 符号。Keil Pack 已安装到本地 MDK Pack 根目录，
-`cpackget list` 报告版本为 1.3.1。
-
-截至本次交接，实体 CMSIS-DAP 枚举、Flash 下载、Keil 断点/单步、寄存器查看以及
-`g_encoder_samples` 实时观察仍属于硬件验收事项；未实际连接探针时不得报告为成功。
-### BMI160 六轴 IMU 接入
-
-BMI160 首版使用 G3507 的独立硬件 SPI0，不使用原接线图中的 I2C 方案。
-MSPM0G3507 的 PB17/PB18 没有 I2C 复用，但支持 SPI0：模块 `SCK` 接 PB18，
-`SDI`/MOSI 接 PB17，`SDO`/MISO 接 PB19，低有效 `CS` 接 PB0。PA21 保留给
-后续数据就绪中断，首版不启用；SPI 模式下 SA0 不参与地址选择。SPI1 仍由
-WS2812 使用。
-
-模块必须使用 3.3 V 并与 MCU 共地；不要在未核对模块原理图前同时给 VIN 和
-3V3 供电。若模块只有 SDA/SCL 标注，必须确认其是否支持 SPI 并找出独立的
-SDI、SDO 和 SCK 引脚，不能把 I2C SDA 直接当作完整 SPI 接线。
-
-`mspm0g3507_app.syscfg` 中的 `SPI_BMI160` 配置为 SPI0、8 MHz、8 位、MSB
-first、Motorola mode 3，PB0 配置为高电平空闲 GPIO CS。上电后驱动先拉低再
-拉高 CS 并发送一次 `0xFF` dummy SPI 事务，以完成 BMI160 的 SPI 接口选择；该
-启动步骤与 Bosch COINES 和公开 SPI 移植例程一致。该模式与 Bosch BMI160_SensorAPI
-官方 `read_sensor_data` 例程一致。`board_bmi160.c/.h` 提供
-`board_bmi160_init(uint8_t *)` 和 `board_bmi160_read_sample(...)`，使用状态码、
-有界 SPI 超时和 CS 错误释放。初始化读取 `CHIP_ID` 并要求 `0xD1`，执行软复位，
-配置加速度计 ±4g/100 Hz、陀螺仪 ±500dps/100 Hz；软复位后按 Bosch 官方流程读取
-0x7F 重新启用 SPI，并在每次寄存器写入后等待 1 ms，再从陀螺仪数据起始寄存器
-0x0C 连续读取至加速度数据结束寄存器 0x17 的 12 字节，并按“陀螺仪三轴在前、
-加速度三轴在后”解析六个有符号原始值。
-
-独立静态 FreeRTOS IMU 任务每 10 ms 读取一次数据。启用 yaw 遥测时，复用目标基线已有的
-`board_uart_write()` 静态帧队列输出 16 字节 JustFloat 帧：
-
-```text
-float yaw_deg, float yaw_rate_dps, float gyro_bias_z_dps, 00 00 80 7F
-```
-
-初始化失败每秒重试，连续三次采样失败后重新初始化。当前已完成目标提交
-`2f644e99dd4606ab2ba911fb29d4e2e813da77c9` 基线迁移、静态集成检查、SysConfig
-生成和 TI Clang 构建。硬件已验证 `CHIP_ID=0xD1`、静止 Z 轴约 1g、陀螺仪三轴
-接近 0dps，编码器遥测、IMU 报文和 UART 回显未出现交叉损坏。后续烧录仍需
-遵循明确授权原则。
-
-`main.c` 中的 `IMU_TELEMETRY_ENABLE` 是 yaw JustFloat 输出的编译期开关，默认值为
-`0U`。与 `IMU_YAW_ENABLE=1U` 同时启用后，输出 yaw、yaw 角速度和 Z 轴陀螺零偏三个
-float 通道；IMU 任务仍会初始化 BMI160、周期采样并在连续失败后重试。
-
-### 四个低有效按键
-
-`mspm0g3507_app.syscfg` 新增 `BUTTONS` GPIO 组，按键输入依次为 PA7、PB12、PA8
-和 PA30。四个引脚均为普通输入，不启用 GPIO 中断，也不配置内部上下拉；硬件必须
-提供外部上拉，按下时将输入拉至低电平。
-
-`board_buttons.c/.h` 提供独立的按键状态驱动。`board_buttons_init()` 只记录上电时
-的当前状态，`board_buttons_scan()` 每次扫描要求连续两个相同采样才确认变化。新增的
-静态 `button_task` 每 10 ms 运行一次，按 PA7、PB12、PA8、PA30 顺序经
-`board_uart_write()` 上报稳定边沿：
-
-```text
-key,pa7=down\r\n
-key,pa7=up\r\n
-```
-
-按键任务使用 `BUTTON_TASK_STACK_DEPTH=128U`，不新增队列、不使用中断，也不合并现有
-WS2812、蜂鸣器、IMU、UART 或编码器任务。TI Clang map 中该任务栈为 512 bytes，
-任务控制块为 76 bytes，按键驱动运行态数据为 12 bytes，按键驱动代码约 568 bytes。
-`main.c` 中的 `BUTTON_FEATURE_ENABLE` 默认为 `0U`；设为 `1U` 后启用按键初始化、
-扫描、按键报文和按键任务的静态资源。无论开关取值如何，SysConfig 引脚定义均保留。
-
-### 编码器机械参数与解码模式
-
-`board_encoder.h` 是四个匹配车轮电机的统一配置入口。`BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION=13U`
-和 `BOARD_ENCODER_GEAR_RATIO=20U` 推导出
-`BOARD_ENCODER_OUTPUT_SHAFT_LINES_PER_REVOLUTION=260U`。不要将 520 或 1040 作为独立的机械常量直接写入。
-
-默认的 `BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE` 对 A 相的两个边沿计数，仅在判定方向时读取 B 相，
-推导出输出轴每转 520 counts。可选的
-`BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4` 会为所有 A/B 输入启用双沿中断，并使用四状态转移表解码，
-推导出输出轴每转 1040 counts。MSPM0 的 GPIOA/GPIOB 共用 GROUP1 IRQ，由该中断分发处理两个端口；非法的双位状态转移会被忽略。
-
-无需修改源代码即可验证 X4 模式，执行
-`powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1 -EncoderDecodeMode 2`。
-Keil 构建脚本也使用相同的 `-EncoderDecodeMode 2` 参数。两个构建脚本都不会写入 Flash。
-切换解码模式或更换电机后，应在低速下手动旋转一个输出轴，在调整 PID 前确认每个物理转约有 +520（默认模式）或 +1040（X4 模式）个有符号计数。
-电机运动时不要设置断点。
-
-### VOFA+ JustFloat 速度环遥测
-
-`mspm0g3507_app/main.c` 的 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 是速度环调参
-专用 UART 编译开关，默认 `0U`。设为 `1U` 时启用速度环 JustFloat，设为 `0U` 时恢复 UART 文本回显；
-`telemetry_task` 以 10 ms 周期
-通过既有 `board_uart_write()` 静态帧队列发送 VOFA+ JustFloat 二进制帧。每帧为
-四个小端 IEEE-754 `float32` 加帧尾 `00 00 80 7F`，固定 20 字节；字段顺序为当前
-`g_motor_debug.wheel` 的 `target_speed_mm_per_s`、原始
-`instant_feedback_speed_mm_per_s`、滤波后的 `feedback_speed_mm_per_s` 与
-`output_duty_percent`。非法轮位自动降级为前左轮，调试模式未使能时仍按所选轮位输出
-状态。
-
-VOFA 模式独占 UART0 输出：UART 回显任务不会创建，BMI160 初始化、错误和采样文本
-也被编译期抑制，不能在该模式下向串口发送文本或同时使用文本串口监视器。VOFA+ 选择
-JustFloat 后应观察四条曲线以 100 Hz 更新；先低速确认编码器符号，再调整
-`g_default_speed_pid_params` 中对应轮子的参数。若需要临时使用 SWD PID 覆盖，必须同时将
-`g_motor_debug.use_speed_pid_override` 设为 `true`，再调整 `g_motor_debug.speed_pid_params`。
-电机运动时禁止设置断点。新增
-`mspm0g3507_app/vofa_justfloat.c/.h` 为无硬件依赖编码模块，主机测试覆盖固定帧长、
-四个已知浮点的字节序与帧尾；尚未执行 Flash 写入或 VOFA 硬件验收。
-
-### 四轮 PWM 速度闭环与 SWD 单轮调试
-
-`mspm0g3507_app/` 的 10 ms 电机任务已加入四路独立增量式速度 PID。速度统一为
-mm/s；`volatile float g_motor_speed_targets_mm_s[4]` 是 SWD 可写的正常四轮目标，
-启动均为 0。控制器输出 -100% 至 100% 的带符号 PWM；
-`board_motor_set_signed_duty()` 仍使用既有双 PWM H 桥和后左反相校准。
-
-编码器速度反馈现在保留每个 10 ms 周期的原始 `delta_counts`，并使用五个样本的
-滑动计数窗口生成 50 ms 有效平均值。窗口每 10 ms 更新一次，启动阶段按当前已有样本数
-平均，不等待窗口填满；`board_encoder_sample_t.speed_mm_per_s` 是 PID 使用的滤波速度，
-`instant_speed_mm_per_s` 用于观察单周期量化跳变。计数窗口在 `board_encoder_init()` 中
-复位，计数和 Q8 平均使用整数，速度换算使用预计算比例。
-
-`volatile motor_control_debug_t g_motor_debug` 是单电机 SWD 调试入口。可通过
-Live Expressions/Watch 设置 `enable`、`wheel`、`mode`、`target_duty_percent`、
-`target_speed_mm_per_s` 与 `speed_pid_params`。模式为 STOP、PWM 与 SPEED；PWM
-模式是有符号占空比开环，不是伏特闭环，因为当前硬件没有电压采样。启用调试时，
-其余三轮始终停机。启用、改模式或改轮位后的第一个 10 ms 周期会复位 PID 并强制
-四轮 0%，下一周期才输出新命令。电机运动时禁止设置断点。
-
-`motor_pid/` 是从 `D:\desktop\2026RC\Control\single_motor_test\Libraries\MotorLib`
-受控复制的 PID-only 核心，只含增量式与位置式 PID 和夹紧函数；外部 MotorLib
-未修改，且没有复制 CAN、STM32 HAL、DJI 或 RobStride 协议。位置式 PID 已编译与
-测试，但在每轮 `BOARD_ENCODER_COUNTS_PER_REVOLUTION` 实测前不开放位置控制。
-
-增量式速度 PID 新增 `integral_output_limit`、`integral_separation_threshold`、
-`derivative_filter_N` 和 `output_delta_limit` 参数。积分在误差分离阈值外停止，输出饱和
-时冻结同方向积分，误差反向时释放；微分使用反馈二阶差分并可进行一阶滤波；输出变化率
-限制按每个 10 ms 周期生效。当前默认参数保持 `ki=0`、`kd=0`，调速时应先调 PI，确认
-反馈稳定后再启用微分。目标和 SWD 参数接口仍使用 `float`，编码器统计、滑动窗口和固定
-比例处理使用整数或预计算常量，以减少 Cortex-M0+ 软件浮点负担。
-
-四个轮子的默认速度 PID 参数现在位于 `mspm0g3507_app/motor_control.c` 的
-`g_default_speed_pid_params[BOARD_MOTOR_COUNT]` 数组中，数组下标依次使用
-`BOARD_MOTOR_FRONT_LEFT`、`BOARD_MOTOR_FRONT_RIGHT`、`BOARD_MOTOR_REAR_LEFT` 和
-`BOARD_MOTOR_REAR_RIGHT`。调参时分别修改对应元素。SWD 单轮 SPEED 调试默认会随
-`g_motor_debug.wheel` 使用对应轮子的默认参数；只有将
-`g_motor_debug.use_speed_pid_override` 设为 `true` 时，才会使用
-`g_motor_debug.speed_pid_params` 覆盖当前选中轮子。切换调试轮位会复位全部速度 PID，
-并让新轮子在一个 10 ms 周期内保持 0% 输出。
-
-新增验证命令：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1
-powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
-powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
 powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
-```
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-freertos.ps1
+~~~
 
-TI Clang 和 Keil 构建均已生成目标文件；Keil 工程同时补齐了此前 BMI160 分支遗漏的
-`board_bmi160.c` 源文件。当前尚未进行四个按键的实体按压、释放和抗抖硬件验收，也未
-执行 Flash 擦除或烧录。
-### 八路灰度传感器接入
+G3507 CCS ELF 为 `mspm0g3507_app/Debug/mspm0g3507_app.out`；Keil 输出为
+`keil/mspm0g3507_app/Objects/mspm0g3507_app.axf`、`.hex` 和
+`keil/mspm0g3507_app/mspm0g3507_app.map`。
 
-`mspm0g3507_app/board_grayscale.c/.h` 已接入感为无 MCU 八路灰度传感器。
-传感器使用 74HC4051 复用模拟输出，物理接线固定为 AD0 -> PB13、AD1 -> PB1、
-AD2 -> PB23、OUT -> PA27；EN 悬空，利用模块内部下拉保持低电平使能。传感器
-必须与 MCU 共地，并使用稳定的独立 5 V 供电。软件通道顺序为地址升序：通道 0
-对应 AD2:AD1:AD0=000，通道 7 对应 111。
+构建脚本支持临时参数 `-VofaSpeedPidTelemetryEnable`、
+`-GrayVofaTelemetryEnable`、`-ImuTelemetryEnable`、`-ImuYawEnable` 和
+`-EncoderDecodeMode`。未显式传入时不覆盖源码默认值。
 
-`mspm0g3507_app.syscfg` 将 PA27 配置为 ADC0 单通道、12 位、VDDA 参考，
-PB13/PB1/PB23 配置为 AD0/AD1/AD2 推挽输出。驱动每次切换地址后等待约 1 us，
-对每路执行 8 次单次 ADC 转换并取平均，避免重复转换模式下同步等待无法结束。
-原始值、0..4095 归一化值和带滞回的 8 位数字值发布到 `g_grayscale_snapshot`。
+`tools/flash-and-debug-g3507.ps1` 的 `Load` 会执行 `--erase chip` 并写入 Flash；
+执行前必须取得用户本次操作的明确授权。构建、静态检查和 `GdbServer` 不会写入 Flash。
 
-应用灰度任务使用静态内存，每 10 ms 采样一次；`GRAY_VOFA_TELEMETRY_ENABLE`
-默认值为 `0U`，设为 `1U` 后每 100 ms 通过现有串行帧队列输出 22 通道、92 字节的
-VOFA+ JustFloat 帧。通道 `0..7` 为 `raw`，`8..15` 为 `normalized`，之后依次为
-`digital`、`black_mask`、`black_count`、`line_error`、`line_strength` 和
-`sequence`。不再输出 `gray,raw=...` 文本帧；当前白值/黑值数组已经是实测标定值，
-不得替换成未经确认的默认值。
+## G3507 应用硬件
 
-本次已完成灰度静态集成检查、CCS SysConfig/TI Clang 构建和 Keil SysConfig/UV4
-构建。Keil 构建日志为 `0 Error(s), 0 Warning(s)`，并生成 AXF/HEX。尚未完成
-灰度传感器实物接线、烧录、逐路地址响应、白黑读数和 UART 实测验收；不能仅凭
-编译结果宣称硬件验收完成。
+### 电机、编码器与 PID
 
-后续修复：Keil 某些 SysConfig 生成结果只生成 ADC memory 配置，没有生成
-`DL_ADC12_initSingleSample()`，导致灰度任务在 `DL_ADC12_isConversionStarted()`
-等待处停住，`g_grayscale_snapshot.sequence` 保持 0。`board_grayscale_init()`
-现在显式关闭并初始化 ADC 为单次、自动采样、软件触发、12 位无符号模式后再
-重新使能，避免依赖生成器是否输出该控制模式初始化。修复已通过 CCS/Keil
-构建；仍需用最新 AXF/HEX 重新下载后进行硬件确认。
-前三项覆盖 PID 数值、四轮隔离、单轮调试覆盖与模式切换归零；后两项仅构建，不写
-Flash。硬件验收仍须先手动转轮确认编码器符号和单圈计数，再低速逐轮调 PID；未获
-用户明确授权不得执行 Flash `Load`。
+CPU 为 80 MHz，四路 PWM 为 10 kHz。逻辑轮位引脚如下：
 
-## 2026-07-22 分支合并交接
+| 轮位 | PWM | 编码器 A/B |
+| --- | --- | --- |
+| 前左 | PA29/PB27 | PA15/PB24 |
+| 前右 | PB4/PB5 | PA17/PA22 |
+| 后左 | PA28/PA31 | PA14/PA9 |
+| 后右 | PA12/PA13 | PA16/PB20 |
 
-本次以 `develop` 基线 `8e5fe8c` 为目标分支，按顺序使用普通合并提交：
+编码器电机轴为 13 线、减速比 20:1，输出轴机械线数 260。默认 A 相双沿模式为每转
+520 counts；AB 正交 X4 模式为每转 1040 counts。GPIOA/GPIOB 共用 GROUP1 IRQ。
+更换电机、接线或解码模式后，必须低速手动转轴确认方向、单圈计数和四轮隔离。
 
-- `f79f611`：合并 `develop_2` 八路灰度传感器接入；
-- `a048193`：合并 `develop_3` 四轮速度闭环与单轮 SWD 调试。
+电机任务每 10 ms 按“编码器采样、速度控制、带符号 PWM 输出”的顺序运行。
+`g_motor_speed_targets_mm_s[4]` 默认全为 0；`g_motor_debug` 支持单轮 STOP、
+PWM 和 SPEED 调试。调试轮位或模式切换时，PID 归零并保持一个周期的 0% 输出。
+速度滤波使用 5 点滑动计数窗口；`instant_speed_mm_per_s` 是当前周期值，
+`speed_mm_per_s` 是 PID 使用的滤波值。PID 支持积分限幅、积分分离、抗饱和、微分滤波
+和输出变化率限制，默认 `ki=0`、`kd=0`。
 
-合并后的 G3507 应用同时保留灰度 ADC 采样、四个低有效按键、BMI160、四轮编码器、
-四轮增量式速度 PID、单轮调试入口、WS2812、蜂鸣器和 UART 静态帧队列。电机任务顺序为
-编码器采样、电机控制计算、带符号 PWM 更新；灰度任务每 10 ms 采样，灰度遥测默认关闭；
-四轮目标速度默认全为 0，单轮调试默认停机。
+### BMI160、IMU Yaw 与其他外设
 
-本次合并后已验证：
+BMI160 使用 SPI0：`SCK=PB18`、`MOSI=PB17`、`MISO=PB19`、`CS=PB0`，
+配置为 100 Hz、±4g、±500 dps。`board_imu_yaw.c/.h` 在现有 10 ms `imu_task`
+中运行，不创建新任务；使用 100 个静止样本校准陀螺仪 Z 轴零偏，并以 130 mm 轮距融合
+左右轮差速角速度。输出 yaw 归一化到 `[-180, 180)`。如安装方向相反，优先修改
+`BOARD_IMU_YAW_GYRO_Z_SIGN`；六轴 IMU 不提供绝对航向。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1
-### Optional one-dimensional vehicle yaw estimator
+四个低有效按键为 PA7、PB12、PA8、PA30，默认 `BUTTON_FEATURE_ENABLE=0U`。
+八路灰度传感器使用 74HC4051：`AD0=PB13`、`AD1=PB1`、`AD2=PB23`、
+`OUT=PA27`；每路 ADC 采样 8 次取平均。`digital` 为 `1=白色`、`0=黑线`；
+线跟踪发布 `black_mask`、`black_count`、`line_strength` 和 `line_error`，
+目前只用于观察，不改变电机 PWM。
 
-`mspm0g3507_app/board_imu_yaw.c/.h` adds a lightweight relative-yaw
-estimator without adding a FreeRTOS task. `imu_task` supplies the BMI160
-sample and a coherent snapshot of all four encoder speeds every 10 ms. The
-estimator converts the configured +/-500 dps gyro range, calibrates the Z gyro
-bias over 100 stationary samples, and fuses gyro yaw rate with the differential
-encoder yaw rate using 98% gyro and 2% encoder weighting.
+当前灰度标定值：
 
-`main.c` keeps `IMU_YAW_ENABLE` at `0U` by default. The measured distance
-between the left and right wheel centers is 130 mm, so
-`IMU_YAW_TRACK_WIDTH_MM` is `130.0f`. With `IMU_TELEMETRY_ENABLE=1U` and
-`IMU_YAW_ENABLE=1U`, the IMU task sends a 16-byte JustFloat frame every 10 ms.
-Its channels are `yaw_deg`, `yaw_rate_dps`, and `gyro_bias_z_dps`, followed by
-the standard `00 00 80 7F` tail. The output is a relative yaw normalized to
-`[-180, 180)`; no absolute heading is available from the current six-axis
-sensor alone.
+~~~text
+white = {2834, 3064, 2150, 1924, 3099, 3032, 3182, 2467}
+black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
+~~~
 
-## 给下一位 AI 的当前上下文：车辆 IMU Yaw 功能测试
+WS2812 使用 SPI1 输出到 PB22，默认每 500 ms 点亮一颗灯；蜂鸣器默认关闭。
 
-### 1. 工作区和 Git 状态
+## UART 遥测
 
-- 工作区：`C:\Users\ayou\.codex\worktrees\9409\2026_electronics_design_contest`
-- 当前分支：`develop_1`，显示为 `develop_1...origin/develop_1 [gone]`。
-- 当前工作树不是干净状态。本次 yaw 功能相关修改尚未提交，不能使用
-  `git reset --hard`、`git checkout --` 或其他方式回退现有修改。
-- 已存在的按键功能、BMI160、编码器、蜂鸣器、WS2812、UART 和 Keil 迁移修改都属于当前工程的一部分，继续工作时必须保留。
-- 最近已提交的按键相关提交为 `658f6b8` 和 `8e5fe8c`；yaw 功能目前是未提交修改。
+UART0 同一时间只能运行一种遥测模式；速度 VOFA、灰度 VOFA、IMU Yaw 之间有编译期互斥
+保护，任一遥测模式启用时 UART 回显任务不会创建。所有帧均为小端 IEEE-754 `float32`，
+帧尾为 `00 00 80 7F`。
 
-### 2. 用户下一步目标
+| 模式 | 开关 | 周期 | 帧内容 |
+| --- | --- | --- | --- |
+| 速度环 | `VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认 `0U` | 10 ms | 4 通道、20 字节 |
+| 灰度线跟踪 | `GRAY_VOFA_TELEMETRY_ENABLE` 默认 `0U` | 100 ms | 22 通道、92 字节 |
+| IMU Yaw | `IMU_TELEMETRY_ENABLE=1U` 且 `IMU_YAW_ENABLE=1U` | 10 ms | 3 通道、16 字节 |
 
-用户准备测试本次新增的车载 IMU 相对 yaw 功能，并可能把工作交给另一个 AI。
-当前任务重点是硬件测试和问题定位，不要未经用户明确授权就擦除 Flash、烧录、启动调试会话或修改硬件连接。
+速度通道依次为 `target_speed_mm_per_s`、`instant_feedback_speed_mm_per_s`、
+`feedback_speed_mm_per_s`、`output_duty_percent`。灰度通道依次为
+`raw[0..7]`、`normalized[0..7]`、`digital`、`black_mask`、`black_count`、
+`line_error`、`line_strength`、`sequence`。IMU 通道依次为 `yaw_deg`、
+`yaw_rate_dps`、`gyro_bias_z_dps`。
 
-### 3. 本次新增文件和接口
+## 公开接口与验证
 
-- `mspm0g3507_app/board_imu_yaw.h`
-  - 暴露 `board_imu_yaw_state_t`。
-  - 暴露 `board_imu_yaw_init(state, track_width_mm)`。
-  - 暴露 `board_imu_yaw_update(state, imu_sample, encoder_samples, dt_s)`。
-- `mspm0g3507_app/board_imu_yaw.c`
-  - 纯算法模块，不依赖 FreeRTOS 或 GPIO。
-  - 当前只使用 BMI160 的 Z 轴陀螺仪计算 yaw 角速度，同时使用加速度模长判断是否静止。
-- `tests/test_board_imu_yaw.c` 和 `tests/test_board_imu_yaw.ps1`
-  - 使用本机 GCC 编译运行算法边界测试。
-- `main.c`、TI Clang 构建脚本、Keil `uvprojx`、静态测试和 README 已同步修改。
+公开接口包括：
 
-### 4. 当前算法和精确参数
+- `board_imu_yaw_state_t`、`board_imu_yaw_init()`、`board_imu_yaw_update()`；
+- `line_tracking_state_t`、`line_tracking_result_t`、线跟踪初始化/更新函数；
+- `encoder_speed_filter_t`、编码器滤波初始化/更新函数；
+- 扩展后的 `board_grayscale_snapshot_t`、`motor_control_wheel_status_t`；
+- 通用 `vofa_justfloat_encode()`、`vofa_justfloat_encode3()`、
+  `vofa_justfloat_encode4()`。
 
-BMI160 在 `board_bmi160.c` 中配置为：
+主机测试和静态集成检查：
 
-- 加速度计：`+/-4g`、100 Hz，换算系数为 `8192 LSB/g`。
-- 陀螺仪：`+/-500 dps`、100 Hz，换算系数为 `65.6 LSB/dps`。
-- `imu_task` 每 10 ms 读取一次样本。
-- `board_bmi160_read_sample()` 的字段顺序已经是 `gyro_x/y/z` 后跟 `accel_x/y/z`，不要重复交换。
-
-Yaw 算法流程：
-
-1. 启动后要求车辆静止，并累计 100 个有效静止样本，约 1 秒。
-2. 静止判断条件：左右平均轮速绝对值均不超过 `20 mm/s`，且加速度模长在 `0.8g` 到 `1.2g` 之间。
-3. 100 个样本的 `gyro_z` 平均值作为 `gyro_bias_z_dps`。
-4. 左右轮速度分别为：
-   - `left = (front_left + rear_left) / 2`
-   - `right = (front_right + rear_right) / 2`
-5. 编码器角速度：
-   - `yaw_rate_encoder = (right - left) / track_width_mm * 180 / pi`
-6. 融合角速度：
-   - `yaw_rate = 0.98 * (gyro_z - gyro_bias_z) + 0.02 * yaw_rate_encoder`
-7. `yaw += yaw_rate * 0.01`，并归一化到 `[-180, 180)`。
-8. 车辆静止时以 10 秒时间常数慢速继续更新陀螺仪 Z 轴零偏。
-
-当前坐标约定是 `+X` 向车头、`+Y` 向车体左侧、`+Z` 向上；正的 Z 轴角速度表示左转。若实体安装方向相反，先修改
-`board_imu_yaw.c` 中的 `BOARD_IMU_YAW_GYRO_Z_SIGN` 为 `-1.0f`，不要立即重写融合算法。
-
-### 5. 必须先确认的编译期开关和参数
-
-`mspm0g3507_app/main.c` 当前默认值：
-
-```c
-#define IMU_TELEMETRY_ENABLE 0U
-#define IMU_YAW_ENABLE 0U
-#define IMU_YAW_TRACK_WIDTH_MM 130.0f
-```
-
-进行 UART yaw 测试时使用构建脚本临时覆盖：
-
-```c
-#define IMU_TELEMETRY_ENABLE 1U
-#define IMU_YAW_ENABLE 1U
-```
-
-`IMU_YAW_TRACK_WIDTH_MM` 已按实测左右轮中心距设置为 `130.0f`。
-`VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认值为 `0U`；VOFA 速度遥测和 IMU yaw
-遥测不能同时启用。
-
-按键功能的 `BUTTON_FEATURE_ENABLE` 当前也为 `0U`；本次 yaw 测试不需要打开它。不要为了测试 yaw 合并或新增 FreeRTOS 任务。
-
-### 6. UART 输出格式
-
-只有 `IMU_TELEMETRY_ENABLE=1U` 且同时开启 yaw 时才输出 IMU JustFloat 报文，
-格式为三个小端 IEEE-754 `float32` 和帧尾 `00 00 80 7F`，固定 16 字节：
-
-```text
-float yaw_deg, float yaw_rate_dps, float gyro_bias_z_dps, 00 00 80 7F
-```
-
-其中：
-
-- 三个 float 通道分别是相对 yaw（度）、yaw 角速度（度/秒）和 Z 轴陀螺零偏（度/秒）。
-- yaw 是相对于启动方向的相对角度，不是绝对北向。
-- 当前六轴 BMI160 没有磁力计，因此长期绝对 yaw 漂移属于设计限制，不应直接判定为驱动故障。
-
-### 7. 已完成的自动验证
-
-以下命令在当前工作区已经通过：
-
-```powershell
+~~~powershell
 powershell -ExecutionPolicy Bypass -File tests\test_board_imu_yaw.ps1
-powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
-powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
-powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
-powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
-```
-
-上述命令均返回成功。CCS/TI Clang 构建完成 SysConfig 生成、应用 ELF 编译和链接；Keil
-构建生成 AXF、HEX、MAP，UV4 日志为 `0 Error(s), 0 Warning(s)`。构建只更新被忽略的
-`Debug/`、`Generated/` 和 `Objects/` 产物，未执行探针枚举、GDB 服务、Flash 擦除或烧录。
-
-灰度传感器的实际接线、逐路地址响应、白黑标定、UART 实测，以及电机编码器方向/单圈计数、
-低速逐轮 PID 调试仍属于后续硬件验收事项；未完成这些项目时不得宣称实体功能验收完成。
-
-### VS Code Keil 工程快捷打开
-
-使用 VS Code 任务 `MSPM0G3507 App: Open Keil Project` 可以直接启动 Keil
-并打开工程。该任务运行 `tools/open-keil-mspm0g3507-app.ps1`，默认使用
-`D:\Keil_v5\UV4\UV4.exe`，打开的工程为
-`keil/mspm0g3507_app/mspm0g3507_app.uvprojx`。
-
-该任务只负责打开工程，不会运行 SysConfig、不执行构建、不下载固件，也不会
-烧录 Flash。如果 Keil 安装在其他目录，可以运行启动脚本时传入 `-KeilRoot`
-参数，或修改脚本中的默认路径。
-
-## 2026-07-22 develop_3 编码器更新合并
-
-已在当前 `develop` 基线执行普通非快进合并，合并提交为
-`f492f8aead889590f583b5fe977ef852bac1624f`，第二父提交为目标
-`9cd4d8e808020cb4072eba0e08487580fb2b8b3`。本次同时纳入其父提交中的 VOFA+
-JustFloat 速度环遥测，并保留当前分支的八路灰度采样、四个低有效按键、BMI160、
-WS2812、蜂鸣器和静态 UART 帧队列。
-
-冲突处理后的应用入口同时支持 GPIOA/GPIOB GROUP1 中断分发、A 相双沿和 AB 正交 X4
-解码、编码器机械参数派生、VOFA 二进制遥测、按键任务和灰度任务。当前 VOFA 遥测默认关闭，
-需将 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 设为 `1U`；UART 回显和 BMI160
-文本遥测在 VOFA 模式下按编译期开关抑制；未执行 Flash 擦除或烧录。
-
-本次实际验证命令均返回成功：
-
-```powershell
+powershell -ExecutionPolicy Bypass -File tests\test_line_tracking.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_vofa_justfloat.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1 -EncoderDecodeMode 1
 powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1 -EncoderDecodeMode 2
 powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
-powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
-powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
-```
+~~~
 
-CCS/TI Clang 构建完成 SysConfig 生成、应用 ELF 编译和链接；Keil 构建完成 AXF、HEX、
-MAP 生成。灰度传感器实体接线、编码器方向与单圈计数、低速 PID 调试、VOFA 硬件验收
-仍属于后续硬件事项。
+构建通过只证明 SysConfig、编译、链接和静态集成检查通过，不代表硬件验收完成。
 
-### 2026-07-22 编码器量化与速度环 PID 优化
+## 待完成硬件验收
 
-本次新增无硬件依赖的 `encoder_speed_filter.c/.h`，并将其接入 TI 与 Keil 工程。主机
-测试覆盖五点滑动窗口的启动、连续计数、亚计数平均和正反向变化；增量式 PID 测试覆盖
-积分分离、积分限幅、反馈微分、抗饱和和输出变化率限制。VOFA+ JustFloat 遥测扩展为
-20 字节四通道帧，依次输出目标速度、原始速度、滤波速度和输出占空比。
+- BMI160 长期零偏、静止漂移、左右转 yaw 符号和急转弯响应；
+- 编码器四轮方向、单圈计数、解码模式和低速隔离；
+- 四轮速度 PID 低速调参、滤波延迟和 PWM 抖动；
+- 灰度白黑归一化、通道位图、横向误差、全白、全黑和丢线状态；
+- VOFA+ 曲线数量、通道顺序、帧尾和 UART 实际接收；
+- WS2812、蜂鸣器和按键实物响应。
 
-已执行并通过默认模式和 AB 四倍频模式的主机测试、静态集成检查、TI 构建及 Keil 构建。
-本次未执行 Flash 烧录、编码器实物整圈计数验收或低速 PID 硬件调试；后续应在低速单轮
-条件下比较 20 ms、30 ms 和 50 ms 窗口的延迟与 PWM 抖动。
+未完成上述项目时，不得仅凭构建结果宣称实体功能验收完成。
 
 ## Git 操作授权规则
 
-在本工程中，除非用户明确要求，否则 AI 不得自行执行 `git commit`、
-`git push`、创建 Pull Request 或其他向 Git 远程仓库上传/发布的操作。
-普通开发任务只允许修改工作区并运行必要的本地验证；提交、推送或发布前
-必须等待用户明确指令。
-算法测试覆盖：启动零偏、静止不漂移、陀螺仪积分、编码器转向符号、yaw 回绕。
-本次迁移后的 yaw 测试使用 130 mm 左右轮中心距；车辆坐标为 +X 朝车头、+Y 朝车体左侧、+Z 朝上，
-`BOARD_IMU_YAW_GYRO_Z_SIGN` 保持 `1.0f`。默认关闭配置不会输出 yaw；UART 测试通过构建参数临时关闭
-VOFA 并打开 IMU JustFloat yaw 遥测：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1
-powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1
-```
-
-算法和构建验证不代表实体验收。后续实体顺序为：上电静止至少 2 秒、静止观察 30 秒、手动左右转、直线推行、原地转向，最后记录急转弯或打滑时编码器与陀螺仪角速度差异。当前未执行 Flash 擦除、烧录、探针枚举、GDB 服务或调试连接。
-
-### 2026-07-22 IMU Yaw 实体测试反馈
-
-用户已完成当前版本实体测试，反馈相对 yaw 功能“勉强能用”。当前主要遗留问题是陀螺仪 Z 轴零偏及其长期稳定性，后续应优先审视静止校准样本、零偏慢速更新时间常数和温漂影响；在此之前不应盲目提高编码器融合权重。
-
-### 2026-07-22 灰度黑线观察变量
-
-G3507 应用新增 `line_tracking.c/.h`。现有 `digital` 字段继续保留，语义为
-`1=白色`、`0=黑线`。灰度快照新增 `black_mask`、`black_count`、
-`line_strength` 和有符号 `line_error`；`black_mask` 的 bit N 对应 channel[N]，
-bit 为 1 表示该路判定为黑线。
-
-`line_error` 使用 `4095-normalized[i]` 作为黑线强度，权重为
-`{-3500,-2500,-1500,-500,500,1500,2500,3500}`。总黑线强度为零时保留上一帧误差。
-当前数据通过 SWD/Live Expressions 和可选灰度 UART 遥测观察，尚未接入电机目标或 PWM。
-`mspm0g3507_app/main.c` 中的当前逐路标定值为实测值：
-`white={2834,3064,2150,1924,3099,3032,3182,2467}`，
-`black={353,1075,139,189,1027,593,2033,110}`。
-
-新增模块已纳入 CCS 和 Keil 构建。主机侧灰度测试以及 CCS/Keil 静态集成检查已通过。
-仍需在实际传感器上验证白黑归一化值、通道到位图的映射、黑线横向移动时的误差变化，
-以及全白、全黑等特殊状态。
-
-### 2026-07-22 灰度数据改为 VOFA+ JustFloat 遥测
-
-灰度文本遥测已移除，新增独立编译开关 `GRAY_VOFA_TELEMETRY_ENABLE`，默认值为
-`0U`。速度环开关 `VOFA_SPEED_PID_TELEMETRY_ENABLE` 也默认为 `0U`；两个开关
-不能同时为 `1U`，否则 `main.c` 编译报错。默认构建恢复 UART 普通回显；任一
-VOFA 模式启用时，UART 回显和 BMI160 文本输出均关闭。
-
-灰度 VOFA 使用 VOFA+ JustFloat、小端 `float32` 和帧尾 `00 00 80 7F`，每 100 ms
-发送一帧固定 22 通道、92 字节的数据，顺序为：
-
-- `0..7`：`raw[0..7]`
-- `8..15`：`normalized[0..7]`
-- `16`：`digital`，`1=白色`、`0=黑线`
-- `17`：`black_mask`，bit N 对应 channel N，`1=黑线`
-- `18`：`black_count`
-- `19`：`line_error`
-- `20`：`line_strength`
-- `21`：`sequence`
-
-CCS 构建可使用 `-GrayVofaTelemetryEnable 1`，Keil 构建使用同名参数；灰度
-观察配置应显式传入 `-VofaSpeedPidTelemetryEnable 0`。本轮只提供 SWD/Live
-Expressions 和 VOFA+ 观察数据，模拟位置误差尚未驱动电机目标或 PWM。当前
-`main.c` 中的白值/黑值数组是用户完成实际校准后的实测值，不能替换为默认值。
-硬件验收仍需人工确认 22 条曲线、通道位图映射、归一化方向、横向移动时的误差
-变化，以及全白、全黑和丢线状态；构建通过不等于传感器硬件验收通过。
+除非用户明确要求，AI 不得自行执行 `git commit`、`git push`、创建 Pull Request 或
+向远程仓库发布内容。普通开发任务只允许修改工作区并运行必要的本地验证。
