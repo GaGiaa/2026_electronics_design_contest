@@ -108,6 +108,7 @@ Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\board_b
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\board_grayscale\.c' -Description 'shared grayscale source'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\motor_control\.c' -Description 'Keil project must compile the motor control layer'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\encoder_quadrature\.c' -Description 'Keil project must compile the X4 quadrature decoder'
+Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\encoder_speed_filter\.c' -Description 'Keil project must compile the integer speed filter'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\motor_pid\\pid\.c' -Description 'Keil project must compile the PID core'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\vofa_justfloat\.c' -Description 'Keil project must compile the JustFloat encoder'
 Assert-Contains -Path $projectFile -Pattern 'Generated\\ti_msp_dl_config\.c' -Description 'Keil SysConfig C output'

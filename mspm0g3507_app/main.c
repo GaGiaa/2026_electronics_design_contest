@@ -288,8 +288,9 @@ static void telemetry_task(void *argument)
         if (wheel >= BOARD_MOTOR_COUNT) {
             wheel = BOARD_MOTOR_FRONT_LEFT;
         }
-        if (vofa_justfloat_encode3(frame, sizeof(frame),
+        if (vofa_justfloat_encode4(frame, sizeof(frame),
                                    control[wheel].target_speed_mm_per_s,
+                                   control[wheel].instant_feedback_speed_mm_per_s,
                                    control[wheel].feedback_speed_mm_per_s,
                                    control[wheel].output_duty_percent)) {
             board_uart_write(frame, sizeof(frame));

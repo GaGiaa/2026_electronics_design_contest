@@ -4,6 +4,7 @@
 
 #include "board_encoder.h"
 #include "encoder_quadrature.h"
+#include "encoder_speed_filter.h"
 #include "motor_control.h"
 #include "pid.h"
 #include "vofa_justfloat.h"
@@ -43,6 +44,69 @@ static void test_incremental_pid_accumulates_and_resets(void)
     PID_Incremental_Reset(&pid);
     expect_close(PID_Incremental_Calc(&pid, 10.0f, 0.0f), 5.0f, 0.001f,
                  "incremental PID reset must clear prior error history");
+}
+
+static void test_incremental_pid_applies_speed_loop_protections(void)
+{
+    const PID_Incremental_Param_Config params = {
+        .kp = 0.0f,
+        .ki = 10.0f,
+        .kd = 1.0f,
+        .output_limit = 1.0f,
+        .deadband = 0.0f,
+        .integral_output_limit = 10.0f,
+        .integral_separation_threshold = 2.0f,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.2f,
+    };
+    PID_Incremental pid;
+
+    PID_Incremental_Init(&pid, &params, 0.1f);
+    expect_close(PID_Incremental_Calc(&pid, 10.0f, 0.0f), 0.0f, 0.001f,
+                 "incremental PID must separate integration outside the error threshold");
+    expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 0.2f, 0.001f,
+                 "incremental PID output must obey the per-cycle slew limit");
+    expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 0.4f, 0.001f,
+                 "incremental PID must accumulate an allowed integral contribution");
+    expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 0.6f, 0.001f,
+                 "incremental PID must continue toward its unclamped output");
+    expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 0.8f, 0.001f,
+                 "incremental PID must keep the output rate bounded");
+    expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 1.0f, 0.001f,
+                 "incremental PID must reach the configured output limit");
+    expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 1.0f, 0.001f,
+                 "incremental PID anti-windup must hold at the output limit");
+    expect_close(PID_Incremental_Calc(&pid, -1.0f, 0.0f), 0.8f, 0.001f,
+                 "incremental PID must release a saturated output when the error reverses");
+
+    PID_Incremental_Reset(&pid);
+    expect_close(PID_Incremental_Calc(&pid, 10.0f, 0.0f), 0.0f, 0.001f,
+                 "incremental PID reset must clear protection state");
+    expect_close(PID_Incremental_Calc(&pid, 20.0f, 0.0f), 0.0f, 0.001f,
+                 "feedback-based derivative must ignore a target-only step");
+}
+
+static void test_encoder_speed_filter_tracks_fractional_window_average(void)
+{
+    encoder_speed_filter_t filter;
+    int32_t average_counts_q8;
+
+    encoder_speed_filter_init(&filter);
+    average_counts_q8 = encoder_speed_filter_update(&filter, 1);
+    expect_true(average_counts_q8 == (1 << ENCODER_SPEED_FILTER_FRACTIONAL_BITS),
+                "speed filter must report the first count without startup attenuation");
+    (void)encoder_speed_filter_update(&filter, 2);
+    (void)encoder_speed_filter_update(&filter, 3);
+    (void)encoder_speed_filter_update(&filter, 4);
+    average_counts_q8 = encoder_speed_filter_update(&filter, 5);
+    expect_true(average_counts_q8 == (3 << ENCODER_SPEED_FILTER_FRACTIONAL_BITS),
+                "speed filter must average a full five-sample window");
+    average_counts_q8 = encoder_speed_filter_update(&filter, 10);
+    expect_true(average_counts_q8 == 1228,
+                "speed filter must preserve fractional counts in its fixed-point average");
+    average_counts_q8 = encoder_speed_filter_update(&filter, -10);
+    expect_true(average_counts_q8 == 614,
+                "speed filter must handle signed direction changes in the window");
 }
 
 static void test_position_pid_applies_deadband_and_limit(void)
@@ -120,6 +184,51 @@ static void test_debug_mode_change_resets_speed_controller(void)
                  "debug stop mode must reset the selected controller and stop output");
 }
 
+static void test_debug_speed_uses_selected_wheel_defaults_without_override(void)
+{
+    board_encoder_sample_t samples[BOARD_MOTOR_COUNT] = {0};
+
+    motor_control_init();
+    g_motor_debug.enable = true;
+    g_motor_debug.wheel = BOARD_MOTOR_REAR_RIGHT;
+    g_motor_debug.mode = MOTOR_CONTROL_DEBUG_MODE_SPEED;
+    g_motor_debug.target_speed_mm_per_s = 100.0f;
+    motor_control_step(samples);
+    motor_control_step(samples);
+
+    expect_close(motor_control_get_output_duty_percent(BOARD_MOTOR_REAR_RIGHT), 6.0f, 0.001f,
+                 "debug speed must use the selected wheel default PID without explicit override");
+
+    g_motor_debug.wheel = BOARD_MOTOR_FRONT_LEFT;
+    motor_control_step(samples);
+    expect_close(motor_control_get_output_duty_percent(BOARD_MOTOR_FRONT_LEFT), 0.0f, 0.001f,
+                 "changing the debug wheel must hold output at zero for one control step");
+    motor_control_step(samples);
+
+    expect_close(motor_control_get_output_duty_percent(BOARD_MOTOR_FRONT_LEFT), 23.0f, 0.001f,
+                 "debug speed must switch to the new wheel default PID after selection");
+}
+
+static void test_debug_speed_explicit_pid_override_is_applied(void)
+{
+    board_encoder_sample_t samples[BOARD_MOTOR_COUNT] = {0};
+
+    motor_control_init();
+    g_motor_debug.enable = true;
+    g_motor_debug.wheel = BOARD_MOTOR_REAR_RIGHT;
+    g_motor_debug.mode = MOTOR_CONTROL_DEBUG_MODE_SPEED;
+    g_motor_debug.use_speed_pid_override = true;
+    g_motor_debug.speed_pid_params.kp = 0.9f;
+    g_motor_debug.speed_pid_params.ki = 0.0f;
+    g_motor_debug.speed_pid_params.kd = 0.0f;
+    g_motor_debug.target_speed_mm_per_s = 100.0f;
+    motor_control_step(samples);
+    motor_control_step(samples);
+
+    expect_close(motor_control_get_output_duty_percent(BOARD_MOTOR_REAR_RIGHT), 90.0f, 0.001f,
+                 "debug speed must apply PID values only when explicit override is enabled");
+}
+
 static void test_debug_mode_change_holds_output_zero_for_one_step(void)
 {
     board_encoder_sample_t samples[BOARD_MOTOR_COUNT] = {0};
@@ -152,6 +261,7 @@ static void test_invalid_debug_speed_parameters_stop_all_wheels(void)
     g_motor_debug.enable = true;
     g_motor_debug.wheel = BOARD_MOTOR_FRONT_RIGHT;
     g_motor_debug.mode = MOTOR_CONTROL_DEBUG_MODE_SPEED;
+    g_motor_debug.use_speed_pid_override = true;
     g_motor_debug.speed_pid_params.output_limit = 0.0f;
     motor_control_step(samples);
     motor_control_step(samples);
@@ -170,6 +280,7 @@ static void test_zero_speed_target_resets_accumulated_output(void)
     g_motor_debug.enable = true;
     g_motor_debug.wheel = BOARD_MOTOR_FRONT_LEFT;
     g_motor_debug.mode = MOTOR_CONTROL_DEBUG_MODE_SPEED;
+    g_motor_debug.use_speed_pid_override = true;
     g_motor_debug.target_speed_mm_per_s = 100.0f;
     g_motor_debug.speed_pid_params.ki = 1.0f;
     motor_control_step(samples);
@@ -201,7 +312,7 @@ static void test_nonfinite_debug_duty_stops_output(void)
 
 static void test_vofa_justfloat_encodes_three_float_channels(void)
 {
-    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE_3];
     static const uint8_t expected[] = {
         0x00U, 0x00U, 0xC0U, 0x3FU,
         0x00U, 0x00U, 0x10U, 0xC0U,
@@ -218,6 +329,26 @@ static void test_vofa_justfloat_encodes_three_float_channels(void)
     }
     expect_true(!vofa_justfloat_encode3(frame, sizeof(frame) - 1U, 0.0f, 0.0f, 0.0f),
                 "JustFloat encoder must reject a frame buffer with the wrong fixed length");
+}
+
+static void test_vofa_justfloat_encodes_raw_and_filtered_speed_channels(void)
+{
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE];
+    static const uint8_t expected[] = {
+        0x00U, 0x00U, 0xC0U, 0x3FU,
+        0x00U, 0x00U, 0x10U, 0xC0U,
+        0x00U, 0x00U, 0x48U, 0x42U,
+        0x00U, 0x00U, 0x20U, 0x41U,
+        0x00U, 0x00U, 0x80U, 0x7FU,
+    };
+    size_t index;
+
+    expect_true(vofa_justfloat_encode4(frame, sizeof(frame), 1.5f, -2.25f, 50.0f, 10.0f),
+                "JustFloat encoder must accept four speed-control channels");
+    for (index = 0U; index < sizeof(expected); ++index) {
+        expect_true(frame[index] == expected[index],
+                    "JustFloat four-channel frame must preserve channel order and tail");
+    }
 }
 
 static void test_encoder_configuration_derives_counts_from_mechanics_and_mode(void)
@@ -275,15 +406,20 @@ static void test_quadrature_decoder_tracks_valid_edges_and_rejects_invalid_trans
 int main(void)
 {
     test_incremental_pid_accumulates_and_resets();
+    test_incremental_pid_applies_speed_loop_protections();
+    test_encoder_speed_filter_tracks_fractional_window_average();
     test_position_pid_applies_deadband_and_limit();
     test_normal_speed_targets_drive_wheels_independently();
     test_debug_pwm_overrides_only_selected_wheel();
     test_debug_mode_change_resets_speed_controller();
+    test_debug_speed_uses_selected_wheel_defaults_without_override();
+    test_debug_speed_explicit_pid_override_is_applied();
     test_debug_mode_change_holds_output_zero_for_one_step();
     test_invalid_debug_speed_parameters_stop_all_wheels();
     test_zero_speed_target_resets_accumulated_output();
     test_nonfinite_debug_duty_stops_output();
     test_vofa_justfloat_encodes_three_float_channels();
+    test_vofa_justfloat_encodes_raw_and_filtered_speed_channels();
     test_encoder_configuration_derives_counts_from_mechanics_and_mode();
     test_quadrature_decoder_tracks_valid_edges_and_rejects_invalid_transitions();
     puts("PASS: motor PID and control tests passed.");

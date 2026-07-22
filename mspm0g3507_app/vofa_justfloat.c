@@ -16,7 +16,7 @@ static void write_float32_le(uint8_t *destination, float value)
 bool vofa_justfloat_encode3(uint8_t *frame, size_t frame_size,
                              float channel0, float channel1, float channel2)
 {
-    if ((frame == NULL) || (frame_size != VOFA_JUSTFLOAT_FRAME_SIZE) ||
+    if ((frame == NULL) || (frame_size != VOFA_JUSTFLOAT_FRAME_SIZE_3) ||
         (sizeof(float) != VOFA_JUSTFLOAT_CHANNEL_SIZE)) {
         return false;
     }
@@ -28,5 +28,25 @@ bool vofa_justfloat_encode3(uint8_t *frame, size_t frame_size,
     frame[13U] = 0x00U;
     frame[14U] = 0x80U;
     frame[15U] = 0x7FU;
+    return true;
+}
+
+bool vofa_justfloat_encode4(uint8_t *frame, size_t frame_size,
+                             float channel0, float channel1, float channel2,
+                             float channel3)
+{
+    if ((frame == NULL) || (frame_size != VOFA_JUSTFLOAT_FRAME_SIZE) ||
+        (sizeof(float) != VOFA_JUSTFLOAT_CHANNEL_SIZE)) {
+        return false;
+    }
+
+    write_float32_le(&frame[0U], channel0);
+    write_float32_le(&frame[4U], channel1);
+    write_float32_le(&frame[8U], channel2);
+    write_float32_le(&frame[12U], channel3);
+    frame[16U] = 0x00U;
+    frame[17U] = 0x00U;
+    frame[18U] = 0x80U;
+    frame[19U] = 0x7FU;
     return true;
 }

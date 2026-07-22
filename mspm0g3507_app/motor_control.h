@@ -14,6 +14,7 @@ typedef enum {
 
 typedef struct {
     float target_speed_mm_per_s;
+    float instant_feedback_speed_mm_per_s;
     float feedback_speed_mm_per_s;
     float pid_p_out;
     float pid_i_out;
@@ -26,8 +27,10 @@ typedef struct {
     bool enable;
     motor_control_debug_mode_t mode;
     board_motor_wheel_t wheel;
+    bool use_speed_pid_override;
     float target_duty_percent;
     float target_speed_mm_per_s;
+    float instant_feedback_speed_mm_per_s;
     PID_Incremental_Param_Config speed_pid_params;
     float feedback_speed_mm_per_s;
     float pid_p_out;

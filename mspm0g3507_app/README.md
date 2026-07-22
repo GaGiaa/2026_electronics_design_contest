@@ -56,8 +56,10 @@ targets and starts with all targets at zero.
 `wheel`, and choose `MOTOR_CONTROL_DEBUG_MODE_STOP`,
 `MOTOR_CONTROL_DEBUG_MODE_PWM`, or `MOTOR_CONTROL_DEBUG_MODE_SPEED`. PWM mode uses
 signed `target_duty_percent`; speed mode uses `target_speed_mm_per_s` and writable
-`speed_pid_params` (`kp`, `ki`, `kd`, `output_limit`, `deadband`). Output is clamped
-to signed 100 percent. When enabled, debug stops all non-selected wheels. Enabling
+`speed_pid_params` (`kp`, `ki`, `kd`, `output_limit`, `deadband`). By default, speed
+debug uses the selected wheel's entry in `g_default_speed_pid_params`; set
+`use_speed_pid_override` to `true` to explicitly use the values in `speed_pid_params`
+for the selected wheel. Output is clamped to signed 100 percent. When enabled, debug stops all non-selected wheels. Enabling
 debug or changing its wheel or mode resets controller state and holds every wheel at
 zero for one 10 ms control step before output resumes. Do not set breakpoints while a
 motor is moving.
@@ -66,10 +68,11 @@ For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without
 adding breakpoints. For speed-loop tuning, set the compile-time
 `VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `main.c` from `0U` to `1U` and select
-JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 16-byte frame
-every 10 ms. Its three float32 channels follow `g_motor_debug.wheel` and are ordered
-as `target_speed_mm_per_s`, `feedback_speed_mm_per_s`, and
-`output_duty_percent`; the frame ends in `00 00 80 7F`.
+JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 20-byte frame
+every 10 ms. Its four float32 channels follow `g_motor_debug.wheel` and are ordered
+as `target_speed_mm_per_s`, `instant_feedback_speed_mm_per_s`,
+`feedback_speed_mm_per_s`, and `output_duty_percent`; the frame ends in
+`00 00 80 7F`.
 
 VOFA mode owns UART0 output: the UART echo task is not created and BMI160 text
 telemetry is suppressed, even if `IMU_TELEMETRY_ENABLE` is `1U`. Do not send text

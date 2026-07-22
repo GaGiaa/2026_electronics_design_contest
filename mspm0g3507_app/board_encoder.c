@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 #include "encoder_quadrature.h"
+#include "encoder_speed_filter.h"
 #include "ti_msp_dl_config.h"
 
 #define BOARD_ENCODER_PI 3.1415926f
@@ -10,6 +11,15 @@
 static volatile int32_t g_total_counts[BOARD_MOTOR_COUNT];
 static volatile int32_t g_interval_counts[BOARD_MOTOR_COUNT];
 static board_encoder_quadrature_t g_quadrature_decoders[BOARD_MOTOR_COUNT];
+static encoder_speed_filter_t g_speed_filters[BOARD_MOTOR_COUNT];
+
+static const float g_speed_mm_per_s_per_count =
+    ((float)BOARD_ENCODER_WHEEL_DIAMETER_MM * BOARD_ENCODER_PI * 1000.0f) /
+    ((float)BOARD_ENCODER_COUNTS_PER_REVOLUTION * (float)BOARD_ENCODER_SAMPLE_PERIOD_MS);
+static const float g_speed_mm_per_s_per_q8_count =
+    (((float)BOARD_ENCODER_WHEEL_DIAMETER_MM * BOARD_ENCODER_PI * 1000.0f) /
+     ((float)BOARD_ENCODER_COUNTS_PER_REVOLUTION * (float)BOARD_ENCODER_SAMPLE_PERIOD_MS)) /
+    (float)(1U << ENCODER_SPEED_FILTER_FRACTIONAL_BITS);
 
 static bool pin_is_high(GPIO_Regs *port, uint32_t pin)
 {
@@ -90,6 +100,7 @@ void board_encoder_init(void)
     for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
         g_total_counts[wheel] = 0;
         g_interval_counts[wheel] = 0;
+        encoder_speed_filter_init(&g_speed_filters[wheel]);
     }
 
 #if BOARD_ENCODER_DECODE_MODE == BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE
@@ -208,10 +219,10 @@ board_encoder_sample_t board_encoder_sample(board_motor_wheel_t wheel)
     g_interval_counts[wheel] = 0;
     __set_PRIMASK(interrupt_mask);
 
-    sample.speed_mm_per_s = ((float)sample.delta_counts *
-                              (float)BOARD_ENCODER_WHEEL_DIAMETER_MM *
-                              BOARD_ENCODER_PI * 1000.0f) /
-                             ((float)BOARD_ENCODER_COUNTS_PER_REVOLUTION *
-                              (float)BOARD_ENCODER_SAMPLE_PERIOD_MS);
+    sample.instant_speed_mm_per_s = (float)sample.delta_counts *
+                                    g_speed_mm_per_s_per_count;
+    sample.speed_mm_per_s = (float)encoder_speed_filter_update(
+                                &g_speed_filters[wheel], sample.delta_counts) *
+                            g_speed_mm_per_s_per_q8_count;
     return sample;
 }

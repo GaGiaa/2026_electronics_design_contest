@@ -8,12 +8,52 @@
 #define MOTOR_CONTROL_DT_S 0.01f
 #define MOTOR_CONTROL_MAX_DUTY_PERCENT 100.0f
 
-static const PID_Incremental_Param_Config g_default_speed_pid_params = {
-    .kp = 0.1f,
-    .ki = 0.0f,
-    .kd = 0.0f,
-    .output_limit = MOTOR_CONTROL_MAX_DUTY_PERCENT,
-    .deadband = 0.0f,
+/* Tune each wheel independently while keeping the same safety defaults. */
+static const PID_Incremental_Param_Config g_default_speed_pid_params[BOARD_MOTOR_COUNT] = {
+    [BOARD_MOTOR_FRONT_LEFT] = {
+        .kp = 0.2f,
+        .ki = 3.0f,
+        .kd = 0.0f,
+        .output_limit = MOTOR_CONTROL_MAX_DUTY_PERCENT,
+        .deadband = 0.0f,
+        .integral_output_limit = 0.0f,
+        .integral_separation_threshold = 0.0f,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.0f,
+    },
+    [BOARD_MOTOR_FRONT_RIGHT] = {
+        .kp = 0.1f,
+        .ki = 1.5f,
+        .kd = 0.0f,
+        .output_limit = MOTOR_CONTROL_MAX_DUTY_PERCENT,
+        .deadband = 0.0f,
+        .integral_output_limit = 0.0f,
+        .integral_separation_threshold = 0.0f,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.0f,
+    },
+    [BOARD_MOTOR_REAR_LEFT] = {
+        .kp = 0.1f,
+        .ki = 1.5f,
+        .kd = 0.0f,
+        .output_limit = MOTOR_CONTROL_MAX_DUTY_PERCENT,
+        .deadband = 0.0f,
+        .integral_output_limit = 0.0f,
+        .integral_separation_threshold = 0.0f,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.0f,
+    },
+    [BOARD_MOTOR_REAR_RIGHT] = {
+        .kp = 0.05f,
+        .ki = 1.0f,
+        .kd = 0.0f,
+        .output_limit = MOTOR_CONTROL_MAX_DUTY_PERCENT,
+        .deadband = 0.0f,
+        .integral_output_limit = 0.0f,
+        .integral_separation_threshold = 0.0f,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.0f,
+    },
 };
 
 static const PID_Position_Param_Config g_default_position_pid_params = {
@@ -30,6 +70,7 @@ volatile motor_control_debug_t g_motor_debug = {
     .enable = false,
     .mode = MOTOR_CONTROL_DEBUG_MODE_STOP,
     .wheel = BOARD_MOTOR_FRONT_LEFT,
+    .use_speed_pid_override = false,
     .target_duty_percent = 0.0f,
     .target_speed_mm_per_s = 0.0f,
     .speed_pid_params = {
@@ -38,6 +79,10 @@ volatile motor_control_debug_t g_motor_debug = {
         .kd = 0.0f,
         .output_limit = MOTOR_CONTROL_MAX_DUTY_PERCENT,
         .deadband = 0.0f,
+        .integral_output_limit = 0.0f,
+        .integral_separation_threshold = 0.0f,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.0f,
     },
 };
 
@@ -58,9 +103,14 @@ static bool speed_pid_params_are_valid(const PID_Incremental_Param_Config *param
 {
     return params != NULL && isfinite(params->kp) && isfinite(params->ki) &&
            isfinite(params->kd) && isfinite(params->output_limit) &&
-           isfinite(params->deadband) && params->kp >= 0.0f && params->ki >= 0.0f &&
+           isfinite(params->deadband) && isfinite(params->integral_output_limit) &&
+           isfinite(params->integral_separation_threshold) &&
+           isfinite(params->derivative_filter_N) && isfinite(params->output_delta_limit) &&
+           params->kp >= 0.0f && params->ki >= 0.0f &&
            params->kd >= 0.0f && params->output_limit > 0.0f &&
-           params->deadband >= 0.0f;
+           params->deadband >= 0.0f && params->integral_output_limit >= 0.0f &&
+           params->integral_separation_threshold >= 0.0f &&
+           params->derivative_filter_N >= 0.0f && params->output_delta_limit >= 0.0f;
 }
 
 static float clamp_duty_percent(float duty_percent)
@@ -89,9 +139,11 @@ static void reset_all_controllers(void)
 }
 
 static void update_status(board_motor_wheel_t wheel, float target_speed,
-                          float feedback_speed, float output_duty)
+                          float instant_feedback_speed, float feedback_speed,
+                          float output_duty)
 {
     g_motor_control_status[wheel].target_speed_mm_per_s = target_speed;
+    g_motor_control_status[wheel].instant_feedback_speed_mm_per_s = instant_feedback_speed;
     g_motor_control_status[wheel].feedback_speed_mm_per_s = feedback_speed;
     g_motor_control_status[wheel].pid_p_out = g_speed_pids[wheel].p_out;
     g_motor_control_status[wheel].pid_i_out = g_speed_pids[wheel].i_out;
@@ -107,7 +159,7 @@ void motor_control_init(void)
     for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
         g_motor_speed_targets_mm_s[wheel] = 0.0f;
         g_motor_control_status[wheel] = (motor_control_wheel_status_t){0};
-        PID_Incremental_Init(&g_speed_pids[wheel], &g_default_speed_pid_params, MOTOR_CONTROL_DT_S);
+        PID_Incremental_Init(&g_speed_pids[wheel], &g_default_speed_pid_params[wheel], MOTOR_CONTROL_DT_S);
         PID_Position_Init(&g_position_pids[wheel], &g_default_position_pid_params, MOTOR_CONTROL_DT_S);
     }
     g_motor_debug.enable = false;
@@ -115,7 +167,8 @@ void motor_control_init(void)
     g_motor_debug.wheel = BOARD_MOTOR_FRONT_LEFT;
     g_motor_debug.target_duty_percent = 0.0f;
     g_motor_debug.target_speed_mm_per_s = 0.0f;
-    g_motor_debug.speed_pid_params = g_default_speed_pid_params;
+    g_motor_debug.instant_feedback_speed_mm_per_s = 0.0f;
+    g_motor_debug.speed_pid_params = g_default_speed_pid_params[BOARD_MOTOR_FRONT_LEFT];
     g_motor_debug.feedback_speed_mm_per_s = 0.0f;
     g_motor_debug.pid_p_out = 0.0f;
     g_motor_debug.pid_i_out = 0.0f;
@@ -142,6 +195,7 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
     debug_configuration_valid = debug_mode_is_valid(g_motor_debug.mode) &&
                                 g_motor_debug.wheel < BOARD_MOTOR_COUNT &&
                                 (g_motor_debug.mode != MOTOR_CONTROL_DEBUG_MODE_SPEED ||
+                                 !g_motor_debug.use_speed_pid_override ||
                                  speed_pid_params_are_valid((const PID_Incremental_Param_Config *)&g_motor_debug.speed_pid_params));
     debug_changed = g_last_debug_enabled != debug_active ||
                     g_last_debug_mode != g_motor_debug.mode ||
@@ -155,7 +209,7 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
         float target_speed = g_motor_speed_targets_mm_s[wheel];
         float output_duty;
 
-        g_speed_pids[wheel].params = g_default_speed_pid_params;
+        g_speed_pids[wheel].params = g_default_speed_pid_params[wheel];
         if (debug_changed) {
             output_duty = 0.0f;
             target_speed = 0.0f;
@@ -169,7 +223,9 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
                 output_duty = clamp_duty_percent(g_motor_debug.target_duty_percent);
                 target_speed = 0.0f;
             } else if (g_motor_debug.mode == MOTOR_CONTROL_DEBUG_MODE_SPEED) {
-                g_speed_pids[wheel].params = g_motor_debug.speed_pid_params;
+                if (g_motor_debug.use_speed_pid_override) {
+                    g_speed_pids[wheel].params = g_motor_debug.speed_pid_params;
+                }
                 target_speed = g_motor_debug.target_speed_mm_per_s;
                 if (speed_command_is_stop(target_speed, samples[wheel].speed_mm_per_s)) {
                     PID_Incremental_Reset(&g_speed_pids[wheel]);
@@ -192,10 +248,13 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
                                                                         samples[wheel].speed_mm_per_s));
             }
         }
-        update_status(wheel_id, target_speed, samples[wheel].speed_mm_per_s, output_duty);
+        update_status(wheel_id, target_speed, samples[wheel].instant_speed_mm_per_s,
+                      samples[wheel].speed_mm_per_s, output_duty);
     }
 
     if (debug_active && debug_configuration_valid && g_motor_debug.wheel < BOARD_MOTOR_COUNT) {
+        g_motor_debug.instant_feedback_speed_mm_per_s =
+            g_motor_control_status[g_motor_debug.wheel].instant_feedback_speed_mm_per_s;
         g_motor_debug.feedback_speed_mm_per_s =
             g_motor_control_status[g_motor_debug.wheel].feedback_speed_mm_per_s;
         g_motor_debug.pid_p_out = g_motor_control_status[g_motor_debug.wheel].pid_p_out;
@@ -205,6 +264,7 @@ void motor_control_step(const board_encoder_sample_t samples[BOARD_MOTOR_COUNT])
         g_motor_debug.output_duty_percent =
             g_motor_control_status[g_motor_debug.wheel].output_duty_percent;
     } else {
+        g_motor_debug.instant_feedback_speed_mm_per_s = 0.0f;
         g_motor_debug.feedback_speed_mm_per_s = 0.0f;
         g_motor_debug.pid_p_out = 0.0f;
         g_motor_debug.pid_i_out = 0.0f;

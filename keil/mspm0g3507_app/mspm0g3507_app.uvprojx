@@ -400,6 +400,11 @@
               <FilePath>..\..\mspm0g3507_app\encoder_quadrature.c</FilePath>
             </File>
             <File>
+              <FileName>encoder_speed_filter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\encoder_speed_filter.c</FilePath>
+            </File>
+            <File>
               <FileName>board_buzzer.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\board_buzzer.c</FilePath>
