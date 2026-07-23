@@ -1,0 +1,153 @@
+# 工程依赖说明
+
+本文档说明本仓库在 Windows 环境下进行构建、开发、调试和烧录所需的软硬件依赖。
+
+## 1. 基础软件环境
+
+- Windows
+- PowerShell
+- Git
+- Python 3：用于 pyOCD 和调试工具
+- VS Code：可选，用于脚本任务、代码浏览和调试配置
+
+## 2. TI CCS 构建依赖
+
+推荐版本如下：
+
+| 组件 | 推荐版本 |
+| --- | --- |
+| Code Composer Studio | 20.2 或兼容版本 |
+| MSPM0 SDK | 2.11.00.07 |
+| SysConfig | 1.26.2 |
+| TI Arm Clang | 4.0.3.LTS |
+
+MSPM0 SDK 提供以下工程依赖：
+
+- MSPM0G3507 和 MSPM0L1306 设备头文件；
+- DriverLib；
+- 启动文件；
+- linker 文件；
+- FreeRTOS 内核源码；
+- TI Arm Clang 的 FreeRTOS 移植层。
+
+`mspm0g3507_app` 的完整应用构建应使用仓库脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+```
+
+CCS 工程可用于源码浏览、SysConfig 和调试配置。直接点击 CCS 的
+`Project -> Build Project` 还需要在本机手动配置 SDK FreeRTOS 源文件和包含路径，
+否则会出现 `FreeRTOS.h`、`pid.h` 找不到或 FreeRTOS 内核符号未定义。不要将本机
+绝对路径写入仓库；跨电脑构建应使用上面的 PowerShell 脚本和环境变量配置。
+
+## 3. Keil 构建依赖
+
+- Keil MDK：5.43a；
+- Arm Compiler：6.24；
+- MSPM0 SDK：2.11.00.07；
+- SysConfig：1.26.2；
+- MSPM0G3507 对应 CMSIS-Pack。
+
+Keil 工程使用：
+
+- SDK 中的 FreeRTOS 内核；
+- 仓库内的 `keil/mspm0g3507_app/freertos_port/ARM_CM0` 移植层；
+- 仓库内的应用源码和 PID 源码。
+
+`keil/mspm0g3507_app/mspm0g3507_app.uvprojx` 是模板，不能直接作为已经配置好的
+本机工程使用。构建或打开工程前，应先生成：
+
+```text
+keil/mspm0g3507_app/mspm0g3507_app.local.uvprojx
+```
+
+生成的 `.local.uvprojx` 使用当前电脑的 `MSPM0_SDK_ROOT`，并且已经被 Git 忽略。
+
+## 4. 调试与烧录依赖
+
+- CMSIS-DAP 调试器；
+- pyOCD：`>=0.45,<0.46`；
+- MSPM0G3507 对应 CMSIS-Pack；
+- Arm GNU GDB；
+- `ARM_GDB_PATH` 指向 `arm-none-eabi-gdb.exe`。
+
+这些工具用于：
+
+- GDB 调试；
+- 连接目标板；
+- 烧录和 Flash 操作。
+
+普通编译、SysConfig 生成和静态检查不会擦除或写入 Flash。Flash 操作必须通过单独
+的调试/烧录命令执行，并在操作前确认目标板和授权范围。
+
+## 5. 环境变量
+
+推荐配置以下环境变量：
+
+```text
+MSPM0_SDK_ROOT
+SYSCONFIG_ROOT
+TI_ARM_CLANG
+CCS_ROOT
+KEIL_ROOT
+ARM_GDB_PATH
+```
+
+可以在仓库根目录运行以下脚本自动搜索常见安装位置，并保存到当前 Windows 用户环境：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistUserEnvironment
+```
+
+也可以在当前 PowerShell 会话中手动设置，或作为构建脚本参数传入。构建脚本参数优先于
+环境变量。不要把这些变量的本机绝对值提交到 Git。
+
+## 6. 工程自身的代码依赖
+
+工程源码依赖以下组件：
+
+- MSPM0 SDK DriverLib；
+- SDK FreeRTOS Kernel；
+- SDK TI Arm Clang FreeRTOS port；
+- 本地 `FreeRTOSConfig.h`；
+- 本地 `motor_pid` PID 模块；
+- SysConfig 生成的 `ti_msp_dl_config.c` 和 `ti_msp_dl_config.h`；
+- CMSIS Core headers。
+
+项目没有依赖外部 MotorLib 的完整代码，只保留了仓库内的 PID 核心代码。
+
+## 7. 运行时硬件依赖
+
+G3507 主应用依赖以下实际硬件：
+
+- MSPM0G3507 核心板；
+- 四路电机和电机驱动器；
+- 四路 AB 编码器；
+- BMI160 IMU；
+- 灰度传感器；
+- WS2812 LED；
+- CRSF 接收机，可选；
+- 与工程 SysConfig 配置匹配的 UART、SPI、PWM、定时器等外设连接。
+
+硬件引脚、协议和外设分配以 `mspm0g3507_app/mspm0g3507_app.syscfg`、应用 README
+以及交接文档为准。更换核心板、芯片型号或 SysConfig 工程时，不得混用 G3507 和
+L1306 的设备包、启动文件、linker、SysConfig 或引脚配置。
+
+## 8. 版本基线
+
+构建时应尽量固定使用以下版本组合：
+
+| 依赖 | 版本 |
+| --- | --- |
+| MSPM0 SDK | 2.11.00.07 |
+| SysConfig | 1.26.2 |
+| TI Arm Clang | 4.0.3.LTS |
+| Code Composer Studio | 20.2 或兼容版本 |
+| Keil MDK | 5.43a |
+| Arm Compiler | 6.24 |
+| pyOCD | `>=0.45,<0.46` |
+
+版本不一致时，首先检查 CCS Build Console 或构建脚本实际解析出的路径，尤其关注
+SDK、SysConfig 和 TI Arm Clang 的版本号。构建输出出现旧 SDK 路径时，应重新配置
+环境变量或在全新的 CCS workspace 中重新导入工程。

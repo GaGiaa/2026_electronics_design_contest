@@ -1,6 +1,6 @@
 # MSPM0 核心板工程交接索引
 
-最后更新：2026-07-22
+最后更新：2026-07-23
 
 ## 使用规则
 
@@ -32,6 +32,8 @@
 
 G3507 应用工程为 `mspm0g3507_app/`，Keil MDK 工程为 `keil/mspm0g3507_app/`；
 FreeRTOS 基线工程为 `mspm0g3507_freertos/`。主要工具如下：
+
+完整依赖分类和固定版本基线见 `docs/DEPENDENCIES.md`。
 
 - CCS：20.2 或工程要求的兼容版本
 - MSPM0 SDK：2.11.00.07
@@ -176,6 +178,23 @@ Keil UV4 构建生成 AXF、HEX、MAP 且日志为 0 error / 0 warning。L1306 �
 因为当前工作区没有 CCS 导入后生成的 `mspm0l1306_bringup/Debug` make 目录；需要在本机
 CCS workspace 导入并生成 Debug 配置后运行 `tools/build-mspm0l1306.ps1`。
 
+本轮新增 `tests/test_ccs_app_workflow.ps1`，并使用当前配置的 MSPM0 SDK、SysConfig 和
+TI Arm Clang 实际运行 `tools/build-mspm0g3507-app.ps1`，应用编译链接成功，生成
+`mspm0g3507_app/Debug/mspm0g3507_app.out`。
+
+### CCS 应用构建边界
+
+`mspm0g3507_app` 的 CCS 工程文件用于源码浏览、SysConfig 和调试目标配置；它不携带
+MSPM0 SDK 内的 FreeRTOS 内核源文件编译输入。应用的跨电脑构建必须使用
+`tools/build-mspm0g3507-app.ps1`，脚本会从 `MSPM0_SDK_ROOT` 解析 FreeRTOS 头文件、
+TI Arm Clang 移植层和内核源文件，并加入仓库内的 `motor_pid` 目录。
+
+因此，下载代码后直接在全新 CCS workspace 中点击 `Project -> Build Project` 不是该
+应用的受支持可复现构建流程；缺少配置时会出现 `FreeRTOS.h`、`pid.h` 找不到，补齐
+头文件后还会缺少 FreeRTOS 内核对象。若必须使用 CCS GUI 构建，需要在本机额外加入
+SDK FreeRTOS include/port 目录、`motor_pid` include 目录和五个 FreeRTOS 内核源文件，
+并将对应对象加入链接，这些配置不应写成机器绝对路径提交。
+
 ## 待完成硬件验收
 
 - BMI160 长期零偏、静止漂移、左右转 yaw 符号和急转弯响应；
@@ -189,7 +208,7 @@ CCS workspace 导入并生成 Debug 配置后运行 `tools/build-mspm0l1306.ps1`
 
 ## FreeRTOS CPU 与任务监控
 
-G3507 app 新增可选 `rtos_monitor.c/.h`。通过 CCS 或 Keil 构建参数
+G3507 app 新增可选 `rtos_monitor.c/.h`。通过应用或 Keil PowerShell 构建脚本参数
 `-RtosMonitorEnable 1` 开启，默认值为 `0U`。监控不占用 UART0，使用静态
 FreeRTOS 任务每 1000 ms 更新 `g_rtos_monitor_snapshot`，可通过 SWD 观察总
 CPU 利用率、空闲率、任务状态、优先级、运行时间占比和栈余量。

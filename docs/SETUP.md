@@ -69,6 +69,25 @@ Keil 源文件 `keil\mspm0g3507_app\mspm0g3507_app.uvprojx` 是工程模板。
 `Project -> Import CCS Projects` 导入需要的工程目录。仓库中的 CCS 工程使用
 CCS 产品变量，不依赖本机绝对源码路径。
 
+`mspm0g3507_app` 的 FreeRTOS 内核源文件位于每台电脑本地安装的 MSPM0 SDK
+中，仓库 CCS 元数据不包含这些外部源文件的完整编译输入。因此，导入后可用
+CCS 编辑源码、修改 SysConfig 和配置调试目标，但不要直接使用
+`Project -> Build Project` 作为该应用的跨电脑构建入口；否则常见结果是
+`FreeRTOS.h` 或 `pid.h` 找不到，随后还会出现 FreeRTOS 内核符号未定义。
+应用的可复现构建入口是：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistUserEnvironment
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+```
+
+如果 CCS Build Console 出现类似
+`D:\ti\mspm0_sdk_2_10_00_04` 或 `sysconfig_1.28.0`，说明当前 CCS
+workspace 绑定了旧产品。安装并选择 MSPM0 SDK `2.11.00.07`、SysConfig
+`1.26.2`，删除旧 workspace 中的同名工程后，在全新的 workspace 中重新导入；
+然后确认构建命令使用当前 clone 的项目目录。不要把该机器上的绝对路径提交到
+Git。
+
 请根据 `.vscode/extensions.json` 安装推荐的 VS Code 扩展，然后在 VS Code 中打开
 仓库根目录。构建任务调用 PowerShell 脚本；调试任务需要先启动 pyOCD GDB
 服务器，并正确配置 `ARM_GDB_PATH`。

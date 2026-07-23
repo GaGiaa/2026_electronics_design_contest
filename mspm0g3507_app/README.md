@@ -9,6 +9,32 @@ one, providing 0.375 us and 0.75 us high intervals respectively.
 Build with `tools/build-mspm0g3507-app.ps1`. Output is
 `mspm0g3507_app/Debug/mspm0g3507_app.out`.
 
+## CCS project and portable build
+
+The `.project`, `.cproject`, and `.ccsproject` files are kept for CCS source
+navigation, SysConfig editing, and target/debug configuration. The FreeRTOS
+kernel sources are installed inside the local MSPM0 SDK rather than stored in
+this repository, so the imported CCS project does not describe a complete
+standalone application build. Clicking `Project > Build Project` in a fresh
+workspace can therefore report `FreeRTOS.h` or `pid.h` not found, and a stale
+CCS workspace can also select an older SDK or SysConfig installation.
+
+Use the repository build script for a reproducible application build. It adds
+the SDK FreeRTOS include and port directories, the repository `motor_pid`
+include directory, and all required FreeRTOS kernel sources:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistUserEnvironment
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
+```
+
+If the CCS GUI must build the application, configure that local project with
+the same SDK FreeRTOS include/port directories and `motor_pid` include
+directory, then add `list.c`, `queue.c`, `tasks.c`, `portable\TI_ARM_CLANG\ARM_CM0\port.c`,
+and `portasm.c` from that SDK to the project and link their objects. This is a
+per-computer CCS workspace configuration; do not replace it with absolute
+paths in the repository.
+
 The static integration test is `tests/test_mspm0g3507_app.ps1`. The animation
 lights one pixel every 500 ms at channel value 16, cycling red, green, blue,
 and white across pixels 1 through 4. Hardware acceptance requires observing
@@ -217,7 +243,8 @@ not constitute physical sensor acceptance.
 ## FreeRTOS CPU and task monitor
 
 The optional `rtos_monitor` module is disabled by default and does not use
-UART0. Build the CCS or Keil app with `-RtosMonitorEnable 1` to enable a static
+UART0. Pass `-RtosMonitorEnable 1` to the application or Keil PowerShell build
+script to enable a static
 monitor task that updates `g_rtos_monitor_snapshot` every 1000 ms for SWD
 observation. The snapshot contains total CPU and idle percentages, task names,
 states, priorities, runtime percentages, runtime in microseconds, and stack
