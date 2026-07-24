@@ -1,6 +1,6 @@
 # MSPM0 核心板工程交接索引
 
-最后更新：2026-07-23
+最后更新：2026-07-25
 
 ## 使用规则
 
@@ -61,8 +61,8 @@ G3507 CCS ELF 为 `mspm0g3507_app/Debug/mspm0g3507_app.out`；Keil 输出为
 `keil/mspm0g3507_app/mspm0g3507_app.map`。
 
 构建脚本支持临时参数 `-VofaSpeedPidTelemetryEnable`、
-`-GrayVofaTelemetryEnable`、`-ImuTelemetryEnable`、`-ImuYawEnable` 和
-`-EncoderDecodeMode`。未显式传入时不覆盖源码默认值。
+`-GrayVofaTelemetryEnable`、`-ImuTelemetryEnable`、`-ImuYawEnable`、
+`-EncoderDecodeMode` 和 `-OledTestTaskEnable`。未显式传入时不覆盖源码默认值。
 
 `tools/flash-and-debug-g3507.ps1` 的 `Load` 会执行 `--erase chip` 并写入 Flash；
 执行前必须取得用户本次操作的明确授权。构建、静态检查和 `GdbServer` 不会写入 Flash。
@@ -154,6 +154,7 @@ powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1 -EncoderDe
 powershell -ExecutionPolicy Bypass -File tests\test_motor_control.ps1 -EncoderDecodeMode 2
 powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
+powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_oled.ps1
 ~~~
 
 Current CRSF transmitter mapping: CH3 (index 2) is forward/reverse from the left stick vertical axis; CH1 (index 0) is differential steering from the right stick horizontal axis.
@@ -249,6 +250,26 @@ CH2/CH4 映射。通道范围为 172..1811，中位 992，死区 20%，默认最
 CRSF 原始通道、有效帧计数、CRC/帧错误计数、最后有效帧时间、链路状态和
 UART 接收溢出计数可通过 SWD 观察。主机测试为
 `powershell -ExecutionPolicy Bypass -File tests\test_crsf.ps1`。
+
+## SSD1306 4 针 I2C OLED
+
+G3507 app 新增 0.96 寸、128x64 SSD1306 OLED 驱动，使用硬件 I2C0：`SDA=PA0`、
+`SCL=PA1`，默认 400 kHz。4 针模块接线为 `VCC`、`GND`、`SDA`、`SCL`；默认 7-bit
+地址为 `0x3C`，少数模块可在 `app_config.h` 中改为 `0x3D`。模块若无板载上拉，
+需要为 SDA/SCL 各增加约 `4.7 kOhm` 到 `3.3 V` 的上拉。
+
+`board_oled.c/.h` 提供 SSD1306 初始化、清屏、分页刷新、光标和字符串绘制接口；
+`board_oled_font.c` 内置可打印 ASCII `0x20..0x7E` 的 5x7 英文字库。验收任务由
+`OLED_TEST_TASK_ENABLE` 控制，默认值为 `0U`，开启后每秒刷新以下英文内容并递增计数：
+`OLED TEST`、`MSPM0G3507`、`I2C0 PA0/PA1`、`COUNT:xxxxx`。可用构建参数
+`-OledTestTaskEnable 1` 临时开启；该任务使用静态 FreeRTOS 栈，不改变 WS2812 的
+`SPI1` 配置和运行路径。
+
+本次本地验证：`tests\test_mspm0g3507_oled.ps1`、
+`tests\test_mspm0g3507_app.ps1` 和 `tests\test_keil_mspm0g3507_app.ps1` 通过；
+`tools\build-mspm0g3507-app.ps1 -OledTestTaskEnable 0` 与 `-OledTestTaskEnable 1`
+均完成 SysConfig、TI Clang 编译和链接。尚未执行 Flash、SWD 或 OLED 实物验收；实物
+验收时确认电源为 `3.3 V`、共地、模块地址和 PA0/PA1 的板级引出。
 
 ## Git 操作授权规则
 

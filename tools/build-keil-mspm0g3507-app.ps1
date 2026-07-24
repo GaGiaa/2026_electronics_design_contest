@@ -19,7 +19,9 @@ param(
     [ValidateSet(0, 1)]
     [int] $RtosMonitorEnable,
     [ValidateSet(0, 1)]
-    [int] $CrsfRemoteControlEnable
+    [int] $CrsfRemoteControlEnable,
+    [ValidateSet(0, 1)]
+    [int] $OledTestTaskEnable
 )
 
 Set-StrictMode -Version Latest
@@ -93,6 +95,9 @@ if ($PSBoundParameters.ContainsKey('RtosMonitorEnable')) {
 }
 if ($PSBoundParameters.ContainsKey('CrsfRemoteControlEnable')) {
     $temporaryDefines += "CRSF_REMOTE_CONTROL_ENABLE=$CrsfRemoteControlEnable"
+}
+if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
+    $temporaryDefines += "OLED_TEST_TASK_ENABLE=$OledTestTaskEnable"
 }
 if ($temporaryDefines.Count -gt 0) {
     $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)

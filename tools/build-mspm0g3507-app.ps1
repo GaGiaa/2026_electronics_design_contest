@@ -17,7 +17,9 @@ param(
     [ValidateSet(0, 1)]
     [int] $RtosMonitorEnable,
     [ValidateSet(0, 1)]
-    [int] $CrsfRemoteControlEnable
+    [int] $CrsfRemoteControlEnable,
+    [ValidateSet(0, 1)]
+    [int] $OledTestTaskEnable
 )
 
 Set-StrictMode -Version Latest
@@ -70,6 +72,9 @@ if ($PSBoundParameters.ContainsKey('RtosMonitorEnable')) {
 if ($PSBoundParameters.ContainsKey('CrsfRemoteControlEnable')) {
     $commonCompilerArguments += "-DCRSF_REMOTE_CONTROL_ENABLE=$CrsfRemoteControlEnable"
 }
+if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
+    $commonCompilerArguments += "-DOLED_TEST_TASK_ENABLE=$OledTestTaskEnable"
+}
 $sources = @(
     @{ Source = (Join-Path $ProjectDir 'board_encoder.c'); Object = 'board_encoder.o' },
     @{ Source = (Join-Path $ProjectDir 'encoder_quadrature.c'); Object = 'encoder_quadrature.o' },
@@ -85,6 +90,8 @@ $sources = @(
     @{ Source = (Join-Path $ProjectDir 'vofa_justfloat.c'); Object = 'vofa_justfloat.o' },
     @{ Source = (Join-Path $ProjectDir 'board_motor.c'); Object = 'board_motor.o' },
     @{ Source = (Join-Path $ProjectDir 'board_ws2812.c'); Object = 'board_ws2812.o' },
+    @{ Source = (Join-Path $ProjectDir 'board_oled.c'); Object = 'board_oled.o' },
+    @{ Source = (Join-Path $ProjectDir 'board_oled_font.c'); Object = 'board_oled_font.o' },
     @{ Source = (Join-Path $ProjectDir 'board_uart.c'); Object = 'board_uart.o' },
     @{ Source = (Join-Path $ProjectDir 'rtos_monitor.c'); Object = 'rtos_monitor.o' },
     @{ Source = (Join-Path $ProjectDir 'board_crsf_uart.c'); Object = 'board_crsf_uart.o' },
@@ -103,6 +110,6 @@ $sources = @(
 Push-Location $BuildDir
 try {
     foreach ($source in $sources) { Invoke-CheckedCommand -FilePath $Compiler -Arguments ($commonCompilerArguments + @('-o', $source.Object, $source.Source)) -Description "Compiling $($source.Object)" }
-    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\motor_pid", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'encoder_quadrature.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_uart.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
+    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\motor_pid", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'encoder_quadrature.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_oled.o', 'board_oled_font.o', 'board_uart.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
 }
 finally { Pop-Location }

@@ -480,6 +480,16 @@
               <FilePath>..\..\mspm0g3507_app\board_ws2812.c</FilePath>
             </File>
             <File>
+              <FileName>board_oled.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\board_oled.c</FilePath>
+            </File>
+            <File>
+              <FileName>board_oled_font.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\board_oled_font.c</FilePath>
+            </File>
+            <File>
               <FileName>rtos_monitor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\rtos_monitor.c</FilePath>

@@ -14,6 +14,7 @@
 #include "board_crsf_uart.h"
 #include "board_grayscale.h"
 #include "board_motor.h"
+#include "board_oled.h"
 #include "board_uart.h"
 #include "board_ws2812.h"
 #include "crsf_control.h"
@@ -31,6 +32,8 @@
 #define MOTOR_TASK_STACK_DEPTH 256U
 /* WS2812 灯效任务的栈深度。 */
 #define WS2812_TASK_STACK_DEPTH 256U
+/* OLED 验收任务的栈深度。 */
+#define OLED_TEST_TASK_STACK_DEPTH 384U
 /* UART 接收任务的栈深度。 */
 #define UART_TASK_STACK_DEPTH 256U
 /* UART 发送任务的栈深度。 */
@@ -141,6 +144,10 @@ static StaticTask_t g_motor_task_buffer;
 static StackType_t g_motor_task_stack[MOTOR_TASK_STACK_DEPTH];
 static StaticTask_t g_ws2812_task_buffer;
 static StackType_t g_ws2812_task_stack[WS2812_TASK_STACK_DEPTH];
+#if OLED_TEST_TASK_ENABLE
+static StaticTask_t g_oled_test_task_buffer;
+static StackType_t g_oled_test_task_stack[OLED_TEST_TASK_STACK_DEPTH];
+#endif
 #if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE && !IMU_TELEMETRY_ENABLE
 static StaticTask_t g_uart_task_buffer;
 static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
@@ -376,6 +383,43 @@ static void ws2812_task(void *argument)
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }
+
+#if OLED_TEST_TASK_ENABLE
+static void oled_test_task(void *argument)
+{
+    uint32_t update_count = 0U;
+    board_oled_status_t status;
+
+    (void)argument;
+    for (;;) {
+        status = board_oled_init();
+        if (status == BOARD_OLED_STATUS_OK) {
+            for (;;) {
+                char counter_text[12];
+
+                board_oled_clear();
+                board_oled_set_cursor(0U, 0U);
+                board_oled_write_string("OLED TEST");
+                board_oled_set_cursor(0U, 2U);
+                board_oled_write_string("MSPM0G3507");
+                board_oled_set_cursor(0U, 4U);
+                board_oled_write_string("I2C0 PA0/PA1");
+                board_oled_set_cursor(0U, 6U);
+                board_oled_write_string("COUNT:");
+                (void)snprintf(counter_text, sizeof(counter_text), "%05lu",
+                               (unsigned long)update_count++);
+                board_oled_write_string(counter_text);
+                status = board_oled_update();
+                if (status != BOARD_OLED_STATUS_OK) {
+                    break;
+                }
+                vTaskDelay(pdMS_TO_TICKS(1000U));
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000U));
+    }
+}
+#endif
 
 #if BUTTON_FEATURE_ENABLE
 static void button_task(void *argument)
@@ -674,6 +718,12 @@ int main(void)
     board_uart_enable_rx_interrupt(uart_queue);
     configASSERT(xTaskCreateStatic(motor_task, "motor", MOTOR_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_motor_task_stack, &g_motor_task_buffer) != NULL);
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812", WS2812_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_ws2812_task_stack, &g_ws2812_task_buffer) != NULL);
+#if OLED_TEST_TASK_ENABLE
+    configASSERT(xTaskCreateStatic(oled_test_task, "oled", OLED_TEST_TASK_STACK_DEPTH,
+                                   NULL, APP_TASK_PRIORITY,
+                                   g_oled_test_task_stack,
+                                   &g_oled_test_task_buffer) != NULL);
+#endif
 #if BUTTON_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(button_task, "buttons", BUTTON_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_button_task_stack, &g_button_task_buffer) != NULL);
 #endif
