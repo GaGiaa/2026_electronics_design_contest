@@ -8,7 +8,7 @@
 
 /* 摇杆满量程对应的车轮目标速度，单位为 mm/s。 */
 #ifndef CRSF_MAX_SPEED_MM_PER_S
-#define CRSF_MAX_SPEED_MM_PER_S 300.0f
+#define CRSF_MAX_SPEED_MM_PER_S 800.0f
 #endif
 
 /* 超过该时间未收到有效 CRSF 帧后停车，单位为 ms。 */
@@ -43,6 +43,6 @@
 /* CRSF 11-bit 通道的标准最大值。 */
 #define CRSF_CHANNEL_MAX 1811U
 /* 摇杆中位死区，占归一化量程的比例。 */
-#define CRSF_CHANNEL_DEADBAND 0.05f
+#define CRSF_CHANNEL_DEADBAND 0.2f
 
 #endif

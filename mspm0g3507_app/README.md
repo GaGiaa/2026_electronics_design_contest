@@ -279,8 +279,8 @@ Build the remote-control variant with
 `tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 1`. The default build
 keeps CRSF control disabled. CH3 (channel index 2) controls forward/reverse
 and CH1 (channel index 0) controls differential steering. The standard CRSF
-range 172..1811 is mapped around 992 with a 5 percent deadband. The default
-maximum wheel target is 300 mm/s and can be changed with
+range 172..1811 is mapped around 992 with a 20 percent deadband. The default
+maximum wheel target is 800 mm/s and can be changed with
 `CRSF_MAX_SPEED_MM_PER_S`.
 
 The four targets use left/right differential mixing and are normalized together

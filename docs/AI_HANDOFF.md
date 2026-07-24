@@ -241,8 +241,8 @@ G3507 应用新增可选 CRSF 接收链路，使用 UART3：PB2 为 TX，PB3 为
 编译开关为 `CRSF_REMOTE_CONTROL_ENABLE`，构建脚本参数为
 `-CrsfRemoteControlEnable 0|1`，默认配置由 `crsf_config.h` 决定。当前实测遥控器
 使用 CH3（索引 2）控制前后，CH1（索引 0）控制差速转向；这会覆盖旧记录中的
-CH2/CH4 映射。通道范围为 172..1811，中位 992，死区 5%，默认最大目标速度为
-300 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
+CH2/CH4 映射。通道范围为 172..1811，中位 992，死区 20%，默认最大目标速度为
+800 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
 左右混控统一归一化；连续 100 ms 没有有效帧时四轮目标清零。开启 CRSF
 构建时，SWD 单轮调试覆盖路径被编译排除；默认构建保留原行为。
 

@@ -133,7 +133,7 @@ Assert-Contains -Path $crsfProtocol -Pattern 'CRSF_FRAME_TYPE_RC_CHANNELS_PACKED
 Assert-Contains -Path $crsfProtocol -Pattern '0xD5U' -Description 'CRSF parser must use CRC8 DVB-S2'
 Assert-Contains -Path $crsfControl -Pattern 'CRSF_LINK_TIMEOUT_MS' -Description 'CRSF control must implement link timeout'
 Assert-Contains -Path $crsfControl -Pattern 'CRSF_CHANNEL_DEADBAND' -Description 'CRSF control must implement stick deadband'
-Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MAX_SPEED_MM_PER_S\s+300\.0f' -Description 'CRSF control must default to 300 mm/s'
+Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MAX_SPEED_MM_PER_S\s+800\.0f' -Description 'CRSF control must default to 800 mm/s'
 Assert-Contains -Path $main -Pattern 'GROUP1_IRQHandler' -Description 'Application must provide the GPIOA interrupt handler for encoder A phases'
 Assert-Contains -Path $main -Pattern 'g_encoder_samples' -Description 'Application must retain encoder samples for debugger observation'
 Assert-Contains -Path $main -Pattern 'VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS\s+10U' -Description 'VOFA speed PID telemetry must run at 100 Hz'

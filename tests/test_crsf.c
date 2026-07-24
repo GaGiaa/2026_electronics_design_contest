@@ -168,10 +168,10 @@ static void test_control_applies_deadband_and_diff_drive_mix(void)
     input.channels[CRSF_FORWARD_CHANNEL_INDEX] = 1811U;
     input.channels[CRSF_TURN_CHANNEL_INDEX] = 992U;
     assert(crsf_control_mix(&input, 1050U, targets));
-    assert(fabsf(targets[BOARD_MOTOR_FRONT_LEFT] - 300.0f) < 0.01f);
-    assert(fabsf(targets[BOARD_MOTOR_REAR_LEFT] - 300.0f) < 0.01f);
-    assert(fabsf(targets[BOARD_MOTOR_FRONT_RIGHT] - 300.0f) < 0.01f);
-    assert(fabsf(targets[BOARD_MOTOR_REAR_RIGHT] - 300.0f) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_FRONT_LEFT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_REAR_LEFT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_FRONT_RIGHT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_REAR_RIGHT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
 
     input.channels[CRSF_FORWARD_CHANNEL_INDEX] = 1020U;
     assert(crsf_control_mix(&input, 1050U, targets));
@@ -191,8 +191,8 @@ static void test_control_uses_observed_radio_mapping(void)
     input.channels[2U] = 1811U;
     input.channels[0U] = 992U;
     assert(crsf_control_mix(&input, 1050U, targets));
-    assert(fabsf(targets[BOARD_MOTOR_FRONT_LEFT] - 300.0f) < 0.01f);
-    assert(fabsf(targets[BOARD_MOTOR_FRONT_RIGHT] - 300.0f) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_FRONT_LEFT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_FRONT_RIGHT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
 }
 
 static void test_control_turns_and_normalizes_combined_command(void)
@@ -207,9 +207,9 @@ static void test_control_turns_and_normalizes_combined_command(void)
     input.channels[CRSF_FORWARD_CHANNEL_INDEX] = 1811U;
     input.channels[CRSF_TURN_CHANNEL_INDEX] = 1811U;
     assert(crsf_control_mix(&input, 1050U, targets));
-    assert(fabsf(targets[BOARD_MOTOR_FRONT_LEFT] - 300.0f) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_FRONT_LEFT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
     assert(fabsf(targets[BOARD_MOTOR_FRONT_RIGHT]) < 0.01f);
-    assert(fabsf(targets[BOARD_MOTOR_REAR_LEFT] - 300.0f) < 0.01f);
+    assert(fabsf(targets[BOARD_MOTOR_REAR_LEFT] - CRSF_MAX_SPEED_MM_PER_S) < 0.01f);
     assert(fabsf(targets[BOARD_MOTOR_REAR_RIGHT]) < 0.01f);
 }
 
