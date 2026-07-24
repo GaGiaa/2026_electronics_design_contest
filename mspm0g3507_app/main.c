@@ -11,6 +11,7 @@
 #include "board_imu_yaw.h"
 #include "board_buttons.h"
 #include "board_buzzer.h"
+#include "board_servo.h"
 #include "board_crsf_uart.h"
 #include "board_grayscale.h"
 #include "board_motor.h"
@@ -40,6 +41,8 @@
 #define UART_TX_TASK_STACK_DEPTH 256U
 /* 蜂鸣器任务的栈深度。 */
 #define BUZZER_TASK_STACK_DEPTH 128U
+/* 舵机调试任务的栈深度。 */
+#define SERVO_TASK_STACK_DEPTH 128U
 /* 按键扫描任务的栈深度。 */
 #define BUTTON_TASK_STACK_DEPTH 128U
 /* 按键功能开关，0 表示不创建按键任务。 */
@@ -174,6 +177,10 @@ static StackType_t g_gray_telemetry_task_stack[GRAY_TASK_STACK_DEPTH];
 static StaticTask_t g_buzzer_task_buffer;
 static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
 #endif
+#if SERVO_FEATURE_ENABLE
+static StaticTask_t g_servo_task_buffer;
+static StackType_t g_servo_task_stack[SERVO_TASK_STACK_DEPTH];
+#endif
 #if RTOS_MONITOR_ENABLE
 static StaticTask_t g_rtos_monitor_task_buffer;
 static StackType_t g_rtos_monitor_task_stack[RTOS_MONITOR_TASK_STACK_DEPTH];
@@ -203,6 +210,11 @@ typedef struct {
 } crsf_debug_state_t;
 
 volatile crsf_debug_state_t g_crsf_debug;
+#endif
+
+#if SERVO_FEATURE_ENABLE
+volatile uint32_t g_servo_angle_deg = SERVO_INITIAL_ANGLE_DEG;
+volatile uint32_t g_servo_pulse_us;
 #endif
 
 #if BUTTON_FEATURE_ENABLE
@@ -689,6 +701,19 @@ static void buzzer_task(void *argument)
 }
 #endif
 
+#if SERVO_FEATURE_ENABLE
+static void servo_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+
+    (void)argument;
+    for (;;) {
+        g_servo_pulse_us = board_servo_set_angle_deg(g_servo_angle_deg);
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(SERVO_TASK_INTERVAL_MS));
+    }
+}
+#endif
+
 void vApplicationMallocFailedHook(void) { taskDISABLE_INTERRUPTS(); for (;;) { } }
 void vApplicationGetIdleTaskMemory(StaticTask_t **task_buffer, StackType_t **stack_buffer, uint32_t *stack_size)
 { *task_buffer = &g_idle_task_buffer; *stack_buffer = g_idle_task_stack; *stack_size = configIDLE_TASK_STACK_DEPTH; }
@@ -713,6 +738,9 @@ int main(void)
     motor_control_init();
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
     board_buzzer_init(BUZZER_FREQUENCY_HZ, BUZZER_DUTY_PERCENT);
+#if SERVO_FEATURE_ENABLE
+    board_servo_init();
+#endif
     uart_queue = xQueueCreateStatic(UART_RX_QUEUE_LENGTH, sizeof(uint8_t), g_uart_queue_storage, &g_uart_queue_buffer);
     configASSERT(uart_queue != NULL);
     board_uart_enable_rx_interrupt(uart_queue);
@@ -746,6 +774,9 @@ int main(void)
 #endif
 #if BUZZER_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(buzzer_task, "buzzer", BUZZER_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_buzzer_task_stack, &g_buzzer_task_buffer) != NULL);
+#endif
+#if SERVO_FEATURE_ENABLE
+    configASSERT(xTaskCreateStatic(servo_task, "servo", SERVO_TASK_STACK_DEPTH, NULL, APP_TASK_PRIORITY, g_servo_task_stack, &g_servo_task_buffer) != NULL);
 #endif
 #if RTOS_MONITOR_ENABLE
     configASSERT(xTaskCreateStatic(rtos_monitor_task, "rtos_monitor",

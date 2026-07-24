@@ -21,7 +21,9 @@ param(
     [ValidateSet(0, 1)]
     [int] $CrsfRemoteControlEnable,
     [ValidateSet(0, 1)]
-    [int] $OledTestTaskEnable
+    [int] $OledTestTaskEnable,
+    [ValidateSet(0, 1)]
+    [int] $ServoFeatureEnable
 )
 
 Set-StrictMode -Version Latest
@@ -99,6 +101,9 @@ if ($PSBoundParameters.ContainsKey('CrsfRemoteControlEnable')) {
 if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
     $temporaryDefines += "OLED_TEST_TASK_ENABLE=$OledTestTaskEnable"
 }
+if ($PSBoundParameters.ContainsKey('ServoFeatureEnable')) {
+    $temporaryDefines += "SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
+}
 if ($temporaryDefines.Count -gt 0) {
     $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)
     $projectFileContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $projectFile
@@ -121,9 +126,13 @@ try {
     New-Item -ItemType Directory -Force -Path $objects | Out-Null
     Push-Location $projectDir
     try {
-        & $uv4 -b $projectFile -j0 -o $log
-        if ($LASTEXITCODE -ne 0) {
-            throw "Keil UV4 build failed (exit code $LASTEXITCODE). See $log"
+        $uv4Process = Start-Process -FilePath $uv4 `
+            -ArgumentList @('-b', $projectFile, '-j0', '-o', $log) `
+            -WorkingDirectory $projectDir `
+            -Wait `
+            -PassThru
+        if ($uv4Process.ExitCode -ne 0) {
+            throw "Keil UV4 build failed (exit code $($uv4Process.ExitCode)). See $log"
         }
     }
     finally {

@@ -18,6 +18,7 @@ const PWMFrontRight = PWM.addInstance();
 const PWMRearLeft = PWM.addInstance();
 const PWMRearRight = PWM.addInstance();
 const PWMBuzzer = PWM.addInstance();
+const PWMServo = PWM.addInstance();
 const TIMER = scripting.addModule("/ti/driverlib/TIMER", {}, false);
 const RTOSMonitorTimer = TIMER.addInstance();
 const SPI = scripting.addModule("/ti/driverlib/SPI", {}, false);
@@ -177,6 +178,15 @@ PWMBuzzer.pwmMode = "EDGE_ALIGN_UP";
 PWMBuzzer.timerCount = 20000;
 PWMBuzzer.peripheral.$assign = "TIMG8";
 PWMBuzzer.peripheral.ccp1Pin.$assign = "PA2";
+
+PWMServo.$name = "SERVO";
+PWMServo.timerStartTimer = true;
+PWMServo.pwmMode = "EDGE_ALIGN_UP";
+PWMServo.clockDivider = 8;
+PWMServo.clockPrescale = 4;
+PWMServo.timerCount = 50000;
+PWMServo.peripheral.$assign = "TIMA0";
+PWMServo.peripheral.ccp0Pin.$assign = "PB8";
 
 RTOSMonitorTimer.$name = "RTOS_MONITOR_TIMER";
 RTOSMonitorTimer.timerClkSrc = "BUSCLK";

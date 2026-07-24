@@ -114,6 +114,25 @@ black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 
 WS2812 使用 SPI1 输出到 PB22，默认每 500 ms 点亮一颗灯；蜂鸣器默认关闭。
 
+### PB8 舵机调试 PWM
+
+新增舵机调试输出：`PB8 = TIMA0_CCP0`，硬件 PWM 周期为 20 ms（50 Hz），
+生成配置中的定时器时钟为 2.5 MHz，使用 `clockDivider=8` 和
+`clockPrescale=4`。该定时器不复用四轮电机 PWM，也不复用蜂鸣器 `TIMG8`。
+
+舵机功能由 `SERVO_FEATURE_ENABLE` 控制，默认 `0U`。开启后创建静态 FreeRTOS
+任务，并暴露 `g_servo_angle_deg` 供 CCS/Keil 调试器直接修改；`g_servo_pulse_us`
+用于观察实际映射脉宽。默认角度范围为 `0..180` 度，初始角度 `90` 度，脉宽范围
+为 `500..2500 us`。270 度舵机调试时将 `SERVO_MAX_ANGLE_DEG` 改为 `270U`。
+
+`500..2500 us` 是宽范围调试默认值，首次连接未知舵机时应先改为
+`1000..2000 us`，逐步确认机械端点，避免舵机撞限位。舵机必须使用独立电源，
+与 MCU 共地；本功能只适用于三线标准 PWM 舵机，不适用于总线协议舵机。
+
+本次验证：`tests/test_board_servo.ps1`、`tests/test_mspm0g3507_app.ps1` 通过；
+`tools/build-mspm0g3507-app.ps1 -ServoFeatureEnable 0` 和
+`-ServoFeatureEnable 1` 均构建成功。尚未执行烧录、示波器测量或舵机实物验收。
+
 ## UART 遥测
 
 UART0 同一时间只能运行一种遥测模式；速度 VOFA、灰度 VOFA、IMU Yaw 之间有编译期互斥
