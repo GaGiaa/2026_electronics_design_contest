@@ -1,13 +1,6 @@
-#ifndef BOARD_OLED_FONT_H
-#define BOARD_OLED_FONT_H
+#ifndef BOARD_OLED_FONT_COMPAT_H
+#define BOARD_OLED_FONT_COMPAT_H
 
-#include <stdint.h>
-
-#define BOARD_OLED_FONT_FIRST_ASCII 0x20U
-#define BOARD_OLED_FONT_LAST_ASCII  0x7EU
-#define BOARD_OLED_FONT_WIDTH        5U
-
-extern const uint8_t g_board_oled_font[BOARD_OLED_FONT_LAST_ASCII -
-                                       BOARD_OLED_FONT_FIRST_ASCII + 1U][BOARD_OLED_FONT_WIDTH];
+#include "drivers/oled/board_oled_font.h"
 
 #endif

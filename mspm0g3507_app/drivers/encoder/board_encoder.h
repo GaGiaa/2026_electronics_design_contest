@@ -1,0 +1,52 @@
+#ifndef BOARD_ENCODER_H
+#define BOARD_ENCODER_H
+
+#include <stdint.h>
+
+#include "drivers/motor/board_motor.h"
+
+#define BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION 13U
+#define BOARD_ENCODER_GEAR_RATIO 20U
+#define BOARD_ENCODER_OUTPUT_SHAFT_LINES_PER_REVOLUTION \
+    (BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION * BOARD_ENCODER_GEAR_RATIO)
+
+#define BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE 1U
+#define BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4 2U
+#define BOARD_ENCODER_A_PHASE_DUAL_EDGE_MULTIPLIER 2U
+#define BOARD_ENCODER_AB_PHASE_QUADRATURE_X4_MULTIPLIER 4U
+
+#ifndef BOARD_ENCODER_DECODE_MODE
+#define BOARD_ENCODER_DECODE_MODE BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE
+#endif
+
+#if (BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION == 0U) || \
+    (BOARD_ENCODER_GEAR_RATIO == 0U)
+#error "Encoder mechanics must have nonzero motor lines and gear ratio"
+#endif
+
+#if BOARD_ENCODER_DECODE_MODE == BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE
+#define BOARD_ENCODER_DECODE_MULTIPLIER BOARD_ENCODER_A_PHASE_DUAL_EDGE_MULTIPLIER
+#elif BOARD_ENCODER_DECODE_MODE == BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4
+#define BOARD_ENCODER_DECODE_MULTIPLIER BOARD_ENCODER_AB_PHASE_QUADRATURE_X4_MULTIPLIER
+#else
+#error "Unsupported board encoder decode mode"
+#endif
+
+#define BOARD_ENCODER_COUNTS_PER_REVOLUTION \
+    (BOARD_ENCODER_OUTPUT_SHAFT_LINES_PER_REVOLUTION * BOARD_ENCODER_DECODE_MULTIPLIER)
+#define BOARD_ENCODER_WHEEL_DIAMETER_MM 48
+#define BOARD_ENCODER_SAMPLE_PERIOD_MS 10U
+
+typedef struct {
+    int32_t delta_counts;
+    int32_t total_counts;
+    float instant_speed_mm_per_s;
+    float speed_mm_per_s;
+} board_encoder_sample_t;
+
+void board_encoder_init(void);
+void board_encoder_gpioa_irq_handler(void);
+void board_encoder_gpiob_irq_handler(void);
+board_encoder_sample_t board_encoder_sample(board_motor_wheel_t wheel);
+
+#endif

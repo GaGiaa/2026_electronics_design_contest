@@ -17,8 +17,8 @@ $output = Join-Path $env:TEMP 'mspm0g3507_crsf_test.exe'
 
 try {
     & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$appDir" `
-        (Join-Path $appDir 'crsf_protocol.c') `
-        (Join-Path $appDir 'crsf_control.c') `
+        (Join-Path $appDir 'protocols\crsf\crsf_protocol.c') `
+        (Join-Path $appDir 'protocols\crsf\crsf_control.c') `
         $testSource '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) {
         throw "CRSF unit test build failed (exit code $LASTEXITCODE)."

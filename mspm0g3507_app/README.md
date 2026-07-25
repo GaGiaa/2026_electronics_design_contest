@@ -1,5 +1,32 @@
 # MSPM0G3507 WS2812 application
 
+## Layered source layout
+
+The application source is organized for reuse across future G3507
+applications:
+
+`text
+app/         application startup, profile, shared state, and RTOS tasks
+drivers/     board and peripheral drivers; no application task policy
+algorithms/  PID, encoder decoding/filtering, line tracking, yaw, and control
+protocols/   CRSF and VOFA framing/mixing
+services/    reusable RTOS services such as the task monitor
+config/      application, CRSF, and FreeRTOS configuration
+platform/    G3507 interrupt dispatch
+`
+
+Each implementation exists in one canonical directory and is added once to
+both CCS and Keil. Root-level legacy headers remain compatibility include
+entry points; they only include the canonical header and contain no duplicate
+declarations or implementation. New code should include canonical paths.
+
+`main.c` only initializes SysConfig, calls `app_startup()`, starts the
+FreeRTOS scheduler, and handles the fatal-stop loop. Application composition
+belongs in `app/`. The public task registration API is
+`app_tasks_motor_start()`, `app_tasks_sensor_start()`,
+`app_tasks_io_start()`, and `app_tasks_telemetry_start()`. Compile-time
+profile switches and SWD-visible state names remain unchanged.
+
 Independent MSPM0G3507 FreeRTOS application. UART0 uses PA10/PA11 at 115200
 8-N-1. PB22 drives four 5 V WS2812 LEDs through a level shifter; all supplies
 must share ground. SPI1 PICO drives PB22 at 2.666667 MHz; PB9 is the unused
@@ -20,7 +47,7 @@ workspace can therefore report `FreeRTOS.h` or `pid.h` not found, and a stale
 CCS workspace can also select an older SDK or SysConfig installation.
 
 Use the repository build script for a reproducible application build. It adds
-the SDK FreeRTOS include and port directories, the repository `motor_pid`
+the SDK FreeRTOS include and port directories, the repository `algorithms/pid`
 include directory, and all required FreeRTOS kernel sources:
 
 ```powershell
@@ -29,7 +56,7 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 ```
 
 If the CCS GUI must build the application, configure that local project with
-the same SDK FreeRTOS include/port directories and `motor_pid` include
+the same SDK FreeRTOS include/port directories and `algorithms/pid` include
 directory, then add `list.c`, `queue.c`, `tasks.c`, `portable\TI_ARM_CLANG\ARM_CM0\port.c`,
 and `portasm.c` from that SDK to the project and link their objects. This is a
 per-computer CCS workspace configuration; do not replace it with absolute
@@ -72,7 +99,7 @@ output-shaft turn at low speed before using the speed loop. The wheel diameter i
 48 mm.
 Every 10 ms motor-task iteration samples the signed encoder delta, accumulated count
 and calculated mm/s speed before updating PWM. It runs one incremental PID speed
-controller per wheel. `motor_pid/` is a controlled copy of only the platform-
+controller per wheel. `algorithms/pid/` is a controlled copy of only the platform-
 independent PID core from the external MotorLib; CAN protocols, STM32 HAL, DJI, and
 RobStride code are intentionally not included. The SWD-writable
 `volatile g_motor_speed_targets_mm_s[4]` array supplies normal four-wheel mm/s
@@ -93,7 +120,7 @@ motor is moving.
 For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
 snapshot written by the 10 ms motor task and can be watched through SWD without
 adding breakpoints. For speed-loop tuning, set the compile-time
-`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `main.c` from `0U` to `1U` and select
+`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `app/app_profile.h` from `0U` to `1U` and select
 JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 20-byte frame
 every 10 ms. Its four float32 channels follow `g_motor_debug.wheel` and are ordered
 as `target_speed_mm_per_s`, `instant_feedback_speed_mm_per_s`,
@@ -131,7 +158,7 @@ only; this change does not modify motor targets or PWM output. For initial
 validation, move a black line across the sensor and confirm that `normalized`,
 `black_mask`, `line_error`, and `sequence` change together.
 
-PA2 drives a passive buzzer through TIMG8 CCP1. `main.c` provides the
+PA2 drives a passive buzzer through TIMG8 CCP1. `app/app_profile.h` provides the
 compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,
 `BUZZER_DUTY_PERCENT`, `BUZZER_ON_TIME_MS`, and `BUZZER_OFF_TIME_MS` macros.
 The defaults are disabled, 2000 Hz, 50 percent, 200 ms on, and 1800 ms off.
@@ -166,7 +193,7 @@ Hardware validation confirmed `CHIP_ID=0xD1`, approximately 1g on stationary Z
 acceleration, and near-zero stationary gyroscope output. No Flash write is
 performed by the build and test commands.
 
-`main.c` provides the compile-time `IMU_TELEMETRY_ENABLE` switch. It defaults
+`app/app_profile.h` provides the compile-time `IMU_TELEMETRY_ENABLE` switch. It defaults
 to `0U`; when enabled together with `IMU_YAW_ENABLE`, it sends one 16-byte
 JustFloat frame every 10 ms through the existing UART frame queue. The three
 float32 channels are `yaw_deg`, `yaw_rate_dps`, and `gyro_bias_z_dps`, followed
@@ -180,7 +207,7 @@ through the serialized UART frame queue in pin order using lines such as
 `key,pa7=down\r\n` and `key,pa7=up\r\n`. SysConfig leaves the internal resistor
 disabled and does not enable GPIO interrupts for these inputs. The button task
 uses a 128-word stack; the TI Clang map reports a 512-byte stack, 76-byte task
-control block, and 12 bytes of button driver state. `main.c` provides the
+control block, and 12 bytes of button driver state. `app/app_profile.h` provides the
 compile-time `BUTTON_FEATURE_ENABLE` switch, defaulting to `0U`. Setting it to
 `1U` enables button initialization, state scanning, UART reports, and the
 button task's static RAM while keeping the SysConfig pin definitions unchanged.
@@ -205,7 +232,7 @@ create another FreeRTOS task. It converts the BMI160 Z gyro using the configured
 `+/-500 dps` range, estimates the startup gyro bias during 100 stationary
 samples, and fuses gyro yaw rate with the left/right differential encoder rate
 using 98% gyro and 2% encoder weighting. The initial track width is configured
-by `IMU_YAW_TRACK_WIDTH_MM` in `main.c`; the measured left/right wheel-center
+by `IMU_YAW_TRACK_WIDTH_MM` in `app/app_profile.h`; the measured left/right wheel-center
 distance is 130 mm. The default
 `IMU_YAW_ENABLE` value is `0U`; set it to `1U` to enable the estimator.
 The estimator assumes the vehicle frame is `+X` forward, `+Y` left, `+Z` up,
@@ -224,7 +251,7 @@ test, build with `-VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1
 -ImuYawEnable 1`; VOFA speed telemetry and IMU yaw telemetry cannot be enabled
 together.
 
-`main.c` uses the measured per-channel calibration values:
+`app/app_startup.c` uses the measured per-channel calibration values:
 
 ```text
 white = {2834, 3064, 2150, 1924, 3099, 3032, 3182, 2467}
@@ -251,8 +278,9 @@ states, priorities, runtime percentages, runtime in microseconds, and stack
 high-water marks in `StackType_t` words. `sequence` is odd while a snapshot is
 being published and even after the update is complete.
 
-For manual configuration, edit `app_config.h` and set
-`RTOS_MONITOR_ENABLE` to `1U`. `main.c` and `FreeRTOSConfig.h` both include this
+For manual configuration, edit `config/app_config.h` and set
+`RTOS_MONITOR_ENABLE` to `1U`. `app/app_profile.h` and
+`config/FreeRTOSConfig.h` both include this
 shared header, so there is only one source-level switch. The build parameter is
 still useful for automated or temporary builds and overrides the header default
 without changing the file.

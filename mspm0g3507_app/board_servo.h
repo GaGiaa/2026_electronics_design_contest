@@ -1,9 +1,6 @@
-#ifndef BOARD_SERVO_H
-#define BOARD_SERVO_H
+#ifndef BOARD_SERVO_COMPAT_H
+#define BOARD_SERVO_COMPAT_H
 
-#include <stdint.h>
-
-void board_servo_init(void);
-uint32_t board_servo_set_angle_deg(uint32_t angle_deg);
+#include "drivers/servo/board_servo.h"
 
 #endif

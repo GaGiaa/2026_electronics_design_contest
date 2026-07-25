@@ -2,8 +2,8 @@
 
 #include <stdbool.h>
 
-#include "encoder_quadrature.h"
-#include "encoder_speed_filter.h"
+#include "algorithms/encoder/encoder_quadrature.h"
+#include "algorithms/encoder/encoder_speed_filter.h"
 #include "ti_msp_dl_config.h"
 
 #define BOARD_ENCODER_PI 3.1415926f

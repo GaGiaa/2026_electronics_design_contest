@@ -17,7 +17,7 @@ $output = Join-Path $env:TEMP 'mspm0g3507_line_tracking_test.exe'
 
 try {
     & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$appDir" `
-        (Join-Path $appDir 'line_tracking.c') $testSource '-o' $output
+        (Join-Path $appDir 'algorithms\line_tracking\line_tracking.c') $testSource '-o' $output
     if ($LASTEXITCODE -ne 0) {
         throw "Line tracking test build failed (exit code $LASTEXITCODE)."
     }

@@ -53,7 +53,7 @@ Assert-Contains -Path $setup -Pattern 'sysconfig_1\.26\.2|SysConfig 1\.26\.2' -D
 Assert-Contains -Path $setup -Pattern 'build-mspm0g3507-app\.ps1' -Description 'Setup guide must provide the portable app build command'
 Assert-Contains -Path $handoff -Pattern 'CCS.*workspace|FreeRTOS.*include|Project.*Build' -Description 'Handoff must document the CCS app build boundary'
 Assert-Contains -Path $buildScript -Pattern 'FreeRtosRoot' -Description 'Build script must resolve FreeRTOS from the selected SDK'
-Assert-Contains -Path $buildScript -Pattern 'motor_pid\\pid\.c' -Description 'Build script must compile the repository PID source'
+Assert-Contains -Path $buildScript -Pattern 'algorithms\\pid\\pid\.c' -Description 'Build script must compile the repository PID source'
 Assert-NotContains -Path $appReadme -Pattern 'Build the CCS or Keil app with' -Description 'README must not imply the CCS GUI is a complete app build'
 
 Write-Host 'PASS: CCS app workflow checks passed.'

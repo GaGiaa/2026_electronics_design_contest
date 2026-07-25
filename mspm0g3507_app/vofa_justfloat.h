@@ -1,25 +1,6 @@
-#ifndef VOFA_JUSTFLOAT_H
-#define VOFA_JUSTFLOAT_H
+#ifndef VOFA_JUSTFLOAT_COMPAT_H
+#define VOFA_JUSTFLOAT_COMPAT_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
-#define VOFA_JUSTFLOAT_CHANNEL_COUNT 4U
-#define VOFA_JUSTFLOAT_CHANNEL_SIZE 4U
-#define VOFA_JUSTFLOAT_TAIL_SIZE 4U
-#define VOFA_JUSTFLOAT_FRAME_SIZE(channel_count) \
-    (((channel_count) * VOFA_JUSTFLOAT_CHANNEL_SIZE) + VOFA_JUSTFLOAT_TAIL_SIZE)
-
-bool vofa_justfloat_encode(uint8_t *frame, size_t frame_size,
-                           const float *channels, size_t channel_count);
-#define VOFA_JUSTFLOAT_FRAME_SIZE_3 \
-    ((3U * VOFA_JUSTFLOAT_CHANNEL_SIZE) + VOFA_JUSTFLOAT_TAIL_SIZE)
-
-bool vofa_justfloat_encode3(uint8_t *frame, size_t frame_size,
-                             float channel0, float channel1, float channel2);
-bool vofa_justfloat_encode4(uint8_t *frame, size_t frame_size,
-                             float channel0, float channel1, float channel2,
-                             float channel3);
+#include "protocols/vofa/vofa_justfloat.h"
 
 #endif

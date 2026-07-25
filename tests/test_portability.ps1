@@ -50,7 +50,7 @@ $forbiddenPathPattern = '(?i)(' +
     [regex]::Escape($driveCUsers) + ')'
 foreach ($relativePath in $trackedFiles) {
     $path = Join-Path $ProjectRoot ($relativePath -replace '/', '\\')
-    if (Select-String -LiteralPath $path -Pattern $forbiddenPathPattern -Quiet) {
+    if ((Test-Path -LiteralPath $path) -and (Select-String -LiteralPath $path -Pattern $forbiddenPathPattern -Quiet)) {
         throw "Machine-specific absolute path found in tracked file: $relativePath"
     }
 }

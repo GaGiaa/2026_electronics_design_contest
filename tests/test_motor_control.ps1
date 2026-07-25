@@ -18,16 +18,16 @@ $testSource = Join-Path $PSScriptRoot 'test_motor_control.c'
 $output = Join-Path $env:TEMP 'mspm0g3507_motor_control_test.exe'
 
 try {
-$compilerArguments = @('-std=c99', '-Wall', '-Wextra', '-Werror', '-DCRSF_REMOTE_CONTROL_ENABLE=0', "-I$appDir", "-I$appDir\motor_pid")
+$compilerArguments = @('-std=c99', '-Wall', '-Wextra', '-Werror', '-DCRSF_REMOTE_CONTROL_ENABLE=0', "-I$appDir", "-I$(Join-Path $appDir 'algorithms\pid')")
     if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
         $compilerArguments += "-DBOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
     }
     & $gcc @compilerArguments `
-        (Join-Path $appDir 'motor_control.c') `
-        (Join-Path $appDir 'encoder_quadrature.c') `
-        (Join-Path $appDir 'encoder_speed_filter.c') `
-        (Join-Path $appDir 'motor_pid\pid.c') `
-        (Join-Path $appDir 'vofa_justfloat.c') `
+        (Join-Path $appDir 'algorithms\motor_control\motor_control.c') `
+        (Join-Path $appDir 'algorithms\encoder\encoder_quadrature.c') `
+        (Join-Path $appDir 'algorithms\encoder\encoder_speed_filter.c') `
+        (Join-Path $appDir 'algorithms\pid\pid.c') `
+        (Join-Path $appDir 'protocols\vofa\vofa_justfloat.c') `
         $testSource '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) {
         throw "Motor control test build failed (exit code $LASTEXITCODE)."

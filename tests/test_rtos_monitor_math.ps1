@@ -12,7 +12,7 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
 
 $gcc = (Get-Command gcc -ErrorAction Stop).Source
 $testSource = Join-Path $ProjectRoot 'tests\test_rtos_monitor_math.c'
-$monitorSource = Join-Path $ProjectRoot 'mspm0g3507_app\rtos_monitor.c'
+$monitorSource = Join-Path $ProjectRoot 'mspm0g3507_app\services\rtos_monitor\rtos_monitor.c'
 $testOutput = Join-Path $env:TEMP 'test_rtos_monitor_math.exe'
 
 try {

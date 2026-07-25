@@ -38,6 +38,13 @@
                                     <listOptionValue value="${SYSCONFIG_TOOL_INCLUDE_PATH}"/>
                                     <listOptionValue value="${PROJECT_ROOT}"/>
                                     <listOptionValue value="${PROJECT_ROOT}/${ConfigName}"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/app"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/drivers"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/algorithms"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/protocols"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/services"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/platform"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/config"/>
                                     <listOptionValue value="${COM_TI_MSPM0_SDK_INSTALL_DIR}/source/third_party/CMSIS/Core/Include"/>
                                     <listOptionValue value="${COM_TI_MSPM0_SDK_INSTALL_DIR}/source"/>
                                 </option>

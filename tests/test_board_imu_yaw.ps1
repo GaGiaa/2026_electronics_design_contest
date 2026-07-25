@@ -12,7 +12,7 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
 
 $gcc = (Get-Command gcc -ErrorAction Stop).Source
 $testSource = Join-Path $ProjectRoot 'tests\test_board_imu_yaw.c'
-$yawSource = Join-Path $ProjectRoot 'mspm0g3507_app\board_imu_yaw.c'
+$yawSource = Join-Path $ProjectRoot 'mspm0g3507_app\algorithms\imu_yaw\board_imu_yaw.c'
 $testOutput = Join-Path $env:TEMP 'test_board_imu_yaw.exe'
 
 try {

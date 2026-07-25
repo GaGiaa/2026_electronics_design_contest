@@ -204,15 +204,23 @@ TI Arm Clang 实际运行 `tools/build-mspm0g3507-app.ps1`，应用编译链接�
 
 ### CCS 应用构建边界
 
+## G3507 应用工程分层迁移（2026-07-25）
+
+`mspm0g3507_app` 现在为每个模块只保留一份规范实现。`app` 目录包含启动流程、编译期 profile、共享 SWD 状态以及电机、传感器、IO 和遥测任务注册实现；`drivers` 目录包含板级外设驱动；`algorithms` 目录包含可复用的控制与估计算法；`protocols` 目录包含 CRSF 和 VOFA；`services` 目录包含 `rtos_monitor`；`config` 目录包含 `app_config`、`crsf_config` 和 `FreeRTOSConfig`；`platform` 目录包含 G3507 中断分发。
+
+根目录旧头文件继续作为兼容 include 入口，只包含对应的规范头文件，不得在其中新增声明。新应用代码应使用规范路径。CCS 工程元数据和 Keil 工程模板中，每个实现文件都只加入一次。`main.c` 现在只负责 SysConfig 初始化、调用 `app_startup`、启动 FreeRTOS 调度器以及异常停机处理。
+
+公开的应用任务注册函数包括 `app_startup`、`app_tasks_motor_start`、`app_tasks_sensor_start`、`app_tasks_io_start` 和 `app_tasks_telemetry_start`。现有公开函数名、结构体名、构建宏名、SWD 全局变量、UART 行为、CRSF 超时行为和默认功能开关均未改变。本次迁移不代表任何尚未完成的硬件验收已经完成。
+
 `mspm0g3507_app` 的 CCS 工程文件用于源码浏览、SysConfig 和调试目标配置；它不携带
 MSPM0 SDK 内的 FreeRTOS 内核源文件编译输入。应用的跨电脑构建必须使用
 `tools/build-mspm0g3507-app.ps1`，脚本会从 `MSPM0_SDK_ROOT` 解析 FreeRTOS 头文件、
-TI Arm Clang 移植层和内核源文件，并加入仓库内的 `motor_pid` 目录。
+TI Arm Clang 移植层和内核源文件，并加入仓库内的 `algorithms/pid` 目录。
 
 因此，下载代码后直接在全新 CCS workspace 中点击 `Project -> Build Project` 不是该
 应用的受支持可复现构建流程；缺少配置时会出现 `FreeRTOS.h`、`pid.h` 找不到，补齐
 头文件后还会缺少 FreeRTOS 内核对象。若必须使用 CCS GUI 构建，需要在本机额外加入
-SDK FreeRTOS include/port 目录、`motor_pid` include 目录和五个 FreeRTOS 内核源文件，
+SDK FreeRTOS include/port 目录、`algorithms/pid` include 目录和五个 FreeRTOS 内核源文件，
 并将对应对象加入链接，这些配置不应写成机器绝对路径提交。
 
 ## 待完成硬件验收
@@ -233,8 +241,9 @@ G3507 app 新增可选 `rtos_monitor.c/.h`。通过应用或 Keil PowerShell 构
 FreeRTOS 任务每 1000 ms 更新 `g_rtos_monitor_snapshot`，可通过 SWD 观察总
 CPU 利用率、空闲率、任务状态、优先级、运行时间占比和栈余量。
 
-手动配置时只修改 `mspm0g3507_app/app_config.h` 中的
-`RTOS_MONITOR_ENABLE`。`main.c` 和 `FreeRTOSConfig.h` 共用这个配置头，避免
+手动配置时只修改 `mspm0g3507_app/config/app_config.h` 中的
+`RTOS_MONITOR_ENABLE`。`app/app_profile.h` 和
+`config/FreeRTOSConfig.h` 共用这个配置头，避免
 出现两个源文件开关不一致。构建参数仍可临时覆盖头文件默认值。
 
 统计接口启用了 `configUSE_TRACE_FACILITY`、`configGENERATE_RUN_TIME_STATS`
@@ -274,7 +283,7 @@ UART 接收溢出计数可通过 SWD 观察。主机测试为
 
 G3507 app 新增 0.96 寸、128x64 SSD1306 OLED 驱动，使用硬件 I2C0：`SDA=PA0`、
 `SCL=PA1`，默认 400 kHz。4 针模块接线为 `VCC`、`GND`、`SDA`、`SCL`；默认 7-bit
-地址为 `0x3C`，少数模块可在 `app_config.h` 中改为 `0x3D`。模块若无板载上拉，
+地址为 `0x3C`，少数模块可在 `config/app_config.h` 中改为 `0x3D`。模块若无板载上拉，
 需要为 SDA/SCL 各增加约 `4.7 kOhm` 到 `3.3 V` 的上拉。
 
 `board_oled.c/.h` 提供 SSD1306 初始化、清屏、分页刷新、光标和字符串绘制接口；

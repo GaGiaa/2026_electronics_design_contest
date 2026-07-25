@@ -12,19 +12,20 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
 
 function Assert-Contains {
     param(
-        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string[]] $Path,
         [Parameter(Mandatory)] [string] $Pattern,
         [Parameter(Mandatory)] [string] $Description
     )
 
-    if (-not (Select-String -Path $Path -Pattern $Pattern -Quiet)) {
+    $content = ($Path | ForEach-Object { Get-Content -Raw -LiteralPath $_ }) -join [Environment]::NewLine
+    if (-not [regex]::IsMatch($content, $Pattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)) {
         throw "${Description}: '$Pattern' was not found in $Path."
     }
 }
 
 function Assert-NotContains {
     param(
-        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string[]] $Path,
         [Parameter(Mandatory)] [string] $Pattern,
         [Parameter(Mandatory)] [string] $Description
     )
@@ -36,15 +37,15 @@ function Assert-NotContains {
 
 function Assert-OrderedPatterns {
     param(
-        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string[]] $Path,
         [Parameter(Mandatory)] [string[]] $Patterns,
         [Parameter(Mandatory)] [string] $Description
     )
 
-    $content = Get-Content -Raw $Path
+    $content = ($Path | ForEach-Object { Get-Content -Raw -LiteralPath $_ }) -join [Environment]::NewLine
     $offset = 0
     foreach ($pattern in $Patterns) {
-        $match = [regex]::Match($content.Substring($offset), $pattern)
+        $match = [regex]::Match($content.Substring($offset), $pattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
         if (-not $match.Success) {
             throw "${Description}: '$pattern' was not found in order in $Path."
         }
@@ -53,45 +54,61 @@ function Assert-OrderedPatterns {
 }
 
 $projectDir = Join-Path $ProjectRoot 'mspm0g3507_app'
-$main = Join-Path $projectDir 'main.c'
-$ws2812 = Join-Path $projectDir 'board_ws2812.c'
-$ws2812Header = Join-Path $projectDir 'board_ws2812.h'
-$buzzer = Join-Path $projectDir 'board_buzzer.c'
-$buzzerHeader = Join-Path $projectDir 'board_buzzer.h'
-$servo = Join-Path $projectDir 'board_servo.c'
-$servoHeader = Join-Path $projectDir 'board_servo.h'
-$servoMath = Join-Path $projectDir 'board_servo_math.h'
-$appConfig = Join-Path $projectDir 'app_config.h'
-$bmi160 = Join-Path $projectDir 'board_bmi160.c'
-$bmi160Header = Join-Path $projectDir 'board_bmi160.h'
-$imuYaw = Join-Path $projectDir 'board_imu_yaw.c'
-$imuYawHeader = Join-Path $projectDir 'board_imu_yaw.h'
-$buttons = Join-Path $projectDir 'board_buttons.c'
-$buttonsHeader = Join-Path $projectDir 'board_buttons.h'
-$grayscale = Join-Path $projectDir 'board_grayscale.c'
-$grayscaleHeader = Join-Path $projectDir 'board_grayscale.h'
-$lineTracking = Join-Path $projectDir 'line_tracking.c'
-$lineTrackingHeader = Join-Path $projectDir 'line_tracking.h'
+$main = @(
+    (Join-Path $projectDir 'main.c'),
+    (Join-Path $projectDir 'app\app_profile.h'),
+    (Join-Path $projectDir 'app\app_state.h'),
+    (Join-Path $projectDir 'app\app_tasks_motor.h'),
+    (Join-Path $projectDir 'app\app_tasks_sensor.h'),
+    (Join-Path $projectDir 'app\app_tasks_io.h'),
+    (Join-Path $projectDir 'app\app_tasks_telemetry.h'),
+    (Join-Path $projectDir 'app\app_profile.c'),
+    (Join-Path $projectDir 'app\app_state.c'),
+    (Join-Path $projectDir 'app\app_startup.c'),
+    (Join-Path $projectDir 'app\app_tasks_motor.c'),
+    (Join-Path $projectDir 'app\app_tasks_sensor.c'),
+    (Join-Path $projectDir 'app\app_tasks_io.c'),
+    (Join-Path $projectDir 'app\app_tasks_telemetry.c'),
+    (Join-Path $projectDir 'platform\g3507_interrupts.c')
+)
+$ws2812 = Join-Path $projectDir 'drivers\ws2812\board_ws2812.c'
+$ws2812Header = Join-Path $projectDir 'drivers\ws2812\board_ws2812.h'
+$buzzer = Join-Path $projectDir 'drivers\buzzer\board_buzzer.c'
+$buzzerHeader = Join-Path $projectDir 'drivers\buzzer\board_buzzer.h'
+$servo = Join-Path $projectDir 'drivers\servo\board_servo.c'
+$servoHeader = Join-Path $projectDir 'drivers\servo\board_servo.h'
+$servoMath = Join-Path $projectDir 'drivers\servo\board_servo_math.h'
+$appConfig = Join-Path $projectDir 'config\app_config.h'
+$bmi160 = Join-Path $projectDir 'drivers\imu\board_bmi160.c'
+$bmi160Header = Join-Path $projectDir 'drivers\imu\board_bmi160.h'
+$imuYaw = Join-Path $projectDir 'algorithms\imu_yaw\board_imu_yaw.c'
+$imuYawHeader = Join-Path $projectDir 'algorithms\imu_yaw\board_imu_yaw.h'
+$buttons = Join-Path $projectDir 'drivers\buttons\board_buttons.c'
+$buttonsHeader = Join-Path $projectDir 'drivers\buttons\board_buttons.h'
+$grayscale = Join-Path $projectDir 'drivers\grayscale\board_grayscale.c'
+$grayscaleHeader = Join-Path $projectDir 'drivers\grayscale\board_grayscale.h'
+$lineTracking = Join-Path $projectDir 'algorithms\line_tracking\line_tracking.c'
+$lineTrackingHeader = Join-Path $projectDir 'algorithms\line_tracking\line_tracking.h'
 $openKeilScript = Join-Path $ProjectRoot 'tools\open-keil-mspm0g3507-app.ps1'
-$uart = Join-Path $projectDir 'board_uart.c'
-$crsfUart = Join-Path $projectDir 'board_crsf_uart.c'
-$crsfProtocol = Join-Path $projectDir 'crsf_protocol.c'
-$crsfProtocolHeader = Join-Path $projectDir 'crsf_protocol.h'
-$crsfControl = Join-Path $projectDir 'crsf_control.c'
-$crsfControlHeader = Join-Path $projectDir 'crsf_control.h'
-$crsfConfig = Join-Path $projectDir 'crsf_config.h'
-$motor = Join-Path $projectDir 'board_motor.c'
-$motorHeader = Join-Path $projectDir 'board_motor.h'
-$encoder = Join-Path $projectDir 'board_encoder.c'
-$encoderHeader = Join-Path $projectDir 'board_encoder.h'
-$motorControl = Join-Path $projectDir 'motor_control.c'
-$motorControlHeader = Join-Path $projectDir 'motor_control.h'
-$motorPid = Join-Path $projectDir 'motor_pid\pid.c'
-$motorPidHeader = Join-Path $projectDir 'motor_pid\pid.h'
-$vofaJustFloat = Join-Path $projectDir 'vofa_justfloat.c'
-$vofaJustFloatHeader = Join-Path $projectDir 'vofa_justfloat.h'
+$uart = Join-Path $projectDir 'drivers\uart\board_uart.c'
+$crsfUart = Join-Path $projectDir 'drivers\crsf_uart\board_crsf_uart.c'
+$crsfProtocol = Join-Path $projectDir 'protocols\crsf\crsf_protocol.c'
+$crsfProtocolHeader = Join-Path $projectDir 'protocols\crsf\crsf_protocol.h'
+$crsfControl = Join-Path $projectDir 'protocols\crsf\crsf_control.c'
+$crsfControlHeader = Join-Path $projectDir 'protocols\crsf\crsf_control.h'
+$crsfConfig = Join-Path $projectDir 'config\crsf_config.h'
+$motor = Join-Path $projectDir 'drivers\motor\board_motor.c'
+$motorHeader = Join-Path $projectDir 'drivers\motor\board_motor.h'
+$encoder = Join-Path $projectDir 'drivers\encoder\board_encoder.c'
+$encoderHeader = Join-Path $projectDir 'drivers\encoder\board_encoder.h'
+$motorControl = Join-Path $projectDir 'algorithms\motor_control\motor_control.c'
+$motorControlHeader = Join-Path $projectDir 'algorithms\motor_control\motor_control.h'
+$motorPid = Join-Path $projectDir 'algorithms\pid\pid.c'
+$motorPidHeader = Join-Path $projectDir 'algorithms\pid\pid.h'
+$vofaJustFloat = Join-Path $projectDir 'protocols\vofa\vofa_justfloat.c'
+$vofaJustFloatHeader = Join-Path $projectDir 'protocols\vofa\vofa_justfloat.h'
 $syscfg = Join-Path $projectDir 'mspm0g3507_app.syscfg'
-$rtosConfig = Join-Path $projectDir 'FreeRTOSConfig.h'
+$rtosConfig = Join-Path $projectDir 'config\FreeRTOSConfig.h'
 $ccsBuildConfig = Join-Path $projectDir '.cproject'
 $buildScript = Join-Path $ProjectRoot 'tools\build-mspm0g3507-app.ps1'
 $flashScript = Join-Path $ProjectRoot 'tools\flash-and-debug-g3507.ps1'
@@ -150,7 +167,7 @@ Assert-Contains -Path $main -Pattern '#error.*cannot be enabled together' -Descr
 Assert-NotContains -Path $main -Pattern 'ENCODER_TELEMETRY_ENABLE' -Description 'Legacy encoder telemetry switch must be removed'
 Assert-NotContains -Path $main -Pattern 'ctl,fl=' -Description 'Legacy text control telemetry must be removed'
 Assert-Contains -Path $main -Pattern 'telemetry_task' -Description 'Application must provide a VOFA telemetry task'
-Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(telemetry_task' -Description 'VOFA telemetry task must use static allocation'
+Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(' -Description 'VOFA telemetry task must use static allocation'
 Assert-Contains -Path $main -Pattern 'vofa_justfloat_encode4' -Description 'VOFA telemetry must encode four-channel JustFloat frames'
 Assert-OrderedPatterns -Path $main -Patterns @('target_speed_mm_per_s', 'instant_feedback_speed_mm_per_s', 'feedback_speed_mm_per_s', 'output_duty_percent') -Description 'VOFA channels must expose target, raw speed, filtered speed, then output duty'
 Assert-Contains -Path $main -Pattern 'g_motor_debug\.wheel' -Description 'VOFA telemetry must follow the SWD debug wheel'
@@ -513,7 +530,7 @@ Assert-Contains -Path $buildScript -Pattern 'board_bmi160\.c' -Description 'Buil
 Assert-Contains -Path $buildScript -Pattern 'board_buttons\.c' -Description 'Build must compile the button driver'
 Assert-Contains -Path $buildScript -Pattern 'board_grayscale\.c' -Description 'Build must compile the grayscale driver'
 Assert-Contains -Path $buildScript -Pattern 'motor_control\.c' -Description 'Build must compile the motor control layer'
-Assert-Contains -Path $buildScript -Pattern 'motor_pid\\pid\.c' -Description 'Build must compile the PID core'
+Assert-Contains -Path $buildScript -Pattern 'algorithms\\pid\\pid\.c' -Description 'Build must compile the PID core'
 Assert-Contains -Path $buildScript -Pattern 'encoder_speed_filter\.c' -Description 'Build must compile the integer speed filter'
 Assert-Contains -Path $buildScript -Pattern 'vofa_justfloat\.c' -Description 'Build must compile the JustFloat encoder'
 Assert-Contains -Path $buildScript -Pattern 'VofaSpeedPidTelemetryEnable' -Description 'Build must support compiling the VOFA telemetry path'

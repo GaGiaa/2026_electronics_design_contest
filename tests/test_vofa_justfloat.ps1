@@ -17,7 +17,7 @@ $output = Join-Path $env:TEMP 'mspm0g3507_vofa_justfloat_test.exe'
 
 try {
     & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$appDir" `
-        (Join-Path $appDir 'vofa_justfloat.c') $testSource '-o' $output
+        (Join-Path $appDir 'protocols\vofa\vofa_justfloat.c') $testSource '-o' $output
     if ($LASTEXITCODE -ne 0) {
         throw "VOFA JustFloat test build failed (exit code $LASTEXITCODE)."
     }

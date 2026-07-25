@@ -4,8 +4,8 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "app_config.h"
-#include "board_oled_font.h"
+#include "config/app_config.h"
+#include "drivers/oled/board_oled_font.h"
 #include "ti_msp_dl_config.h"
 
 #define BOARD_OLED_WIDTH                 128U

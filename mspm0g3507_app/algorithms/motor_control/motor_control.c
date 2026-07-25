@@ -3,8 +3,8 @@
 #include <math.h>
 #include <stddef.h>
 
-#include "app_math.h"
-#include "crsf_config.h"
+#include "algorithms/pid/app_math.h"
+#include "config/crsf_config.h"
 
 #define MOTOR_CONTROL_DT_S 0.01f
 #define MOTOR_CONTROL_MAX_DUTY_PERCENT 100.0f

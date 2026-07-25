@@ -1,6 +1,6 @@
 #include "board_servo.h"
 
-#include "board_servo_math.h"
+#include "drivers/servo/board_servo_math.h"
 #include "ti_msp_dl_config.h"
 
 static uint32_t pulse_us_to_timer_ticks(uint32_t pulse_us)

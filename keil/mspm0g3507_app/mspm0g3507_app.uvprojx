@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>__MSPM0G3507__</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\mspm0g3507_app;..\..\mspm0g3507_app\motor_pid;.\Generated;@MSPM0_SDK_ROOT@\source;@MSPM0_SDK_ROOT@\source\third_party\CMSIS\Core\Include;@MSPM0_SDK_ROOT@\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
+              <IncludePath>..\..\mspm0g3507_app;..\..\mspm0g3507_app\app;..\..\mspm0g3507_app\drivers;..\..\mspm0g3507_app\algorithms;..\..\mspm0g3507_app\protocols;..\..\mspm0g3507_app\services;..\..\mspm0g3507_app\platform;..\..\mspm0g3507_app\config;.\Generated;@MSPM0_SDK_ROOT@\source;@MSPM0_SDK_ROOT@\source\third_party\CMSIS\Core\Include;@MSPM0_SDK_ROOT@\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -390,124 +390,164 @@
               <FilePath>..\..\mspm0g3507_app\main.c</FilePath>
             </File>
             <File>
+              <FileName>app_profile.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\app\app_profile.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_state.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\app\app_state.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_startup.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\app\app_startup.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_tasks_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\app\app_tasks_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_tasks_sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\app\app_tasks_sensor.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_tasks_io.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\app\app_tasks_io.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_tasks_telemetry.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\app\app_tasks_telemetry.c</FilePath>
+            </File>
+            <File>
+              <FileName>g3507_interrupts.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\platform\g3507_interrupts.c</FilePath>
+            </File>
+            <File>
               <FileName>board_encoder.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_encoder.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\encoder\board_encoder.c</FilePath>
             </File>
             <File>
               <FileName>encoder_quadrature.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\encoder_quadrature.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\algorithms\encoder\encoder_quadrature.c</FilePath>
             </File>
             <File>
               <FileName>encoder_speed_filter.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\encoder_speed_filter.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\algorithms\encoder\encoder_speed_filter.c</FilePath>
             </File>
             <File>
               <FileName>board_buzzer.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_buzzer.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\buzzer\board_buzzer.c</FilePath>
             </File>
             <File>
               <FileName>board_servo.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_servo.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\servo\board_servo.c</FilePath>
             </File>
             <File>
               <FileName>board_buttons.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_buttons.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\buttons\board_buttons.c</FilePath>
             </File>
             <File>
               <FileName>board_grayscale.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_grayscale.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\grayscale\board_grayscale.c</FilePath>
             </File>
             <File>
               <FileName>line_tracking.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\line_tracking.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\algorithms\line_tracking\line_tracking.c</FilePath>
             </File>
             <File>
               <FileName>board_bmi160.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_bmi160.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\imu\board_bmi160.c</FilePath>
             </File>
             <File>
               <FileName>board_imu_yaw.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_imu_yaw.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\algorithms\imu_yaw\board_imu_yaw.c</FilePath>
             </File>
             <File>
               <FileName>board_motor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_motor.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\motor\board_motor.c</FilePath>
             </File>
             <File>
               <FileName>motor_control.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\motor_control.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\algorithms\motor_control\motor_control.c</FilePath>
             </File>
             <File>
               <FileName>vofa_justfloat.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\vofa_justfloat.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\protocols\vofa\vofa_justfloat.c</FilePath>
             </File>
             <File>
               <FileName>pid.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\motor_pid\pid.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\algorithms\pid\pid.c</FilePath>
             </File>
             <File>
               <FileName>board_uart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_uart.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\uart\board_uart.c</FilePath>
             </File>
             <File>
               <FileName>board_crsf_uart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_crsf_uart.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\crsf_uart\board_crsf_uart.c</FilePath>
             </File>
             <File>
               <FileName>crsf_protocol.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\crsf_protocol.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\protocols\crsf\crsf_protocol.c</FilePath>
             </File>
             <File>
               <FileName>crsf_control.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\crsf_control.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\protocols\crsf\crsf_control.c</FilePath>
             </File>
             <File>
               <FileName>board_ws2812.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_ws2812.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\ws2812\board_ws2812.c</FilePath>
             </File>
             <File>
               <FileName>board_oled.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_oled.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\oled\board_oled.c</FilePath>
             </File>
             <File>
               <FileName>board_oled_font.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\board_oled_font.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\drivers\oled\board_oled_font.c</FilePath>
             </File>
             <File>
               <FileName>rtos_monitor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\rtos_monitor.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\services\rtos_monitor\rtos_monitor.c</FilePath>
             </File>
             <File>
               <FileName>FreeRTOSConfig.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\mspm0g3507_app\FreeRTOSConfig.h</FilePath>
+              <FilePath>..\..\mspm0g3507_app\config\FreeRTOSConfig.h</FilePath>
             </File>
             <File>
               <FileName>app_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\mspm0g3507_app\app_config.h</FilePath>
+              <FilePath>..\..\mspm0g3507_app\config\app_config.h</FilePath>
             </File>
             <File>
               <FileName>mspm0g3507_app.syscfg</FileName>
