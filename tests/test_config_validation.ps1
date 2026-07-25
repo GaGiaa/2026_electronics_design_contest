@@ -75,4 +75,5 @@ Assert-ConfigCompileFails -Header 'config/crsf_config.h' `
     -Defines @('-DCRSF_CHANNEL_CENTER=1811U') `
     -Description 'CRSF channel range is not increasing'
 
+$global:LASTEXITCODE = 0
 Write-Output 'Configuration validation tests passed.'

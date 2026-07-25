@@ -95,7 +95,7 @@ MotorLib 中受控复制的、仅包含平台无关 PID 核心的目录；CAN �
 RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_speed_targets_mm_s[4]`
 提供普通的四轮 mm/s 目标值，初始时所有目标均为 0。
 
-`volatile g_motor_debug` 提供单轮 SWD 调试覆盖。设置 `enable`，选择 `wheel`，再选择
+当 `CRSF_REMOTE_CONTROL_ENABLE=0U` 时，`volatile g_motor_debug` 提供单轮 SWD 调试覆盖。设置 `enable`，选择 `wheel`，再选择
 `MOTOR_CONTROL_DEBUG_MODE_STOP`、`MOTOR_CONTROL_DEBUG_MODE_PWM` 或
 `MOTOR_CONTROL_DEBUG_MODE_SPEED`。PWM 模式使用带符号的 `target_duty_percent`；速度模式
 使用 `target_speed_mm_per_s` 和可写的 `speed_pid_params`（`kp`、`ki`、`kd`、
@@ -135,9 +135,24 @@ VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发送文�
 | 21 | `sequence` |
 
 帧尾为 `00 00 80 7F`。速度和灰度 VOFA 遥测互斥，同时启用会触发编译期错误。在任一
-VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度字段仅用于观察，本次改动不改变
-电机目标或 PWM 输出。初次验证时，让黑线经过传感器，确认 `normalized`、`black_mask`、
-`line_error` 和 `sequence` 同步变化。
+VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度 VOFA 字段仅用于观察；高档循迹
+使用同一个灰度快照，但不改变该 VOFA 帧的通道定义。灰度快照
+额外提供 `adc_timeout_mask`，用于防止 ADC 超时被误判为黑线。初次验证时，让黑线经过传感器，
+确认 `normalized`、`black_mask`、`line_error` 和 `sequence` 同步变化。
+
+## 黑线循迹闭环
+
+`algorithms/line_control/` 使用现有 `PID_Position` 实现灰度位置误差到左右差速速度的
+外环，随后由现有四轮速度 PID 跟踪每个轮位的 mm/s 目标。位置式 PID 默认参数为
+`kp=0.08f`、`ki=0`、`kd=0`，转向输出上限为 300 mm/s；可通过 `volatile`
+`g_line_control_debug` 使用 SWD 覆盖 PID 参数、最大转向速度、轮速上限、转向符号、
+黑度阈值和丢线时间。`g_drive_control_snapshot` 通过 `app_state` 提供模式、SB、灰度、
+PID、四轮目标和反馈速度的序列保护快照，供 SWD 观察和后续 VOFA 扩展。
+
+循迹有效判据要求灰度 `sequence` 非零、本次采样 `adc_timeout_mask` 为 0，并满足
+`line_strength` 进入阈值 800；已有效后使用退出阈值 400。丢线时冻结 PID 并保持上次
+转向输出最多 100 ms，超时后四轮目标清零并复位 PID。本轮不新增线控 VOFA 帧，已有灰度、
+速度 PID 和 IMU JustFloat 格式保持不变。
 
 PA2 通过 TIMG8 CCP1 驱动无源蜂鸣器。`config/app_config.h` 提供编译期宏
 `APP_BUZZER_FEATURE_ENABLE`、`APP_BUZZER_FREQUENCY_HZ`、`APP_BUZZER_DUTY_PERCENT`、
@@ -226,7 +241,8 @@ black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 
 `line_error` 根据归一化模拟值计算黑度 `4095-normalized[i]`，使用权重
 `{-3500,-2500,-1500,-500,500,1500,2500,3500}`。当黑度总和为 0 时保持之前的误差。
-当前这些数据仅用于观察，不会改变电机目标或 PWM 输出。`APP_GRAY_VOFA_TELEMETRY_ENABLE`
+当前这些标定数据由灰度任务和高档循迹控制共同读取；灰度 VOFA 帧仍只用于观察。
+`APP_GRAY_VOFA_TELEMETRY_ENABLE`
 默认值为 `0U`，可以通过构建脚本设置为 1 以发送前文描述的二进制帧。即使遥测关闭，
 仍可通过 SWD 观察 volatile 的 `g_grayscale_snapshot`。构建成功不代表灰度传感器实物验收
 完成。
@@ -252,23 +268,26 @@ black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 
 ## CRSF 遥控输入
 
-可选的 CRSF 遥控链路使用 UART3，速率 420000 baud、8-N-1，PB3 为 RX，PB2 为 TX。将接收机
+CRSF 遥控链路使用 UART3，速率 420000 baud、8-N-1，PB3 为 RX，PB2 为 TX。将接收机
 TX 输出连接到 PB3，并与 MCU 共地。固件只接收 CRSF 数据，不向接收机上传遥测或其他帧。
 接收机输出必须是 3.3 V、非反相 UART TTL。
 
-使用 `tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 1` 构建遥控版本。默认构建
-保持 CRSF 控制关闭。CH3（通道索引 2）控制前进和后退，CH1（通道索引 0）控制差速转向。
-标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20% 死区。默认最大轮速目标为
-800 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
+`CRSF_REMOTE_CONTROL_ENABLE` 默认值为 `1U`。使用
+`tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 0` 可以构建不创建 CRSF 接收任务的
+SWD 调试版本。CH3（通道索引 2）控制前进和后退，CH1（通道索引 0）控制差速转向，CH5
+（通道索引 4）控制底盘模式。标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20%
+死区。默认最大轮速目标为 800 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
 
-四个轮目标使用左右差速混控；当组合命令超过配置的最大值时，四个目标统一归一化。如果
-连续 100 ms 没有收到有效的打包 RC 帧，四个轮目标全部置零。方向符号可以通过
-`CRSF_FORWARD_SIGN` 和 `CRSF_TURN_SIGN` 调整。启用 CRSF 编译开关时，SWD 单轮调试覆盖
-路径会被编译排除；UART0 仍可用于现有调试和 VOFA 输出。
+SB 低档（小于 700）使底盘空闲，中档（700 到 1299）使用 CH1/CH3 手动差速，高档（不小于
+1300）使用 CH3 作为基础速度并进入黑线循迹。模式切换时先输出一个 10 ms 的四轮零目标，
+连续 100 ms 没有收到有效的打包 RC 帧时也会清零。方向符号可以通过 `CRSF_FORWARD_SIGN`
+和 `CRSF_TURN_SIGN` 调整。`CRSF_REMOTE_CONTROL_ENABLE=0U` 时保留 `g_motor_debug` 单轮
+SWD 调试覆盖路径；UART0 仍可用于现有调试和 VOFA 输出。
 
 通过 SWD 观察时，可以展开 volatile 的 `g_crsf_debug` 结构体。其字段包括
 `channels.channels[0..15]`、`link_active`、`last_valid_time_ms`、`valid_frame_count`、
 `crc_error_count`、`frame_error_count` 和 `rx_overflow_count`。其中
-`channels.channels[2]` 是 CH3，`channels.channels[0]` 是 CH1。
+`channels.channels[2]` 是 CH3，`channels.channels[0]` 是 CH1，`channels.channels[4]` 是
+CH5/SB。线控状态可通过 `g_drive_control_snapshot` 观察。
 
 协议和混控主机测试位于 `tests/test_crsf.ps1`。硬件验收前必须先让车轮悬空，或断开电机电源。

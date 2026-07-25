@@ -9,9 +9,11 @@
 
 volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 volatile board_grayscale_snapshot_t g_grayscale_snapshot;
+volatile app_drive_control_snapshot_t g_drive_control_snapshot;
 line_tracking_state_t g_line_tracking_state;
 static volatile uint32_t g_encoder_sample_sequence;
 static volatile uint32_t g_grayscale_publish_sequence;
+static volatile uint32_t g_drive_control_publish_sequence;
 #if APP_IMU_YAW_ENABLE
 static volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
 static volatile uint32_t g_imu_yaw_publish_sequence;
@@ -34,9 +36,11 @@ void app_state_init(void)
         g_encoder_samples[wheel] = (board_encoder_sample_t){0};
     }
     g_grayscale_snapshot = (board_grayscale_snapshot_t){0};
+    g_drive_control_snapshot = (app_drive_control_snapshot_t){0};
     g_line_tracking_state = (line_tracking_state_t){0};
     g_encoder_sample_sequence = 0U;
     g_grayscale_publish_sequence = 0U;
+    g_drive_control_publish_sequence = 0U;
 #if APP_IMU_YAW_ENABLE
     g_imu_yaw_snapshot = (app_imu_yaw_snapshot_t){0};
     g_imu_yaw_publish_sequence = 0U;
@@ -130,6 +134,7 @@ void app_state_grayscale_publish(const board_grayscale_snapshot_t *snapshot)
     }
     g_grayscale_snapshot.digital = snapshot->digital;
     g_grayscale_snapshot.black_mask = snapshot->black_mask;
+    g_grayscale_snapshot.adc_timeout_mask = snapshot->adc_timeout_mask;
     g_grayscale_snapshot.black_count = snapshot->black_count;
     g_grayscale_snapshot.line_strength = snapshot->line_strength;
     g_grayscale_snapshot.line_error = snapshot->line_error;
@@ -155,12 +160,93 @@ void app_state_grayscale_snapshot_copy(board_grayscale_snapshot_t *snapshot)
             }
             snapshot->digital = g_grayscale_snapshot.digital;
             snapshot->black_mask = g_grayscale_snapshot.black_mask;
+            snapshot->adc_timeout_mask = g_grayscale_snapshot.adc_timeout_mask;
             snapshot->black_count = g_grayscale_snapshot.black_count;
             snapshot->line_strength = g_grayscale_snapshot.line_strength;
             snapshot->line_error = g_grayscale_snapshot.line_error;
             snapshot->sequence = g_grayscale_snapshot.sequence;
             end_sequence = g_grayscale_publish_sequence;
             if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
+                break;
+            }
+        }
+    }
+}
+
+void app_state_drive_control_publish(
+    const app_drive_control_snapshot_t *snapshot)
+{
+    uint32_t wheel;
+
+    if (snapshot == NULL) {
+        return;
+    }
+    ++g_drive_control_publish_sequence;
+    g_drive_control_snapshot.mode = snapshot->mode;
+    g_drive_control_snapshot.link_active = snapshot->link_active;
+    g_drive_control_snapshot.sb_raw = snapshot->sb_raw;
+    g_drive_control_snapshot.line_error = snapshot->line_error;
+    g_drive_control_snapshot.line_strength = snapshot->line_strength;
+    g_drive_control_snapshot.adc_timeout_mask = snapshot->adc_timeout_mask;
+    g_drive_control_snapshot.line_valid = snapshot->line_valid;
+    g_drive_control_snapshot.lost_line_ms = snapshot->lost_line_ms;
+    g_drive_control_snapshot.base_speed_mm_per_s = snapshot->base_speed_mm_per_s;
+    g_drive_control_snapshot.turn_speed_mm_per_s = snapshot->turn_speed_mm_per_s;
+    g_drive_control_snapshot.pid_p_out = snapshot->pid_p_out;
+    g_drive_control_snapshot.pid_i_out = snapshot->pid_i_out;
+    g_drive_control_snapshot.pid_d_out = snapshot->pid_d_out;
+    g_drive_control_snapshot.pid_output = snapshot->pid_output;
+    for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
+        g_drive_control_snapshot.wheel_targets_mm_per_s[wheel] =
+            snapshot->wheel_targets_mm_per_s[wheel];
+        g_drive_control_snapshot.wheel_feedback_mm_per_s[wheel] =
+            snapshot->wheel_feedback_mm_per_s[wheel];
+    }
+    g_drive_control_snapshot.line_sequence = snapshot->line_sequence;
+    g_drive_control_snapshot.control_sequence = snapshot->control_sequence;
+    ++g_drive_control_publish_sequence;
+}
+
+void app_state_drive_control_snapshot_copy(
+    app_drive_control_snapshot_t *snapshot)
+{
+    uint32_t begin_sequence;
+    uint32_t end_sequence;
+    uint32_t wheel;
+
+    if (snapshot == NULL) {
+        return;
+    }
+    for (;;) {
+        begin_sequence = g_drive_control_publish_sequence;
+        if ((begin_sequence & 1U) == 0U) {
+            snapshot->mode = g_drive_control_snapshot.mode;
+            snapshot->link_active = g_drive_control_snapshot.link_active;
+            snapshot->sb_raw = g_drive_control_snapshot.sb_raw;
+            snapshot->line_error = g_drive_control_snapshot.line_error;
+            snapshot->line_strength = g_drive_control_snapshot.line_strength;
+            snapshot->adc_timeout_mask = g_drive_control_snapshot.adc_timeout_mask;
+            snapshot->line_valid = g_drive_control_snapshot.line_valid;
+            snapshot->lost_line_ms = g_drive_control_snapshot.lost_line_ms;
+            snapshot->base_speed_mm_per_s =
+                g_drive_control_snapshot.base_speed_mm_per_s;
+            snapshot->turn_speed_mm_per_s =
+                g_drive_control_snapshot.turn_speed_mm_per_s;
+            snapshot->pid_p_out = g_drive_control_snapshot.pid_p_out;
+            snapshot->pid_i_out = g_drive_control_snapshot.pid_i_out;
+            snapshot->pid_d_out = g_drive_control_snapshot.pid_d_out;
+            snapshot->pid_output = g_drive_control_snapshot.pid_output;
+            for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
+                snapshot->wheel_targets_mm_per_s[wheel] =
+                    g_drive_control_snapshot.wheel_targets_mm_per_s[wheel];
+                snapshot->wheel_feedback_mm_per_s[wheel] =
+                    g_drive_control_snapshot.wheel_feedback_mm_per_s[wheel];
+            }
+            snapshot->line_sequence = g_drive_control_snapshot.line_sequence;
+            snapshot->control_sequence = g_drive_control_snapshot.control_sequence;
+            end_sequence = g_drive_control_publish_sequence;
+            if ((begin_sequence == end_sequence) &&
+                ((end_sequence & 1U) == 0U)) {
                 break;
             }
         }

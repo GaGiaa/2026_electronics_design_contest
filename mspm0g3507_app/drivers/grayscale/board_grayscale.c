@@ -1,5 +1,6 @@
 #include "board_grayscale.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "ti_msp_dl_config.h"
@@ -44,10 +45,14 @@ static void set_address(uint8_t channel)
     DL_Common_delayCycles(GRAYSCALE_ADDRESS_SETTLE_CYCLES);
 }
 
-static uint16_t read_average(void)
+static uint16_t read_average(bool *timed_out)
 {
     uint32_t total = 0U;
     uint32_t sample;
+
+    if (timed_out != NULL) {
+        *timed_out = false;
+    }
 
     for (sample = 0U; sample < GRAYSCALE_ADC_SAMPLES_PER_CHANNEL; ++sample) {
         uint32_t wait_count = 0U;
@@ -63,6 +68,9 @@ static uint16_t read_average(void)
         }
         if (wait_count == GRAYSCALE_ADC_WAIT_LIMIT) {
             ++g_grayscale_adc_timeout_count;
+            if (timed_out != NULL) {
+                *timed_out = true;
+            }
             DL_ADC12_enableConversions(GRAYSCALE_ADC_INST);
             return 0U;
         }
@@ -135,11 +143,16 @@ void board_grayscale_sample(board_grayscale_snapshot_t *snapshot)
     if (snapshot == NULL) {
         return;
     }
+    snapshot->adc_timeout_mask = 0U;
     for (channel = 0U; channel < BOARD_GRAYSCALE_CHANNEL_COUNT; ++channel) {
         uint16_t value;
+        bool timed_out;
 
         set_address((uint8_t)channel);
-        value = read_average();
+        value = read_average(&timed_out);
+        if (timed_out) {
+            snapshot->adc_timeout_mask |= (uint8_t)(1U << channel);
+        }
         snapshot->raw[channel] = value;
         snapshot->normalized[channel] = normalize(value, g_black[channel],
                                                    g_white[channel]);

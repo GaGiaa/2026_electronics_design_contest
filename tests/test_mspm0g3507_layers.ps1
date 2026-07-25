@@ -62,6 +62,7 @@ $expectedDirectories = @(
     'algorithms\pid',
     'algorithms\encoder',
     'algorithms\line_tracking',
+    'algorithms\line_control',
     'algorithms\imu_yaw',
     'algorithms\motor_control',
     'protocols\crsf',

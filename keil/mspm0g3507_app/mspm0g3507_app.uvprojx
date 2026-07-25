@@ -470,6 +470,11 @@
               <FilePath>..\..\mspm0g3507_app\algorithms\line_tracking\line_tracking.c</FilePath>
             </File>
             <File>
+              <FileName>line_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\algorithms\line_control\line_control.c</FilePath>
+            </File>
+            <File>
               <FileName>board_bmi160.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\drivers\imu\board_bmi160.c</FilePath>

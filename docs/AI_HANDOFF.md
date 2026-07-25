@@ -107,7 +107,8 @@ BMI160 使用 SPI0：`SCK=PB18`、`MOSI=PB17`、`MISO=PB19`、`CS=PB0`，配置�
 ### 灰度、WS2812、按键和 OLED
 
 八路灰度传感器使用 74HC4051：`AD0=PB13`、`AD1=PB1`、`AD2=PB23`、`OUT=PA27`。
-灰度结果目前用于 SWD 和 VOFA 观察，不改变电机目标或 PWM。WS2812 使用 SPI1 输出到
+灰度结果通过 `g_grayscale_snapshot` 提供 SWD 和 VOFA 观察，并由高档循迹模式读取其
+`line_error`、`line_strength`、`sequence` 和 `adc_timeout_mask`。WS2812 使用 SPI1 输出到
 PB22；四针 SSD1306 OLED 使用 I2C0：`SDA=PA0`、`SCL=PA1`，默认地址为 `0x3C`。
 WS2812、蜂鸣器、按键和 OLED 的实物响应仍需单独验收。
 
@@ -115,10 +116,24 @@ WS2812、蜂鸣器、按键和 OLED 的实物响应仍需单独验收。
 
 UART0 同一时间只能运行一种遥测模式。速度 VOFA、灰度 VOFA 和 IMU Yaw 在编译期互斥，
 启用遥测时不创建 UART 回显任务。当前 CRSF 映射为 CH3（索引 2）控制前进和后退，
-CH1（索引 0）控制差速转向；连续 100 ms 没有有效帧时四轮目标清零。
+CH1（索引 0）控制差速转向，CH5（索引 4）控制低档空闲、中档手动和高档循迹；连续
+100 ms 没有有效帧时四轮目标清零。`CRSF_REMOTE_CONTROL_ENABLE` 默认值为 `1U`，
+仍可通过构建参数设为 `0` 以保留无 CRSF 的 SWD 单轮电机调试路径。
 
 详细帧格式、构建参数和调试变量见 `mspm0g3507_app/README.md`。CRSF 硬件验收前必须
 让车轮悬空或断开电机电源。
+
+### 黑线循迹闭环
+
+新增 `algorithms/line_control/`，使用现有 `PID_Position` 将灰度位置误差转换为左右
+差速速度，再由四轮速度 PID 生成 PWM。默认位置式 PID 为 `kp=0.08f`、`ki=0`、`kd=0`，
+转向输出上限为 300 mm/s。`g_line_control_debug` 提供 SWD 可写的 PID、轮速、转向符号、
+灰度阈值和丢线时间参数；`g_drive_control_snapshot` 通过 `app_state` 提供模式、SB、
+灰度、PID、四轮目标和反馈速度的序列保护快照。
+
+线控要求 `sequence` 非零、ADC 超时掩码为 0 且 `line_strength` 达到进入阈值 800；已有效
+后使用退出阈值 400。丢线时冻结 PID 并保持上次转向输出 100 ms，之后清零目标并复位。
+本轮没有新增 VOFA 帧，已有灰度、速度 PID 和 IMU JustFloat 帧格式保持不变。
 
 ## 分层迁移事实
 
@@ -157,6 +172,11 @@ JustFloat、G3507 应用静态集成、OLED、RTOS monitor、CCS/Keil 工程静�
 host test、CRSF、电机控制、舵机、IMU yaw、线跟踪和 VOFA 单元测试。TI Clang 与 Keil
 构建结果只能说明软件构建链路通过。
 
+本轮闭环开发已通过 `test_line_control.ps1`、`test_crsf.ps1`、`test_line_tracking.ps1`、
+`test_motor_control.ps1` 和 `test_app_state_imu_yaw.ps1`。TI Clang 应用构建已分别通过默认
+`CRSF_REMOTE_CONTROL_ENABLE=1` 和 `-CrsfRemoteControlEnable 0` 配置；Keil 软件工程构建也已
+通过。本轮未执行 Flash、GDB、烧录、电机调试或任何循迹实物验收。
+
 本轮未执行 Flash 擦除、烧录、探针枚举、电机调试或任何实物验收操作。
 
 尚未完成或需要持续复核的硬件项目包括：
@@ -165,6 +185,7 @@ host test、CRSF、电机控制、舵机、IMU yaw、线跟踪和 VOFA 单元测
 - 编码器四轮方向、单圈计数、解码模式和低速隔离；
 - 四轮速度 PID 低速调参、滤波延迟和 PWM 抖动；
 - 灰度白黑归一化、位图、横向误差、全白、全黑和丢线状态；
+- 黑线循迹位置式 PID 的 `turn_sign`、基础速度、四轮速度环联调和模式切换实车响应；
 - VOFA+ 曲线数量、通道顺序、帧尾和 UART 实际接收；
 - WS2812、蜂鸣器、按键和 OLED 实物响应。
 

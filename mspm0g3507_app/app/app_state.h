@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "config/app_config.h"
+#include "algorithms/line_control/line_control.h"
 #include "algorithms/line_tracking/line_tracking.h"
 #include "algorithms/motor_control/motor_control.h"
 #include "drivers/encoder/board_encoder.h"
@@ -12,8 +13,34 @@
 #include "protocols/crsf/crsf_control.h"
 #include "protocols/crsf/crsf_protocol.h"
 
+typedef struct {
+    /* 当前 CRSF/循迹底盘模式。 */
+    crsf_drive_mode_t mode;
+    /* CRSF 帧链路是否在超时窗口内。 */
+    bool link_active;
+    /* SB 原始通道值和灰度线控观察量。 */
+    uint16_t sb_raw;
+    int32_t line_error;
+    uint32_t line_strength;
+    uint8_t adc_timeout_mask;
+    bool line_valid;
+    uint32_t lost_line_ms;
+    /* 线控外环和四轮速度环的输入/输出，单位为 mm/s。 */
+    float base_speed_mm_per_s;
+    float turn_speed_mm_per_s;
+    float pid_p_out;
+    float pid_i_out;
+    float pid_d_out;
+    float pid_output;
+    float wheel_targets_mm_per_s[BOARD_MOTOR_COUNT];
+    float wheel_feedback_mm_per_s[BOARD_MOTOR_COUNT];
+    uint32_t line_sequence;
+    uint32_t control_sequence;
+} app_drive_control_snapshot_t;
+
 extern volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 extern volatile board_grayscale_snapshot_t g_grayscale_snapshot;
+extern volatile app_drive_control_snapshot_t g_drive_control_snapshot;
 extern line_tracking_state_t g_line_tracking_state;
 
 #if APP_IMU_YAW_ENABLE
@@ -56,6 +83,10 @@ void app_state_motor_control_snapshot_copy(
     motor_control_wheel_status_t control[BOARD_MOTOR_COUNT]);
 void app_state_grayscale_publish(const board_grayscale_snapshot_t *snapshot);
 void app_state_grayscale_snapshot_copy(board_grayscale_snapshot_t *snapshot);
+void app_state_drive_control_publish(
+    const app_drive_control_snapshot_t *snapshot);
+void app_state_drive_control_snapshot_copy(
+    app_drive_control_snapshot_t *snapshot);
 
 #if APP_IMU_YAW_ENABLE
 void app_state_imu_yaw_publish(float yaw_deg, float yaw_rate_dps,

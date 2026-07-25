@@ -13,6 +13,8 @@ typedef struct {
     uint8_t digital;
     /* Derived line observation: bit N corresponds to channel N; 1 means black. */
     uint8_t black_mask;
+    /* ADC timeout observation: bit N means channel N timed out in this sample. */
+    uint8_t adc_timeout_mask;
     uint8_t black_count;
     uint32_t line_strength;
     int32_t line_error;

@@ -114,6 +114,7 @@ Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\drivers
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\drivers\\imu\\board_bmi160\.c' -Description 'shared BMI160 driver source'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\drivers\\grayscale\\board_grayscale\.c' -Description 'shared grayscale source'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\algorithms\\line_tracking\\line_tracking\.c' -Description 'Keil project must compile the line tracking layer'
+Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\algorithms\\line_control\\line_control\.c' -Description 'Keil project must compile the line control layer'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\algorithms\\motor_control\\motor_control\.c' -Description 'Keil project must compile the motor control layer'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\algorithms\\encoder\\encoder_quadrature\.c' -Description 'Keil project must compile the X4 quadrature decoder'
 Assert-Contains -Path $projectFile -Pattern '\.\.\\\.\.\\mspm0g3507_app\\algorithms\\encoder\\encoder_speed_filter\.c' -Description 'Keil project must compile the integer speed filter'

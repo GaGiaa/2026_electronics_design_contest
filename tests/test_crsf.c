@@ -232,6 +232,26 @@ static void test_control_stops_on_invalid_or_expired_input(void)
     assert(!crsf_control_mix(&input, 1000U, targets));
 }
 
+static void test_control_classifies_three_position_sb_mode(void)
+{
+    crsf_control_input_t input = {
+        .valid = true,
+        .channels = {992U},
+        .last_valid_time_ms = 1000U,
+    };
+
+    input.channels[CRSF_MODE_CHANNEL_INDEX] = 500U;
+    assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_IDLE);
+
+    input.channels[CRSF_MODE_CHANNEL_INDEX] = 992U;
+    assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_MANUAL);
+
+    input.channels[CRSF_MODE_CHANNEL_INDEX] = 1500U;
+    assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_LINE_TRACKING);
+
+    assert(crsf_control_get_drive_mode(&input, 1101U) == CRSF_DRIVE_MODE_IDLE);
+}
+
 int main(void)
 {
     test_protocol_decodes_all_channels();
@@ -243,5 +263,6 @@ int main(void)
     test_control_uses_observed_radio_mapping();
     test_control_turns_and_normalizes_combined_command();
     test_control_stops_on_invalid_or_expired_input();
+    test_control_classifies_three_position_sb_mode();
     return 0;
 }

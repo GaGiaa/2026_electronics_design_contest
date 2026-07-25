@@ -45,6 +45,54 @@ static void clear_targets(float targets[BOARD_MOTOR_COUNT])
     }
 }
 
+static bool input_link_is_active(const crsf_control_input_t *input,
+                                 uint32_t now_ms)
+{
+    return input != NULL && input->valid &&
+           (uint32_t)(now_ms - input->last_valid_time_ms) <
+               CRSF_LINK_TIMEOUT_MS;
+}
+
+crsf_drive_mode_t crsf_control_get_drive_mode(
+    const crsf_control_input_t *input, uint32_t now_ms)
+{
+    uint16_t mode_value;
+
+    if (!input_link_is_active(input, now_ms)) {
+        return CRSF_DRIVE_MODE_IDLE;
+    }
+
+    mode_value = input->channels[CRSF_MODE_CHANNEL_INDEX];
+    if ((mode_value < CRSF_CHANNEL_MIN) || (mode_value > CRSF_CHANNEL_MAX)) {
+        return CRSF_DRIVE_MODE_IDLE;
+    }
+    if (mode_value <= CRSF_MODE_LOW_MAX) {
+        return CRSF_DRIVE_MODE_IDLE;
+    }
+    if (mode_value >= CRSF_MODE_HIGH_MIN) {
+        return CRSF_DRIVE_MODE_LINE_TRACKING;
+    }
+    return CRSF_DRIVE_MODE_MANUAL;
+}
+
+bool crsf_control_get_forward_speed(const crsf_control_input_t *input,
+                                    uint32_t now_ms,
+                                    float *speed_mm_per_s)
+{
+    if (speed_mm_per_s == NULL) {
+        return false;
+    }
+    *speed_mm_per_s = 0.0f;
+    if (!input_link_is_active(input, now_ms)) {
+        return false;
+    }
+
+    *speed_mm_per_s = normalize_channel(
+                          input->channels[CRSF_FORWARD_CHANNEL_INDEX]) *
+                      CRSF_FORWARD_SIGN * CRSF_MAX_SPEED_MM_PER_S;
+    return true;
+}
+
 bool crsf_control_mix(const crsf_control_input_t *input,
                       uint32_t now_ms,
                       float targets[BOARD_MOTOR_COUNT])
@@ -59,8 +107,7 @@ bool crsf_control_mix(const crsf_control_input_t *input,
         return false;
     }
     clear_targets(targets);
-    if (input == NULL || !input->valid ||
-        (uint32_t)(now_ms - input->last_valid_time_ms) >= CRSF_LINK_TIMEOUT_MS) {
+    if (!input_link_is_active(input, now_ms)) {
         return false;
     }
 
