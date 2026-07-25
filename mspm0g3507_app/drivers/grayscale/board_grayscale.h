@@ -21,6 +21,17 @@ typedef struct {
     uint32_t sequence;
 } board_grayscale_snapshot_t;
 
+typedef struct {
+    uint16_t white[BOARD_GRAYSCALE_CHANNEL_COUNT];
+    uint16_t black[BOARD_GRAYSCALE_CHANNEL_COUNT];
+    uint16_t gray_white[BOARD_GRAYSCALE_CHANNEL_COUNT];
+    uint16_t gray_black[BOARD_GRAYSCALE_CHANNEL_COUNT];
+    uint8_t digital;
+    uint32_t sequence;
+} board_grayscale_debug_state_t;
+
+/* SWD-observable mirror of grayscale calibration and driver state. */
+extern volatile board_grayscale_debug_state_t g_grayscale_debug;
 extern volatile uint32_t g_grayscale_adc_timeout_count;
 
 void board_grayscale_init(const uint16_t *white, const uint16_t *black);

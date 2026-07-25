@@ -134,6 +134,12 @@ VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发送文�
 | 20 | `line_strength` |
 | 21 | `sequence` |
 
+`app_state.h` 公开了以下用于 SWD 观察的 `volatile` 全局变量：`g_encoder_sample_sequence`、`g_grayscale_publish_sequence`、
+`g_drive_control_publish_sequence`，以及在 `APP_IMU_YAW_ENABLE=1U` 时存在的 `g_imu_yaw_snapshot` 和
+`g_imu_yaw_publish_sequence`。这些序列变量用于快照一致性保护，只应观察，不应通过调试器写入。灰度驱动另提供
+`volatile g_grayscale_debug` 镜像，用于观察每个通道的 `white`、`black`、`gray_white`、`gray_black` 标定值，
+以及 `digital` 和 `sequence`。该镜像不会反向修改驱动内部的私有标定数组。
+
 帧尾为 `00 00 80 7F`。速度和灰度 VOFA 遥测互斥，同时启用会触发编译期错误。在任一
 VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度 VOFA 字段仅用于观察；高档循迹
 使用同一个灰度快照，但不改变该 VOFA 帧的通道定义。灰度快照

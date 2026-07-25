@@ -18,6 +18,17 @@ int main(void)
     app_drive_control_snapshot_t copied_drive = {0};
 
     app_state_init();
+    assert(g_encoder_sample_sequence == 0U);
+    assert(g_grayscale_publish_sequence == 0U);
+    assert(g_drive_control_publish_sequence == 0U);
+    assert(g_imu_yaw_publish_sequence == 0U);
+    assert(!g_imu_yaw_snapshot.valid);
+
+    app_state_encoder_cycle_begin();
+    assert(g_encoder_sample_sequence == 1U);
+    app_state_encoder_cycle_end();
+    assert(g_encoder_sample_sequence == 2U);
+
     app_state_imu_yaw_snapshot_copy(&snapshot);
     assert(!snapshot.valid);
     assert(snapshot.sequence == 0U);
@@ -29,6 +40,13 @@ int main(void)
     assert_float_equal(snapshot.yaw_deg, 12.5f);
     assert_float_equal(snapshot.yaw_rate_dps, -3.25f);
     assert_float_equal(snapshot.gyro_bias_z_dps, 0.75f);
+    assert(g_imu_yaw_publish_sequence == 2U);
+    assert(g_imu_yaw_snapshot.valid);
+
+    board_grayscale_snapshot_t grayscale = {0};
+    grayscale.sequence = 9U;
+    app_state_grayscale_publish(&grayscale);
+    assert(g_grayscale_publish_sequence == 2U);
 
     drive.mode = CRSF_DRIVE_MODE_LINE_TRACKING;
     drive.link_active = true;
@@ -43,6 +61,7 @@ int main(void)
     drive.line_sequence = 7U;
     drive.control_sequence = 11U;
     app_state_drive_control_publish(&drive);
+    assert(g_drive_control_publish_sequence == 2U);
     app_state_drive_control_snapshot_copy(&copied_drive);
     assert(copied_drive.mode == CRSF_DRIVE_MODE_LINE_TRACKING);
     assert(copied_drive.link_active);

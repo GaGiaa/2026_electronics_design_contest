@@ -76,6 +76,12 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 ```
 
+`app_state.h` 公开 `g_encoder_sample_sequence`、`g_grayscale_publish_sequence` 和
+`g_drive_control_publish_sequence` 供 SWD 观察；启用 `APP_IMU_YAW_ENABLE=1U` 时还公开
+`g_imu_yaw_snapshot` 和 `g_imu_yaw_publish_sequence`。这些 `volatile` 变量是快照序列保护状态，
+只应观察，不应通过调试器写入。灰度驱动的 `volatile g_grayscale_debug` 是标定参数和数字状态的只读镜像，
+不改变驱动内部仍保持 `static` 的标定数组。任务栈、通信缓存、编码器滤波器和 PID 内部状态继续保持私有链接。
+
 G3507 CCS 应用输出为 `mspm0g3507_app/Debug/mspm0g3507_app.out`。Keil 输出为
 `keil/mspm0g3507_app/Objects/mspm0g3507_app.axf`、对应 HEX 和
 `keil/mspm0g3507_app/mspm0g3507_app.map`。

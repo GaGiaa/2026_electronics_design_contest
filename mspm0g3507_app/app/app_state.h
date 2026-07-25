@@ -38,6 +38,11 @@ typedef struct {
     uint32_t control_sequence;
 } app_drive_control_snapshot_t;
 
+/* SWD-observable app-state sequence guards. Treat these as read-only. */
+extern volatile uint32_t g_encoder_sample_sequence;
+extern volatile uint32_t g_grayscale_publish_sequence;
+extern volatile uint32_t g_drive_control_publish_sequence;
+
 extern volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 extern volatile board_grayscale_snapshot_t g_grayscale_snapshot;
 extern volatile app_drive_control_snapshot_t g_drive_control_snapshot;
@@ -51,6 +56,9 @@ typedef struct {
     bool valid;
     uint32_t sequence;
 } app_imu_yaw_snapshot_t;
+
+extern volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
+extern volatile uint32_t g_imu_yaw_publish_sequence;
 #endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE

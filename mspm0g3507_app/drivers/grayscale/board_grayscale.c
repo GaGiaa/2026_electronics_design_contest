@@ -17,6 +17,7 @@ static uint16_t g_gray_white[BOARD_GRAYSCALE_CHANNEL_COUNT];
 static uint16_t g_gray_black[BOARD_GRAYSCALE_CHANNEL_COUNT];
 static uint8_t g_digital;
 static uint32_t g_sequence;
+volatile board_grayscale_debug_state_t g_grayscale_debug;
 volatile uint32_t g_grayscale_adc_timeout_count;
 
 static uint16_t clamp_adc_value(uint32_t value)
@@ -117,6 +118,7 @@ void board_grayscale_init(const uint16_t *white, const uint16_t *black)
 
     g_digital = 0U;
     g_sequence = 0U;
+    g_grayscale_debug = (board_grayscale_debug_state_t){0};
     g_grayscale_adc_timeout_count = 0U;
     for (channel = 0U; channel < BOARD_GRAYSCALE_CHANNEL_COUNT; ++channel) {
         uint16_t calibrated_white = white[channel];
@@ -133,6 +135,10 @@ void board_grayscale_init(const uint16_t *white, const uint16_t *black)
                                             (2U * calibrated_white)) / 3U);
         g_gray_black[channel] = (uint16_t)(((2U * calibrated_black) +
                                             calibrated_white) / 3U);
+        g_grayscale_debug.white[channel] = calibrated_white;
+        g_grayscale_debug.black[channel] = calibrated_black;
+        g_grayscale_debug.gray_white[channel] = g_gray_white[channel];
+        g_grayscale_debug.gray_black[channel] = g_gray_black[channel];
     }
 }
 
@@ -167,4 +173,6 @@ void board_grayscale_sample(board_grayscale_snapshot_t *snapshot)
     }
     snapshot->digital = g_digital;
     snapshot->sequence = ++g_sequence;
+    g_grayscale_debug.digital = g_digital;
+    g_grayscale_debug.sequence = g_sequence;
 }

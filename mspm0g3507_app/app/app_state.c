@@ -11,12 +11,12 @@ volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 volatile board_grayscale_snapshot_t g_grayscale_snapshot;
 volatile app_drive_control_snapshot_t g_drive_control_snapshot;
 line_tracking_state_t g_line_tracking_state;
-static volatile uint32_t g_encoder_sample_sequence;
-static volatile uint32_t g_grayscale_publish_sequence;
-static volatile uint32_t g_drive_control_publish_sequence;
+volatile uint32_t g_encoder_sample_sequence;
+volatile uint32_t g_grayscale_publish_sequence;
+volatile uint32_t g_drive_control_publish_sequence;
 #if APP_IMU_YAW_ENABLE
-static volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
-static volatile uint32_t g_imu_yaw_publish_sequence;
+volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
+volatile uint32_t g_imu_yaw_publish_sequence;
 #endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
