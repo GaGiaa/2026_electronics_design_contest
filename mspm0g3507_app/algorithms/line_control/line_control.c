@@ -4,16 +4,18 @@
 #include <stddef.h>
 
 #include "algorithms/pid/app_math.h"
+#include "config/app_config.h"
 #include "config/crsf_config.h"
 
 #define LINE_CONTROL_DEFAULT_MAX_TURN_SPEED_MM_PER_S 300.0f
 #define LINE_CONTROL_DEFAULT_MAX_WHEEL_SPEED_MM_PER_S \
     CRSF_MAX_SPEED_MM_PER_S
 #define LINE_CONTROL_DEFAULT_TURN_SIGN -1.0f
-#define LINE_CONTROL_DEFAULT_STRENGTH_ENTER 10000U
-#define LINE_CONTROL_DEFAULT_STRENGTH_EXIT 5000U
+#define LINE_CONTROL_DEFAULT_STRENGTH_ENTER 800U
+#define LINE_CONTROL_DEFAULT_STRENGTH_EXIT 400U
 #define LINE_CONTROL_DEFAULT_LOST_TIMEOUT_MS 100U
 #define LINE_CONTROL_DEFAULT_KP 0.4f
+#define LINE_CONTROL_DEFAULT_ERROR_FILTER_TIME_CONSTANT_MS 30U
 
 static const PID_Position_Param_Config g_default_pid_params = {
     .kp = LINE_CONTROL_DEFAULT_KP,
@@ -38,6 +40,8 @@ volatile line_control_debug_t g_line_control_debug = {
     .line_strength_enter = LINE_CONTROL_DEFAULT_STRENGTH_ENTER,
     .line_strength_exit = LINE_CONTROL_DEFAULT_STRENGTH_EXIT,
     .lost_line_timeout_ms = LINE_CONTROL_DEFAULT_LOST_TIMEOUT_MS,
+    .line_error_filter_time_constant_ms =
+        LINE_CONTROL_DEFAULT_ERROR_FILTER_TIME_CONSTANT_MS,
 };
 
 typedef struct {
@@ -48,6 +52,7 @@ typedef struct {
     uint32_t line_strength_enter;
     uint32_t line_strength_exit;
     uint32_t lost_line_timeout_ms;
+    uint32_t line_error_filter_time_constant_ms;
 } line_control_config_t;
 
 static bool pid_params_are_valid(const PID_Position_Param_Config *params)
@@ -96,6 +101,10 @@ static void line_control_config_read(line_control_config_t *config)
     config->lost_line_timeout_ms = debug.lost_line_timeout_ms != 0U ?
                                        debug.lost_line_timeout_ms :
                                        LINE_CONTROL_DEFAULT_LOST_TIMEOUT_MS;
+    config->line_error_filter_time_constant_ms =
+        debug.line_error_filter_time_constant_ms != 0U ?
+            debug.line_error_filter_time_constant_ms :
+            LINE_CONTROL_DEFAULT_ERROR_FILTER_TIME_CONSTANT_MS;
 }
 
 static void output_clear(line_control_output_t *output)
@@ -119,6 +128,38 @@ static bool sample_is_valid(const line_control_state_t *state,
     threshold = state->line_valid ? config->line_strength_exit :
                                     config->line_strength_enter;
     return input->line_strength >= threshold;
+}
+
+static bool update_line_error_filter(line_control_state_t *state,
+                                     const line_control_input_t *input,
+                                     const line_control_config_t *config)
+{
+    uint32_t elapsed_ms;
+    float alpha;
+
+    if ((state == NULL) || (input == NULL) || (config == NULL)) {
+        return false;
+    }
+
+    if (!state->has_filtered_line_error) {
+        state->filtered_line_error = (float)input->line_error;
+        state->has_filtered_line_error = true;
+        state->last_filter_time_ms = input->now_ms;
+        return true;
+    }
+
+    elapsed_ms = (uint32_t)(input->now_ms - state->last_filter_time_ms);
+    state->last_filter_time_ms = input->now_ms;
+    if (elapsed_ms == 0U) {
+        return false;
+    }
+
+    alpha = (float)elapsed_ms /
+            ((float)config->line_error_filter_time_constant_ms +
+             (float)elapsed_ms);
+    state->filtered_line_error +=
+        alpha * ((float)input->line_error - state->filtered_line_error);
+    return false;
 }
 
 static void mix_targets(float base_speed, float turn_speed,
@@ -170,11 +211,17 @@ void line_control_init(line_control_state_t *state)
         return;
     }
     line_control_config_read(&config);
-    PID_Position_Init(&state->pid, &config.pid_params, 0.01f);
+    PID_Position_Init(&state->pid, &config.pid_params,
+                      (float)APP_LINE_CONTROL_INTERVAL_MS / 1000.0f);
     state->has_valid_line = false;
     state->line_valid = false;
+    state->has_filtered_line_error = false;
+    state->has_position_update = false;
     state->last_sequence = 0U;
     state->last_valid_time_ms = 0U;
+    state->last_filter_time_ms = 0U;
+    state->last_position_update_ms = 0U;
+    state->filtered_line_error = 0.0f;
     state->last_turn_speed_mm_per_s = 0.0f;
 }
 
@@ -186,8 +233,13 @@ void line_control_reset(line_control_state_t *state)
     PID_Position_Reset(&state->pid);
     state->has_valid_line = false;
     state->line_valid = false;
+    state->has_filtered_line_error = false;
+    state->has_position_update = false;
     state->last_sequence = 0U;
     state->last_valid_time_ms = 0U;
+    state->last_filter_time_ms = 0U;
+    state->last_position_update_ms = 0U;
+    state->filtered_line_error = 0.0f;
     state->last_turn_speed_mm_per_s = 0.0f;
 }
 
@@ -197,7 +249,8 @@ void line_control_step(line_control_state_t *state,
 {
     line_control_config_t config;
     bool new_sample;
-    bool valid_sample;
+    bool valid_sample = false;
+    bool filter_reinitialized = false;
     uint32_t elapsed_ms = 0U;
 
     if ((state == NULL) || (input == NULL) || (output == NULL)) {
@@ -214,14 +267,24 @@ void line_control_step(line_control_state_t *state,
         if (valid_sample) {
             state->has_valid_line = true;
             state->last_valid_time_ms = input->now_ms;
-            state->pid.params = config.pid_params;
-            state->last_turn_speed_mm_per_s =
-                App_Math_ClampFloat(
-                    config.turn_sign *
-                        PID_Position_Calc(&state->pid, 0.0f,
-                                          (float)input->line_error),
-                    -config.max_turn_speed_mm_per_s,
-                    config.max_turn_speed_mm_per_s);
+            filter_reinitialized = update_line_error_filter(
+                state, input, &config);
+            if (filter_reinitialized || !state->has_position_update ||
+                (uint32_t)(input->now_ms - state->last_position_update_ms) >=
+                    APP_LINE_CONTROL_INTERVAL_MS) {
+                state->pid.params = config.pid_params;
+                state->last_turn_speed_mm_per_s =
+                    App_Math_ClampFloat(
+                        config.turn_sign *
+                            PID_Position_Calc(&state->pid, 0.0f,
+                                              state->filtered_line_error),
+                        -config.max_turn_speed_mm_per_s,
+                        config.max_turn_speed_mm_per_s);
+                state->last_position_update_ms = input->now_ms;
+                state->has_position_update = true;
+            }
+        } else {
+            state->has_filtered_line_error = false;
         }
     }
 

@@ -56,6 +56,9 @@ Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_LINE_CONTROL_VOFA_TELEMETRY_INTERVAL_MS=0U') `
     -Description 'line control VOFA telemetry period is zero'
 Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_LINE_CONTROL_INTERVAL_MS=0U') `
+    -Description 'line control period is zero'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_IMU_VOFA_TELEMETRY_INTERVAL_MS=0U') `
     -Description 'IMU VOFA telemetry period is zero'
 Assert-ConfigCompileFails -Header 'config/app_config.h' `

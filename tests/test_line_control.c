@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stddef.h>
 
+#include "config/app_config.h"
 #include "line_control.h"
 
 static void assert_close(float actual, float expected, float tolerance)
@@ -23,6 +24,7 @@ static void reset_debug(void)
     g_line_control_debug.line_strength_enter = 800U;
     g_line_control_debug.line_strength_exit = 400U;
     g_line_control_debug.lost_line_timeout_ms = 100U;
+    g_line_control_debug.line_error_filter_time_constant_ms = 30U;
 }
 
 static line_control_input_t make_input(int32_t error, uint32_t strength,
@@ -47,11 +49,11 @@ static void test_default_configuration(void)
     line_control_input_t input;
 
     line_control_init(&state);
-    input = make_input(1000, 9999U, 0U, 1U, 200.0f, 0U);
+    input = make_input(1000, 799U, 0U, 1U, 200.0f, 0U);
     line_control_step(&state, &input, &output);
     assert(!output.line_valid);
 
-    input = make_input(1000, 10000U, 0U, 2U, 200.0f, 10U);
+    input = make_input(1000, 800U, 0U, 2U, 200.0f, 10U);
     line_control_step(&state, &input, &output);
     assert(output.line_valid);
     assert_close(output.pid_p_out, -400.0f, 0.001f);
@@ -61,12 +63,12 @@ static void test_default_configuration(void)
     assert_close(output.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_RIGHT],
                  -100.0f, 0.001f);
 
-    input = make_input(1000, 5000U, 0U, 3U, 200.0f, 20U);
+    input = make_input(1000, 400U, 0U, 3U, 200.0f, 20U);
     line_control_step(&state, &input, &output);
     assert(output.line_valid);
     assert_close(output.turn_speed_mm_per_s, 300.0f, 0.001f);
 
-    input = make_input(1000, 4999U, 0U, 4U, 200.0f, 30U);
+    input = make_input(1000, 399U, 0U, 4U, 200.0f, 30U);
     line_control_step(&state, &input, &output);
     assert(!output.line_valid);
 }
@@ -100,7 +102,7 @@ static void test_positive_error_turns_right_and_negative_error_turns_left(void)
     assert(output.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_LEFT] <
            output.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_RIGHT]);
 
-    input = make_input(-1000, 4095U, 0U, 2U, 200.0f, 10U);
+    input = make_input(-1000, 4095U, 0U, 2U, 200.0f, 50U);
     line_control_step(&state, &input, &output);
     assert(output.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_LEFT] >
            output.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_RIGHT]);
@@ -200,6 +202,74 @@ static void test_repeated_sequence_does_not_update_pid(void)
                  first.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_LEFT], 0.001f);
 }
 
+static void test_position_loop_uses_50_ms_dt(void)
+{
+    line_control_state_t state;
+
+    reset_debug();
+    line_control_init(&state);
+
+    assert(APP_LINE_CONTROL_INTERVAL_MS == 50U);
+    assert_close(state.pid.dt_s, 0.05f, 0.0001f);
+}
+
+static void test_position_loop_filters_error_and_updates_every_50_ms(void)
+{
+    line_control_state_t state;
+    line_control_output_t output;
+    line_control_input_t input;
+
+    reset_debug();
+    line_control_init(&state);
+
+    input = make_input(0, 4095U, 0U, 1U, 200.0f, 0U);
+    line_control_step(&state, &input, &output);
+    assert_close(state.filtered_line_error, 0.0f, 0.001f);
+
+    input = make_input(1000, 4095U, 0U, 2U, 200.0f, 10U);
+    line_control_step(&state, &input, &output);
+    assert_close(state.filtered_line_error, 250.0f, 0.001f);
+    assert_close(output.turn_speed_mm_per_s, 0.0f, 0.001f);
+
+    input = make_input(1000, 4095U, 0U, 3U, 200.0f, 20U);
+    line_control_step(&state, &input, &output);
+    assert_close(state.filtered_line_error, 437.5f, 0.001f);
+    assert_close(output.turn_speed_mm_per_s, 0.0f, 0.001f);
+
+    input = make_input(1000, 4095U, 0U, 4U, 200.0f, 30U);
+    line_control_step(&state, &input, &output);
+    input = make_input(1000, 4095U, 0U, 5U, 200.0f, 40U);
+    line_control_step(&state, &input, &output);
+    assert_close(output.turn_speed_mm_per_s, 0.0f, 0.001f);
+
+    input = make_input(1000, 4095U, 0U, 6U, 200.0f, 50U);
+    line_control_step(&state, &input, &output);
+    assert_close(state.filtered_line_error, 762.6953f, 0.001f);
+    assert_close(output.turn_speed_mm_per_s, -61.0156f, 0.001f);
+}
+
+static void test_reacquired_line_reinitializes_filter(void)
+{
+    line_control_state_t state;
+    line_control_output_t output;
+    line_control_input_t input;
+
+    reset_debug();
+    line_control_init(&state);
+
+    input = make_input(1000, 4095U, 0U, 1U, 200.0f, 0U);
+    line_control_step(&state, &input, &output);
+    input = make_input(1000, 0U, 0U, 2U, 200.0f, 10U);
+    line_control_step(&state, &input, &output);
+    assert(!output.line_valid);
+
+    input = make_input(-1000, 4095U, 0U, 3U, 200.0f, 20U);
+    line_control_step(&state, &input, &output);
+    assert_close(state.filtered_line_error, -1000.0f, 0.001f);
+    assert(output.line_valid);
+    assert_close(output.turn_speed_mm_per_s, 80.0f, 0.001f);
+}
+
 int main(void)
 {
     test_default_configuration();
@@ -210,5 +280,8 @@ int main(void)
     test_lost_line_holds_then_stops_and_resets();
     test_adc_timeout_is_invalid_even_when_strength_is_high();
     test_repeated_sequence_does_not_update_pid();
+    test_position_loop_uses_50_ms_dt();
+    test_position_loop_filters_error_and_updates_every_50_ms();
+    test_reacquired_line_reinitializes_filter();
     return 0;
 }

@@ -36,14 +36,20 @@ typedef struct {
     uint32_t line_strength_enter;
     uint32_t line_strength_exit;
     uint32_t lost_line_timeout_ms;
+    uint32_t line_error_filter_time_constant_ms;
 } line_control_debug_t;
 
 typedef struct {
     PID_Position pid;
     bool has_valid_line;
     bool line_valid;
+    bool has_filtered_line_error;
+    bool has_position_update;
     uint32_t last_sequence;
     uint32_t last_valid_time_ms;
+    uint32_t last_filter_time_ms;
+    uint32_t last_position_update_ms;
+    float filtered_line_error;
     float last_turn_speed_mm_per_s;
 } line_control_state_t;
 

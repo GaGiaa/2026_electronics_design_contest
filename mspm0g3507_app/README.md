@@ -163,9 +163,15 @@ VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度 VOFA
 PID、四轮目标和反馈速度的序列保护快照，供 SWD 观察和后续 VOFA 扩展。
 
 循迹有效判据要求灰度 `sequence` 非零、本次采样 `adc_timeout_mask` 为 0，并满足
-`line_strength` 进入阈值 10000；已有效后使用退出阈值 5000。丢线时冻结 PID 并保持上次
+`line_strength` 进入阈值 800；已有效后使用退出阈值 400。丢线时冻结 PID 并保持上次
 转向输出最多 100 ms，超时后四轮目标清零并复位 PID。由于单个通道的最大黑度为 4095，
-该进入阈值隐含黑线通常覆盖约三个以上通道；窄线覆盖范围仍需结合灰度 VOFA 和实车验证。
+该阈值允许较弱或较窄的黑线进入有效状态；实际抗干扰能力仍需结合灰度 VOFA 和实车验证。
+
+巡线位置外环默认由 `APP_LINE_CONTROL_INTERVAL_MS=50U` 控制更新周期；灰度采样和四轮速度环仍保持
+10 ms。有效的模拟 `line_error` 在位置环内部使用时间常数 30 ms 的一阶低通，首次有效样本和丢线恢复
+后的首个有效样本直接初始化滤波器。外环未到更新时间时保持上一次差速速度目标，但灰度有效性、ADC
+超时和丢线安全判定仍按 10 ms 执行。当前保持 `PID_POSITION_VARIANT_BASIC`，位置 PID 的 `Ki/Kd`
+仍为 0；`g_line_control_debug.line_error_filter_time_constant_ms` 可用于调节滤波时间常数。
 
 ### 巡线 VOFA 遥测
 
