@@ -28,9 +28,9 @@
 #define CRSF_TURN_CHANNEL_INDEX 0U
 #endif
 
-/* 当前发射机 SB 三档开关使用 CH5，数组索引为 4。 */
+/* 当前发射机 SB 三档开关使用 CH5，接收机通道数组索引为 6。 */
 #ifndef CRSF_MODE_CHANNEL_INDEX
-#define CRSF_MODE_CHANNEL_INDEX 4U
+#define CRSF_MODE_CHANNEL_INDEX 6U
 #endif
 
 /* SB 原始值低于/高于这两个阈值时分别进入低档/高档。 */

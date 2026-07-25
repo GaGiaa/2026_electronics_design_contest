@@ -165,7 +165,7 @@ Assert-Contains -Path $crsfControl -Pattern 'CRSF_LINK_TIMEOUT_MS' -Description 
 Assert-Contains -Path $crsfControl -Pattern 'CRSF_CHANNEL_DEADBAND' -Description 'CRSF control must implement stick deadband'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MAX_SPEED_MM_PER_S\s+800\.0f' -Description 'CRSF control must default to 800 mm/s'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_REMOTE_CONTROL_ENABLE 1U' -Description 'CRSF control must default to enabled'
-Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MODE_CHANNEL_INDEX\s+4U' -Description 'CRSF mode must use CH5'
+Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MODE_CHANNEL_INDEX\s+6U' -Description 'CRSF mode must use CH5 array index 6'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MODE_LOW_MAX\s+700U' -Description 'CRSF low mode threshold'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MODE_HIGH_MIN\s+1300U' -Description 'CRSF high mode threshold'
 Assert-Contains -Path $main -Pattern 'GROUP1_IRQHandler' -Description 'Application must provide the GPIOA interrupt handler for encoder A phases'

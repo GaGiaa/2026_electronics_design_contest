@@ -276,8 +276,8 @@ TX 输出连接到 PB3，并与 MCU 共地。固件只接收 CRSF 数据，不�
 
 `CRSF_REMOTE_CONTROL_ENABLE` 默认值为 `1U`。使用
 `tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 0` 可以构建不创建 CRSF 接收任务的
-SWD 调试版本。CH3（通道索引 2）控制前进和后退，CH1（通道索引 0）控制差速转向，CH5
-（通道索引 4）控制底盘模式。标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20%
+SWD 调试版本。CH3（通道索引 2）控制前进和后退，CH1（通道索引 0）控制差速转向，SB/CH5
+（通道数组索引 6）控制底盘模式。标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20%
 死区。默认最大轮速目标为 800 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
 
 SB 低档（小于 700）使底盘空闲，中档（700 到 1299）使用 CH1/CH3 手动差速，高档（不小于
@@ -289,7 +289,7 @@ SWD 调试覆盖路径；UART0 仍可用于现有调试和 VOFA 输出。
 通过 SWD 观察时，可以展开 volatile 的 `g_crsf_debug` 结构体。其字段包括
 `channels.channels[0..15]`、`link_active`、`last_valid_time_ms`、`valid_frame_count`、
 `crc_error_count`、`frame_error_count` 和 `rx_overflow_count`。其中
-`channels.channels[2]` 是 CH3，`channels.channels[0]` 是 CH1，`channels.channels[4]` 是
+`channels.channels[2]` 是 CH3，`channels.channels[0]` 是 CH1，`channels.channels[6]` 是
 CH5/SB。线控状态可通过 `g_drive_control_snapshot` 观察。
 
 协议和混控主机测试位于 `tests/test_crsf.ps1`。硬件验收前必须先让车轮悬空，或断开电机电源。

@@ -240,12 +240,15 @@ static void test_control_classifies_three_position_sb_mode(void)
         .last_valid_time_ms = 1000U,
     };
 
+    input.channels[4U] = 500U;
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 500U;
     assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_IDLE);
 
+    input.channels[4U] = 1811U;
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 992U;
     assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_MANUAL);
 
+    input.channels[4U] = 500U;
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 1500U;
     assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_LINE_TRACKING);
 
