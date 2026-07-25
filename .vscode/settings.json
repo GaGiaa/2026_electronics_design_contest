@@ -3,8 +3,33 @@
   "C_Cpp.default.includePath": [
     "${workspaceFolder}/mspm0l1306_bringup",
     "${workspaceFolder}/mspm0l1306_bringup/Debug",
+    "${workspaceFolder}/mspm0g3507_bringup",
+    "${workspaceFolder}/mspm0g3507_bringup/Debug",
+    "${workspaceFolder}/mspm0g3507_freertos",
+    "${workspaceFolder}/mspm0g3507_freertos/Debug",
+    "${workspaceFolder}/mspm0g3507_app",
+    "${workspaceFolder}/mspm0g3507_app/Debug",
+    "${workspaceFolder}/mspm0g3507_app/app",
+    "${workspaceFolder}/mspm0g3507_app/drivers",
+    "${workspaceFolder}/mspm0g3507_app/algorithms",
+    "${workspaceFolder}/mspm0g3507_app/protocols",
+    "${workspaceFolder}/mspm0g3507_app/services",
+    "${workspaceFolder}/mspm0g3507_app/platform",
+    "${workspaceFolder}/mspm0g3507_app/config",
+    "${env:MSPM0_SDK_ROOT}/kernel/freertos/Source/include",
+    "${env:MSPM0_SDK_ROOT}/kernel/freertos/Source/portable/TI_ARM_CLANG/ARM_CM0",
     "${env:MSPM0_SDK_ROOT}/source",
     "${env:MSPM0_SDK_ROOT}/source/third_party/CMSIS/Core/Include"
+  ],
+  "C_Cpp.default.defines": [
+    "__MSPM0G3507__",
+    "__USE_SYSCONFIG__"
+  ],
+  "C_Cpp.default.compilerArgs": [
+    "-mcpu=cortex-m0plus",
+    "-march=thumbv6m",
+    "-mfloat-abi=soft",
+    "-mthumb"
   ],
   "files.exclude": { "**/Debug": true }
 }

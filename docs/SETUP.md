@@ -91,6 +91,12 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 仓库根目录。构建任务调用 PowerShell 脚本；调试任务需要先启动 pyOCD GDB
 服务器，并正确配置 `ARM_GDB_PATH`。
 
+仓库根目录的 `.vscode/settings.json` 已配置四套工程的源码、`Debug` 生成目录、SDK
+FreeRTOS、CMSIS 和 TI Arm Clang Cortex-M0+ 参数，默认 IntelliSense 目标为当前主线的
+`mspm0g3507_app`。由于 L1306 与 G3507 需要不同的芯片宏，单独检查 L1306 源码时不要
+把 `__MSPM0L1306__` 和 `__MSPM0G3507__` 同时加入同一个配置；应切换到对应工程的独立
+VS Code 配置。
+
 ## 文档维护
 
 开发完成后必须先更新 `docs/AI_HANDOFF.md`。工具版本或环境变量变化时更新

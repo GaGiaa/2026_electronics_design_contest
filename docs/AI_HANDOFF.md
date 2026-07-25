@@ -166,6 +166,15 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 
 ## 已知验证与遗留风险
 
+### 本轮 VS Code IntelliSense 修复
+
+- 修复 `.vscode/settings.json` 只包含 `mspm0l1306_bringup` 头文件路径的问题，补齐四套 CCS 工程、各自 `Debug` 生成目录、SDK FreeRTOS、TI Arm Clang FreeRTOS port 和 CMSIS 路径。
+- 补充 G3507 应用当前构建使用的 `__MSPM0G3507__`、`__USE_SYSCONFIG__` 和 Cortex-M0+ 编译参数，避免 CMSIS 被主机默认架构错误解析。
+- 新增 `tests/test_vscode_intellisense.ps1`，检查 VS Code 配置路径、宏、编译参数和跨电脑路径可移植性。
+- 根工作区的 C/C++ IntelliSense 默认面向当前主线 `mspm0g3507_app`。L1306 与 G3507 不能共用同一组芯片宏；单独检查 L1306 时应在对应工程目录或独立 VS Code 配置中选择 `__MSPM0L1306__`。
+- 已验证 VS Code 配置 JSON、配置回归测试，以及使用 TI Arm Clang 对 G3507 应用入口和黑线控制源文件的 Cortex-M0+ 语法检查。
+- 本轮未执行 Flash 擦除、烧录、探针枚举、GDB/SWD、电机调试或任何实物验收操作。
+
 此前已记录通过的验证包括电机控制、编码器模式 1/2、线跟踪、IMU Yaw、CRSF、VOFA
 JustFloat、G3507 应用静态集成、OLED、RTOS monitor、CCS/Keil 工程静态检查和可移植性
 检查。本轮额外增加 IMU yaw app-state host test，并通过 `test_config_ownership.ps1`、`test_config_validation.ps1`、RTOS monitor
