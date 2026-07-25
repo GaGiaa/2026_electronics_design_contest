@@ -16,8 +16,10 @@
 #include "drivers/ws2812/board_ws2812.h"
 #include "app/app_state.h"
 
+#if APP_WS2812_ANIMATION_ENABLE || APP_WS2812_STATUS_INDICATOR_ENABLE
 static StaticTask_t g_ws2812_task_buffer;
 static StackType_t g_ws2812_task_stack[APP_WS2812_TASK_STACK_DEPTH];
+#endif
 #if APP_OLED_TEST_TASK_ENABLE
 static StaticTask_t g_oled_test_task_buffer;
 static StackType_t g_oled_test_task_stack[APP_OLED_TEST_TASK_STACK_DEPTH];
@@ -35,13 +37,20 @@ static StackType_t g_button_task_stack[APP_BUTTON_TASK_STACK_DEPTH];
 static StaticQueue_t g_uart_queue_buffer;
 static uint8_t g_uart_queue_storage[APP_UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
 
+#if APP_WS2812_ANIMATION_ENABLE || APP_WS2812_STATUS_INDICATOR_ENABLE
 static void ws2812_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval = pdMS_TO_TICKS(500U);
     board_ws2812_pixel_t pixels[BOARD_WS2812_PIXEL_COUNT] = {0};
+#if APP_WS2812_STATUS_INDICATOR_ENABLE
+    app_drive_control_snapshot_t drive_snapshot = {0};
+    bool red_blink_on = true;
+    uint32_t color_index = 0U;
+#else
     uint32_t pixel_index = 0U;
     uint32_t color_index = 0U;
+#endif
 
     (void)argument;
     for (;;) {
@@ -52,6 +61,27 @@ static void ws2812_task(void *argument)
             pixels[index].green = 0U;
             pixels[index].blue = 0U;
         }
+#if APP_WS2812_STATUS_INDICATOR_ENABLE
+        app_state_drive_control_snapshot_copy(&drive_snapshot);
+        if (drive_snapshot.link_active) {
+            pixels[0].green = APP_WS2812_BRIGHTNESS;
+        } else if (red_blink_on) {
+            pixels[0].red = APP_WS2812_BRIGHTNESS;
+        }
+
+        if (color_index == 0U) {
+            pixels[3].red = APP_WS2812_BRIGHTNESS;
+        } else if (color_index == 1U) {
+            pixels[3].blue = APP_WS2812_BRIGHTNESS;
+        } else if (color_index == 2U) {
+            pixels[3].green = APP_WS2812_BRIGHTNESS;
+        } else {
+            pixels[3].red = APP_WS2812_BRIGHTNESS;
+            pixels[3].green = APP_WS2812_BRIGHTNESS;
+            pixels[3].blue = APP_WS2812_BRIGHTNESS;
+        }
+        red_blink_on = drive_snapshot.link_active ? true : !red_blink_on;
+#else
         if (color_index == 0U) {
             pixels[pixel_index].red = APP_WS2812_BRIGHTNESS;
         } else if (color_index == 1U) {
@@ -63,8 +93,15 @@ static void ws2812_task(void *argument)
             pixels[pixel_index].green = APP_WS2812_BRIGHTNESS;
             pixels[pixel_index].blue = APP_WS2812_BRIGHTNESS;
         }
+#endif
         board_ws2812_write(pixels);
 
+#if APP_WS2812_STATUS_INDICATOR_ENABLE
+        ++color_index;
+        if (color_index == 4U) {
+            color_index = 0U;
+        }
+#else
         ++color_index;
         if (color_index == 4U) {
             color_index = 0U;
@@ -73,9 +110,11 @@ static void ws2812_task(void *argument)
                 pixel_index = 0U;
             }
         }
+#endif
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }
+#endif
 
 #if APP_OLED_TEST_TASK_ENABLE
 static void oled_test_task(void *argument)
@@ -216,10 +255,12 @@ void app_tasks_io_start(void)
     configASSERT(uart_queue != NULL);
     board_uart_enable_rx_interrupt(uart_queue);
 
+#if APP_WS2812_ANIMATION_ENABLE || APP_WS2812_STATUS_INDICATOR_ENABLE
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812",
                                    APP_WS2812_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_ws2812_task_stack,
                                    &g_ws2812_task_buffer) != NULL);
+#endif
 #if APP_OLED_TEST_TASK_ENABLE
     configASSERT(xTaskCreateStatic(oled_test_task, "oled",
                                    APP_OLED_TEST_TASK_STACK_DEPTH, NULL,

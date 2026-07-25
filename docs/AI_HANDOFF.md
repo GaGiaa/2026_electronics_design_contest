@@ -177,6 +177,17 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 - 已验证 VS Code 配置 JSON、配置回归测试，以及使用 TI Arm Clang 对 G3507 应用入口和黑线控制源文件的 Cortex-M0+ 语法检查。
 - 本轮未执行 Flash 擦除、烧录、探针枚举、GDB/SWD、电机调试或任何实物验收操作。
 
+### 本轮 WS2812 状态指示功能
+
+- 在 `mspm0g3507_app/config/app_config.h` 增加 `APP_WS2812_ANIMATION_ENABLE` 和
+  `APP_WS2812_STATUS_INDICATOR_ENABLE`。旧的四灯轮流动画默认关闭，新的状态指示默认开启，
+  两种流程不能同时启用。
+- `ws2812_task` 保持单任务输出：1 号灯根据 `app_state` 中的 CRSF 链路快照显示绿灯或
+  500 ms 红灯闪烁，4 号灯每 500 ms 按红、蓝、绿、白换色，2、3 号灯保持熄灭。
+- 已通过 `powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1`。
+- 已通过 `powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1`；构建过程只生成
+  `Debug` 软件产物，未执行 Flash、烧录、GDB/SWD、电机调试或 WS2812 实物验收。
+
 此前已记录通过的验证包括电机控制、编码器模式 1/2、线跟踪、IMU Yaw、CRSF、VOFA
 JustFloat、G3507 应用静态集成、OLED、RTOS monitor、CCS/Keil 工程静态检查和可移植性
 检查。本轮额外增加 IMU yaw app-state host test，并通过 `test_config_ownership.ps1`、`test_config_validation.ps1`、RTOS monitor

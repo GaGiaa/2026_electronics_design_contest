@@ -65,9 +65,15 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 `portable\TI_ARM_CLANG\ARM_CM0\port.c` 和 `portasm.c` 加入工程并链接对应对象。这属于
 每台电脑自己的 CCS workspace 配置，不应替换为仓库中的绝对路径。
 
-静态集成测试为 `tests/test_mspm0g3507_app.ps1`。动画每 500 ms 点亮一个像素，通道值为
-16，依次在四个像素上循环显示红、绿、蓝和白色。硬件验收需要实际观察 LED 并持续回显
-UART 输入；构建或测试命令本身不会执行 Flash 操作。
+静态集成测试为 `tests/test_mspm0g3507_app.ps1`。WS2812 任务由
+`APP_WS2812_ANIMATION_ENABLE` 和 `APP_WS2812_STATUS_INDICATOR_ENABLE` 控制，默认分别为
+`0U` 和 `1U`，两个开关不能同时启用。启用旧动画时，每 500 ms 点亮一个像素，通道值为
+16，依次在四个像素上循环显示红、绿、蓝和白色。
+
+默认状态指示模式中，1 号灯（索引 0）在 CRSF 链路有效时常亮绿色，链路无效时以 500 ms
+周期闪烁红色；4 号灯（索引 3）每 500 ms 按红、蓝、绿、白顺序换色并保持点亮，2、3 号灯
+保持熄灭。链路状态沿用现有 100 ms CRSF 有效帧超时判定。硬件验收需要实际观察 LED 并持续
+回显 UART 输入；构建或测试命令本身不会执行 Flash 操作。
 
 应用 CPU 由板载 40 MHz HFXT 和 SYSPLL 运行在 80 MHz。四路 10 kHz、双输入 PWM 硬件通道
 使用 PA12/PA13、PA28/PA31、PA29/PB27 和 PB4/PB5。逻辑轮位映射为：前左 PA29/PB27、
