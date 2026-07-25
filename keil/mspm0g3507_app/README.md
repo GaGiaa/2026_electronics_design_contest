@@ -106,7 +106,7 @@ AD0=PB13、AD1=PB1、AD2=PB23、OUT=PA27，EN 悬空，传感器使用独立稳�
 说明采样正在进行；如果超时计数器持续变化，说明 ADC0 没有报告 MEM0 转换完成标志。
 
 可选的 `board_imu_yaw.c` 航向估算器会编译进共享应用工程，并在现有 IMU 任务中
-运行。当 `APP_IMU_YAW_ENABLE` 从默认值 `0U` 改为 `1U` 后，该估算器才会启用。它使用
+运行。`APP_IMU_YAW_ENABLE` 默认值为 `1U`，需要无 IMU 硬件的调试构建时可显式改为 `0U`。它使用
 BMI160 Z 轴陀螺仪、启动时陀螺仪零偏校准，以及左右轮编码器差速计算，并使用
 `mspm0g3507_app/config/app_config.h` 中的 `APP_IMU_YAW_TRACK_WIDTH_MM`。实测左右轮中心距离为 130 mm，车辆坐标系
 为 +X 向前、+Y 向左、+Z 向上。将 `APP_IMU_TELEMETRY_ENABLE` 也设为 `1U`，即可通过

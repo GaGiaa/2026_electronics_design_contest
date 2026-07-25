@@ -152,8 +152,9 @@ CH1（索引 0）控制差速转向，CH5（索引 4）控制低档空闲、中�
 停机处理。应用任务注册接口为 `app_startup()`、`app_tasks_motor_start()`、
 `app_tasks_sensor_start()`、`app_tasks_io_start()` 和 `app_tasks_telemetry_start()`。
 
-现有公开函数名、结构体名、PowerShell 构建参数、SWD 全局变量、UART 行为、CRSF 超时行为和默认功能
-开关保持不变；应用源码级配置宏已统一为 `APP_` 前缀。分层迁移不代表任何尚未完成的硬件验收已经完成。
+现有公开函数名、结构体名、PowerShell 构建参数、SWD 全局变量、UART 行为和 CRSF 超时行为保持不变；
+应用源码级配置宏已统一为 `APP_` 前缀。当前 `APP_IMU_YAW_ENABLE` 默认开启，仍可通过构建参数显式关闭。
+分层迁移不代表任何尚未完成的硬件验收已经完成。
 
 IMU yaw 与 IMU VOFA 遥测采用独立任务边界：`APP_IMU_YAW_ENABLE=1U` 时创建 `imu_task`，负责
 BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENABLE=1U` 时创建独立的
@@ -162,7 +163,7 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 `APP_IMU_VOFA_TELEMETRY_INTERVAL_MS` 与 `APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH` 分别配置
 独立遥测周期和栈大小；`ImuYawEnable`、`ImuTelemetryEnable` 等既有 PowerShell 参数继续保留。
 由于该方案明确采用 yaw 开关控制 IMU 任务，关闭 `APP_IMU_YAW_ENABLE` 时不会初始化或读取 BMI160，
-同时 `app_profile_t.enable_imu` 为 `false`。
+同时 `app_profile_t.enable_imu` 为 `false`；当前默认值为 `1U`，因此默认构建会创建 IMU 任务。
 
 ## 已知验证与遗留风险
 
