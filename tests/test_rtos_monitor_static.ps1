@@ -61,7 +61,7 @@ Assert-Contains -Path $header -Pattern 'stack_high_water_words' -Description 'Ta
 Assert-Contains -Path $source -Pattern 'rtos_monitor_counter_delta' -Description 'Monitor must implement counter wrap-safe delta'
 Assert-Contains -Path $source -Pattern 'uxTaskGetSystemState' -Description 'Monitor must use FreeRTOS task state statistics'
 Assert-Contains -Path $source -Pattern 'xTaskGetIdleTaskHandle' -Description 'Monitor must identify the idle task'
-Assert-Contains -Path $appConfig -Pattern 'APP_RTOS_MONITOR_ENABLE\s+0U' -Description 'Application configuration must own the monitor default'
+Assert-Contains -Path $appConfig -Pattern 'APP_RTOS_MONITOR_ENABLE\s+1U' -Description 'Application configuration must own the enabled monitor default'
 Assert-Contains -Path $config -Pattern '#include "config/app_config\.h"' -Description 'FreeRTOS must use the shared application configuration'
 Assert-Contains -Path $config -Pattern 'configMAX_TASK_NAME_LEN\s+RTOS_MONITOR_TASK_NAME_LENGTH' -Description 'FreeRTOS task name length must derive from monitor configuration'
 Assert-NotContains -Path $main -Pattern '#define APP_RTOS_MONITOR_ENABLE' -Description 'Main must not duplicate the monitor default'

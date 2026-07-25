@@ -250,13 +250,14 @@ black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 
 ## FreeRTOS CPU 与任务监控
 
-可选的 `rtos_monitor` 模块默认关闭，不占用 UART0。向应用或 Keil PowerShell 构建脚本传入
-`-RtosMonitorEnable 1` 可启用静态监控任务。该任务每 1000 ms 更新一次
+`rtos_monitor` 模块默认开启，不占用 UART0。需要精简资源或排查监控影响时，可向应用或 Keil
+PowerShell 构建脚本传入 `-RtosMonitorEnable 0` 临时关闭；传入 `-RtosMonitorEnable 1` 可显式开启。
+该任务每 1000 ms 更新一次
 `g_rtos_monitor_snapshot`，供 SWD 观察总 CPU 利用率、空闲率、任务名称、状态、优先级、
 运行时间占比、微秒级运行时间以及栈高水位标记。发布快照时 `sequence` 为奇数，更新完成
 后为偶数。
 
-手动配置时，编辑 `config/app_config.h` 并将 `APP_RTOS_MONITOR_ENABLE` 设为 `1U`。
+手动配置时，编辑 `config/app_config.h`，`APP_RTOS_MONITOR_ENABLE` 默认设为 `1U`，需要关闭时改为 `0U`。
 `config/app_config.h` 和 `config/FreeRTOSConfig.h` 都包含这个共享头文件，因此只有一个
 源码级开关。构建参数适合自动化或临时构建，并会覆盖头文件默认值，但不会修改文件。
 

@@ -118,3 +118,6 @@ UART 观察航向字段。
 ```text
 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1
 ```
+
+共享应用默认启用 `rtos_monitor`，通过 SWD 观察 `g_rtos_monitor_snapshot`，不占用 UART0。
+如需构建精简版本，可使用 `-RtosMonitorEnable 0` 临时关闭；该参数不会修改共享源码配置。

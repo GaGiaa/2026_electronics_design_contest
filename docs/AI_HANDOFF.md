@@ -153,7 +153,8 @@ CH1（索引 0）控制差速转向，CH5（索引 4）控制低档空闲、中�
 `app_tasks_sensor_start()`、`app_tasks_io_start()` 和 `app_tasks_telemetry_start()`。
 
 现有公开函数名、结构体名、PowerShell 构建参数、SWD 全局变量、UART 行为和 CRSF 超时行为保持不变；
-应用源码级配置宏已统一为 `APP_` 前缀。当前 `APP_IMU_YAW_ENABLE` 默认开启，仍可通过构建参数显式关闭。
+应用源码级配置宏已统一为 `APP_` 前缀。当前 `APP_IMU_YAW_ENABLE` 和 `APP_RTOS_MONITOR_ENABLE` 默认开启，
+仍可分别通过 `-ImuYawEnable 0` 和 `-RtosMonitorEnable 0` 显式关闭。
 分层迁移不代表任何尚未完成的硬件验收已经完成。
 
 IMU yaw 与 IMU VOFA 遥测采用独立任务边界：`APP_IMU_YAW_ENABLE=1U` 时创建 `imu_task`，负责

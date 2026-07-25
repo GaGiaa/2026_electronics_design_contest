@@ -4,7 +4,7 @@
 /* Application-wide compile-time configuration. Build defines override defaults. */
 
 #ifndef APP_RTOS_MONITOR_ENABLE
-#define APP_RTOS_MONITOR_ENABLE 0U
+#define APP_RTOS_MONITOR_ENABLE 1U
 #endif
 #ifndef APP_OLED_TEST_TASK_ENABLE
 #define APP_OLED_TEST_TASK_ENABLE 0U
