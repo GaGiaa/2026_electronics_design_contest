@@ -120,7 +120,7 @@ WS2812、蜂鸣器、按键和 OLED 的实物响应仍需单独验收。
 
 ### UART 遥测与 CRSF
 
-UART0 同一时间只能运行一种遥测模式。速度 VOFA、灰度 VOFA 和 IMU Yaw 在编译期互斥，
+UART0 同一时间只能运行一种遥测模式。速度 VOFA、灰度 VOFA、巡线 VOFA 和 IMU Yaw 在编译期互斥，
 启用遥测时不创建 UART 回显任务。当前 CRSF 映射为 CH3（索引 2）控制前进和后退，
 CH1（索引 0）控制差速转向，SB/CH5 使用通道数组索引 6 控制低档空闲、中档手动和高档循迹；连续
 100 ms 没有有效帧时四轮目标清零。`CRSF_REMOTE_CONTROL_ENABLE` 默认值为 `1U`，
@@ -139,7 +139,11 @@ CH1（索引 0）控制差速转向，SB/CH5 使用通道数组索引 6 控制�
 
 线控要求 `sequence` 非零、ADC 超时掩码为 0 且 `line_strength` 达到进入阈值 800；已有效
 后使用退出阈值 400。丢线时冻结 PID 并保持上次转向输出 100 ms，之后清零目标并复位。
-本轮没有新增 VOFA 帧，已有灰度、速度 PID 和 IMU JustFloat 帧格式保持不变。
+新增巡线 VOFA 遥测任务，默认由 `APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE=0U` 关闭，周期默认
+为 20 ms，发送 18 通道、76 字节 JustFloat 帧。通道依次包含底盘模式、CRSF 链路、灰度误差、
+黑度、有效标志、丢线时间、ADC 超时掩码、基础速度、转向输出、左右目标速度、左右平均反馈速度、
+左右平均 PWM 以及位置 PID 的 P/I/D 输出。任务只读取 `g_drive_control_snapshot` 和电机状态快照，
+通过现有 UART TX 队列发送，不直接访问巡线控制器内部状态。
 
 ## 分层迁移事实
 
@@ -206,7 +210,8 @@ host test、CRSF、电机控制、舵机、IMU yaw、线跟踪和 VOFA 单元测
 `CRSF_REMOTE_CONTROL_ENABLE=1` 和 `-CrsfRemoteControlEnable 0` 配置；Keil 软件工程构建也已
 通过。本轮未执行 Flash、GDB、烧录、电机调试或任何循迹实物验收。
 
-本轮未执行 Flash 擦除、烧录、探针枚举、电机调试或任何实物验收操作。
+本轮未执行 Flash 擦除、烧录、探针枚举、电机调试或任何实物验收操作。巡线 VOFA 帧的实际
+VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 尚未完成或需要持续复核的硬件项目包括：
 

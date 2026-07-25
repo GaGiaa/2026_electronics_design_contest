@@ -11,6 +11,7 @@ static const app_profile_t g_app_profile = {
     .enable_oled = (APP_OLED_TEST_TASK_ENABLE != 0U),
     .enable_telemetry = (APP_VOFA_SPEED_PID_TELEMETRY_ENABLE != 0U) ||
                         (APP_GRAY_VOFA_TELEMETRY_ENABLE != 0U) ||
+                        (APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE != 0U) ||
                         (APP_IMU_TELEMETRY_ENABLE != 0U),
 };
 

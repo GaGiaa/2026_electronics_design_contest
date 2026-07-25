@@ -16,6 +16,10 @@ param(
     [int] $ImuYawEnable,
     [ValidateSet(0, 1)]
     [int] $GrayVofaTelemetryEnable,
+    [ValidateSet(0, 1)]
+    [int] $LineControlVofaTelemetryEnable,
+    [ValidateRange(1, 60000)]
+    [int] $LineControlVofaTelemetryIntervalMs,
     [ValidateSet(1, 2)]
     [int] $EncoderDecodeMode,
     [ValidateSet(0, 1)]
@@ -93,6 +97,12 @@ if ($PSBoundParameters.ContainsKey('ImuYawEnable')) {
 }
 if ($PSBoundParameters.ContainsKey('GrayVofaTelemetryEnable')) {
     $temporaryDefines += "APP_GRAY_VOFA_TELEMETRY_ENABLE=$GrayVofaTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('LineControlVofaTelemetryEnable')) {
+    $temporaryDefines += "APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE=$LineControlVofaTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('LineControlVofaTelemetryIntervalMs')) {
+    $temporaryDefines += "APP_LINE_CONTROL_VOFA_TELEMETRY_INTERVAL_MS=$LineControlVofaTelemetryIntervalMs"
 }
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $temporaryDefines += "BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
