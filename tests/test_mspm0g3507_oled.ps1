@@ -56,10 +56,10 @@ Assert-Contains -Path $syscfg -Pattern 'I2C1\.peripheral\.sdaPin\.\$assign\s*=\s
 Assert-Contains -Path $syscfg -Pattern 'I2C1\.peripheral\.sclPin\.\$assign\s*=\s*"PA1"' -Description 'OLED SCL must use PA1'
 Assert-Contains -Path $syscfg -Pattern 'I2C1\.basicEnableController\s*=\s*true' -Description 'I2C controller mode must be enabled'
 
-Assert-Contains -Path $config -Pattern 'OLED_TEST_TASK_ENABLE\s+0U' -Description 'OLED test task must default off'
-Assert-Contains -Path $config -Pattern 'OLED_I2C_ADDRESS\s+0x3CU' -Description 'OLED address must default to 0x3C'
+Assert-Contains -Path $config -Pattern 'APP_OLED_TEST_TASK_ENABLE\s+0U' -Description 'OLED test task must default off'
+Assert-Contains -Path $config -Pattern 'APP_OLED_I2C_ADDRESS\s+0x3CU' -Description 'OLED address must default to 0x3C'
 Assert-Contains -Path $main -Pattern '#include "drivers/oled/board_oled\.h"' -Description 'Application must include the OLED driver'
-Assert-Contains -Path $main -Pattern 'OLED_TEST_TASK_ENABLE' -Description 'OLED task must be compile-time gated'
+Assert-Contains -Path $main -Pattern 'APP_OLED_TEST_TASK_ENABLE' -Description 'OLED task must be compile-time gated'
 Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(oled_test_task' -Description 'OLED test task must use static allocation'
 Assert-Contains -Path $main -Pattern 'board_oled_init' -Description 'Application must initialize OLED'
 

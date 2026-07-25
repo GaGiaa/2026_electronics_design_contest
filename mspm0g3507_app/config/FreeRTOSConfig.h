@@ -2,7 +2,7 @@
 #define FREERTOS_CONFIG_H
 
 #include "config/app_config.h"
-#include "services/rtos_monitor/rtos_monitor.h"
+#include "config/rtos_monitor_config.h"
 
 #define configCPU_CLOCK_HZ                         (80000000UL)
 #define configTICK_RATE_HZ                          1000U
@@ -11,10 +11,11 @@
 #define configUSE_TIME_SLICING                      1
 #define configMAX_PRIORITIES                        4U
 #define configMINIMAL_STACK_SIZE                    128U
-#define configMAX_TASK_NAME_LEN                     16U
+#define configMAX_TASK_NAME_LEN                     RTOS_MONITOR_TASK_NAME_LENGTH
 #define configTICK_TYPE_WIDTH_IN_BITS               TICK_TYPE_WIDTH_32_BITS
 #define configUSE_TICKLESS_IDLE                     0
-#if RTOS_MONITOR_ENABLE
+#include "services/rtos_monitor/rtos_monitor.h"
+#if APP_RTOS_MONITOR_ENABLE
 #define configUSE_TRACE_FACILITY                    1
 #define configGENERATE_RUN_TIME_STATS               1
 #define configRUN_TIME_COUNTER_TYPE                 uint32_t

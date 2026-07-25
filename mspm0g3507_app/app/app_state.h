@@ -30,7 +30,7 @@ typedef struct {
 extern volatile crsf_debug_state_t g_crsf_debug;
 #endif
 
-#if SERVO_FEATURE_ENABLE
+#if APP_SERVO_FEATURE_ENABLE
 extern volatile uint32_t g_servo_angle_deg;
 extern volatile uint32_t g_servo_pulse_us;
 #endif

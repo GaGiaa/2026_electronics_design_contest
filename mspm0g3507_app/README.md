@@ -17,12 +17,12 @@ Keil MDK 的工程模板、构建产物和 Keil 调试说明见
 应用源码按便于后续 G3507 应用复用的方式组织：
 
 ```text
-app/         应用启动、编译期 profile、共享状态和 FreeRTOS 任务
+app/         应用启动、profile API、共享状态和 FreeRTOS 任务
 drivers/     板级和外设驱动，不包含应用任务策略
 algorithms/  PID、编码器解码与滤波、线跟踪、yaw 和电机控制算法
 protocols/   CRSF 和 VOFA 帧处理与混控
 services/    可复用的 FreeRTOS 服务，例如任务监控
-config/      应用、CRSF 和 FreeRTOS 配置
+config/      应用、编码器、CRSF、RTOS monitor 和 FreeRTOS 配置
 platform/    G3507 中断分发
 ```
 
@@ -32,7 +32,9 @@ platform/    G3507 中断分发
 `main.c` 只负责 SysConfig 初始化、调用 `app_startup()`、启动 FreeRTOS 调度器和异常停机
 循环。应用组合逻辑属于 `app/`。公开的任务注册接口为 `app_tasks_motor_start()`、
 `app_tasks_sensor_start()`、`app_tasks_io_start()` 和 `app_tasks_telemetry_start()`。
-编译期 profile 开关和可通过 SWD 观察的状态名称保持不变。
+`app/app_profile.h` 只提供 profile 类型和 API。应用编译期配置集中在
+`config/app_config.h`，宏使用 `APP_` 前缀；编码器和 RTOS monitor 的参数分别位于
+`config/encoder_config.h` 和 `config/rtos_monitor_config.h`。可通过 SWD 观察的状态名称保持不变。
 
 这是一个独立的 MSPM0G3507 FreeRTOS 应用工程。UART0 使用 PA10/PA11，配置为 115200、
 8-N-1。PB22 通过电平转换器驱动四颗 5 V WS2812，所有电源必须共地。SPI1 PICO 输出到
@@ -104,8 +106,8 @@ RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_spee
 前让所有轮位保持一个 10 ms 控制周期的 0 输出。电机运动时不要设置断点。
 
 为便于观察，10 ms 电机任务会写入 `volatile g_encoder_samples[BOARD_MOTOR_COUNT]` 快照，
-可通过 SWD 观察，不需要增加断点。调试速度环时，将 `app/app_profile.h` 中的编译期开关
-`VOFA_SPEED_PID_TELEMETRY_ENABLE` 从 `0U` 改为 `1U`，并在 VOFA+ 中选择 JustFloat。
+可通过 SWD 观察，不需要增加断点。调试速度环时，将 `config/app_config.h` 中的编译期开关
+`APP_VOFA_SPEED_PID_TELEMETRY_ENABLE` 从 `0U` 改为 `1U`，并在 VOFA+ 中选择 JustFloat。
 低优先级遥测任务每 10 ms 发送一个固定 20 字节帧。四个 `float32` 通道跟随
 `g_motor_debug.wheel`，顺序为 `target_speed_mm_per_s`、`instant_feedback_speed_mm_per_s`、
 `feedback_speed_mm_per_s` 和 `output_duty_percent`；帧尾为 `00 00 80 7F`。
@@ -137,9 +139,9 @@ VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度字�
 电机目标或 PWM 输出。初次验证时，让黑线经过传感器，确认 `normalized`、`black_mask`、
 `line_error` 和 `sequence` 同步变化。
 
-PA2 通过 TIMG8 CCP1 驱动无源蜂鸣器。`app/app_profile.h` 提供编译期宏
-`BUZZER_FEATURE_ENABLE`、`BUZZER_FREQUENCY_HZ`、`BUZZER_DUTY_PERCENT`、
-`BUZZER_ON_TIME_MS` 和 `BUZZER_OFF_TIME_MS`。默认值依次为关闭、2000 Hz、50%、200 ms
+PA2 通过 TIMG8 CCP1 驱动无源蜂鸣器。`config/app_config.h` 提供编译期宏
+`APP_BUZZER_FEATURE_ENABLE`、`APP_BUZZER_FREQUENCY_HZ`、`APP_BUZZER_DUTY_PERCENT`、
+`APP_BUZZER_ON_TIME_MS` 和 `APP_BUZZER_OFF_TIME_MS`。默认值依次为关闭、2000 Hz、50%、200 ms
 开启和 1800 ms 关闭。启用后创建独立的静态 FreeRTOS 任务，重复开关周期；禁用时 PWM
 比较值初始化为 0，不创建蜂鸣器任务。无源蜂鸣器驱动电路和 MCU 必须共地。
 
@@ -161,8 +163,8 @@ SPI1 仍专用于 WS2812。BMI160 模块必须使用 3.3 V 并与 MCU 共地；�
 轴加速度约为 1g，以及静止陀螺仪输出接近 0。构建和测试命令不会执行 Flash 写入；这些
 软件结果不替代尚未完成的完整硬件验收。
 
-`app/app_profile.h` 提供编译期开关 `IMU_TELEMETRY_ENABLE`，默认值为 `0U`。当它与
-`IMU_YAW_ENABLE` 同时启用时，每 10 ms 通过现有 UART 帧队列发送一个 16 字节 JustFloat 帧。
+`config/app_config.h` 提供编译期开关 `APP_IMU_TELEMETRY_ENABLE`，默认值为 `0U`。当它与
+`APP_IMU_YAW_ENABLE` 同时启用时，每 10 ms 通过现有 UART 帧队列发送一个 16 字节 JustFloat 帧。
 三个 `float32` 通道为 `yaw_deg`、`yaw_rate_dps` 和 `gyro_bias_z_dps`，之后是标准的
 `00 00 80 7F` 帧尾。无论该输出开关是否启用，BMI160 初始化和采样都会继续运行。
 
@@ -170,8 +172,8 @@ PA7、PB12、PA8 和 PA30 是四个外部上拉、低有效按键输入。独立
 10 ms 扫描一次，并在连续两次采样一致后确认状态。稳定的按下和释放边沿按照引脚顺序，
 通过串行 UART 帧队列发送，例如 `key,pa7=down\r\n` 和 `key,pa7=up\r\n`。SysConfig 关闭
 内部电阻，也不为这些输入启用 GPIO 中断。按键任务使用 128 字的栈；TI Clang map 报告的
-栈大小为 512 字节，任务控制块为 76 字节，按键驱动状态为 12 字节。`app/app_profile.h`
-提供编译期开关 `BUTTON_FEATURE_ENABLE`，默认值为 `0U`。设为 `1U` 后启用按键初始化、
+栈大小为 512 字节，任务控制块为 76 字节，按键驱动状态为 12 字节。`config/app_config.h`
+提供编译期开关 `APP_BUTTON_FEATURE_ENABLE`，默认值为 `0U`。设为 `1U` 后启用按键初始化、
 状态扫描、UART 报告和按键任务的静态 RAM，同时保持 SysConfig 引脚定义不变。
 
 ## 八路灰度传感器
@@ -189,18 +191,18 @@ MCU 地线，传感器使用稳定的独立 5 V 电源供电。
 可选的一维车辆 yaw 估计器实现在 `board_imu_yaw.c/.h` 中，并运行在现有 10 ms 的
 `imu_task` 内，不会创建额外的 FreeRTOS 任务。它使用配置的 `+/-500 dps` 量程转换
 BMI160 Z 轴陀螺仪数据，在启动时通过 100 个静止样本估计陀螺仪零偏，并以 98% 陀螺仪和
-2% 编码器的权重融合左右差速编码器角速度。初始轮距由 `app/app_profile.h` 中的
-`IMU_YAW_TRACK_WIDTH_MM` 配置；测得的左右轮中心距离为 130 mm。`IMU_YAW_ENABLE` 默认值
+2% 编码器的权重融合左右差速编码器角速度。初始轮距由 `config/app_config.h` 中的
+`APP_IMU_YAW_TRACK_WIDTH_MM` 配置；测得的左右轮中心距离为 130 mm。`APP_IMU_YAW_ENABLE` 默认值
 为 `0U`，设为 `1U` 可启用估计器。
 
 估计器假设车辆坐标系为 `+X` 向前、`+Y` 向左、`+Z` 向上，Z 轴正角速度表示左转。如果
 安装的传感器 Z 轴方向相反，将 `BOARD_IMU_YAW_GYRO_Z_SIGN` 改为 `-1.0f`。
 
-当 `IMU_YAW_ENABLE` 和 `IMU_TELEMETRY_ENABLE` 都为 `1U` 时，IMU 任务发送前文所述的
+当 `APP_IMU_YAW_ENABLE` 和 `APP_IMU_TELEMETRY_ENABLE` 都为 `1U` 时，IMU 任务发送前文所述的
 三通道 JustFloat yaw 帧。yaw 相对于启动时的朝向，并归一化到 `[-180, 180)`；六轴 IMU
 没有磁力计或其他外部航向来源时，无法提供绝对 yaw 参考。
 
-`VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认值为 `0U`。进行 yaw UART 测试时，使用以下参数构建：
+`APP_VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认值为 `0U`。进行 yaw UART 测试时，使用以下参数构建：
 
 ```text
 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1
@@ -217,7 +219,7 @@ black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 
 `line_error` 根据归一化模拟值计算黑度 `4095-normalized[i]`，使用权重
 `{-3500,-2500,-1500,-500,500,1500,2500,3500}`。当黑度总和为 0 时保持之前的误差。
-当前这些数据仅用于观察，不会改变电机目标或 PWM 输出。`GRAY_VOFA_TELEMETRY_ENABLE`
+当前这些数据仅用于观察，不会改变电机目标或 PWM 输出。`APP_GRAY_VOFA_TELEMETRY_ENABLE`
 默认值为 `0U`，可以通过构建脚本设置为 1 以发送前文描述的二进制帧。即使遥测关闭，
 仍可通过 SWD 观察 volatile 的 `g_grayscale_snapshot`。构建成功不代表灰度传感器实物验收
 完成。
@@ -230,8 +232,8 @@ black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 运行时间占比、微秒级运行时间以及栈高水位标记。发布快照时 `sequence` 为奇数，更新完成
 后为偶数。
 
-手动配置时，编辑 `config/app_config.h` 并将 `RTOS_MONITOR_ENABLE` 设为 `1U`。
-`app/app_profile.h` 和 `config/FreeRTOSConfig.h` 都包含这个共享头文件，因此只有一个
+手动配置时，编辑 `config/app_config.h` 并将 `APP_RTOS_MONITOR_ENABLE` 设为 `1U`。
+`config/app_config.h` 和 `config/FreeRTOSConfig.h` 都包含这个共享头文件，因此只有一个
 源码级开关。构建参数适合自动化或临时构建，并会覆盖头文件默认值，但不会修改文件。
 
 运行时计数器使用未连接引脚的 `TIMG12` 定时器。定时器由 BUSCLK 除以 8 后以 10 MHz 运行；

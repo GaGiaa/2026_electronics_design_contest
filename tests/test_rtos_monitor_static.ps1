@@ -38,6 +38,7 @@ $projectDir = Join-Path $ProjectRoot 'mspm0g3507_app'
 $header = Join-Path $projectDir 'services\rtos_monitor\rtos_monitor.h'
 $source = Join-Path $projectDir 'services\rtos_monitor\rtos_monitor.c'
 $appConfig = Join-Path $projectDir 'config\app_config.h'
+$monitorConfig = Join-Path $projectDir 'config\rtos_monitor_config.h'
 $config = Join-Path $projectDir 'config\FreeRTOSConfig.h'
 $main = Join-Path $projectDir 'app\app_tasks_telemetry.c'
 $syscfg = Join-Path $projectDir 'mspm0g3507_app.syscfg'
@@ -45,24 +46,26 @@ $ccsBuild = Join-Path $ProjectRoot 'tools\build-mspm0g3507-app.ps1'
 $keilBuild = Join-Path $ProjectRoot 'tools\build-keil-mspm0g3507-app.ps1'
 $keilProject = Join-Path $ProjectRoot 'keil\mspm0g3507_app\mspm0g3507_app.uvprojx'
 
-foreach ($path in @($header, $source, $appConfig, $config, $main, $syscfg, $ccsBuild, $keilBuild, $keilProject)) {
+foreach ($path in @($header, $source, $appConfig, $monitorConfig, $config, $main, $syscfg, $ccsBuild, $keilBuild, $keilProject)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Required RTOS monitor file is missing: $path"
     }
 }
 
 Assert-Contains -Path $header -Pattern 'g_rtos_monitor_snapshot' -Description 'Monitor header must export the SWD snapshot'
-Assert-Contains -Path $header -Pattern 'RTOS_MONITOR_MAX_TASKS\s+16U' -Description 'Monitor must reserve 16 task slots'
-Assert-Contains -Path $header -Pattern 'RTOS_MONITOR_TIMER_HZ\s+10000000UL' -Description 'Monitor must expose the actual 10 MHz timer rate'
+Assert-Contains -Path $monitorConfig -Pattern 'RTOS_MONITOR_MAX_TASKS\s+16U' -Description 'Monitor configuration must reserve 16 task slots'
+Assert-Contains -Path $monitorConfig -Pattern 'RTOS_MONITOR_TIMER_HZ\s+10000000UL' -Description 'Monitor configuration must expose the actual 10 MHz timer rate'
+Assert-Contains -Path $header -Pattern '#include "config/rtos_monitor_config\.h"' -Description 'Monitor header must include monitor configuration'
 Assert-Contains -Path $header -Pattern 'runtime_percent_x100' -Description 'Task snapshot must expose runtime percentage'
 Assert-Contains -Path $header -Pattern 'stack_high_water_words' -Description 'Task snapshot must expose stack high water mark'
 Assert-Contains -Path $source -Pattern 'rtos_monitor_counter_delta' -Description 'Monitor must implement counter wrap-safe delta'
 Assert-Contains -Path $source -Pattern 'uxTaskGetSystemState' -Description 'Monitor must use FreeRTOS task state statistics'
 Assert-Contains -Path $source -Pattern 'xTaskGetIdleTaskHandle' -Description 'Monitor must identify the idle task'
-Assert-Contains -Path $appConfig -Pattern 'RTOS_MONITOR_ENABLE\s+0U' -Description 'Application configuration must own the monitor default'
+Assert-Contains -Path $appConfig -Pattern 'APP_RTOS_MONITOR_ENABLE\s+0U' -Description 'Application configuration must own the monitor default'
 Assert-Contains -Path $config -Pattern '#include "config/app_config\.h"' -Description 'FreeRTOS must use the shared application configuration'
-Assert-NotContains -Path $main -Pattern '#define RTOS_MONITOR_ENABLE' -Description 'Main must not duplicate the monitor default'
-Assert-NotContains -Path $config -Pattern '#define RTOS_MONITOR_ENABLE' -Description 'FreeRTOSConfig must not duplicate the monitor default'
+Assert-Contains -Path $config -Pattern 'configMAX_TASK_NAME_LEN\s+RTOS_MONITOR_TASK_NAME_LENGTH' -Description 'FreeRTOS task name length must derive from monitor configuration'
+Assert-NotContains -Path $main -Pattern '#define APP_RTOS_MONITOR_ENABLE' -Description 'Main must not duplicate the monitor default'
+Assert-NotContains -Path $config -Pattern '#define APP_RTOS_MONITOR_ENABLE' -Description 'FreeRTOSConfig must not duplicate the monitor default'
 Assert-Contains -Path $config -Pattern 'configUSE_TRACE_FACILITY\s+1' -Description 'FreeRTOS trace facility must be enabled for monitoring'
 Assert-Contains -Path $config -Pattern 'configGENERATE_RUN_TIME_STATS\s+1' -Description 'FreeRTOS runtime statistics must be enabled'
 Assert-Contains -Path $config -Pattern 'INCLUDE_uxTaskGetStackHighWaterMark\s+1' -Description 'FreeRTOS stack watermark API must be enabled'

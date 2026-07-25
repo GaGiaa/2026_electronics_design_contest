@@ -7,7 +7,7 @@
 #include <queue.h>
 #include <task.h>
 
-#include "app/app_profile.h"
+#include "config/app_config.h"
 #include "drivers/buttons/board_buttons.h"
 #include "drivers/buzzer/board_buzzer.h"
 #include "drivers/oled/board_oled.h"
@@ -17,23 +17,23 @@
 #include "app/app_state.h"
 
 static StaticTask_t g_ws2812_task_buffer;
-static StackType_t g_ws2812_task_stack[WS2812_TASK_STACK_DEPTH];
-#if OLED_TEST_TASK_ENABLE
+static StackType_t g_ws2812_task_stack[APP_WS2812_TASK_STACK_DEPTH];
+#if APP_OLED_TEST_TASK_ENABLE
 static StaticTask_t g_oled_test_task_buffer;
-static StackType_t g_oled_test_task_stack[OLED_TEST_TASK_STACK_DEPTH];
+static StackType_t g_oled_test_task_stack[APP_OLED_TEST_TASK_STACK_DEPTH];
 #endif
-#if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE && !IMU_TELEMETRY_ENABLE
+#if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE
 static StaticTask_t g_uart_task_buffer;
-static StackType_t g_uart_task_stack[UART_TASK_STACK_DEPTH];
+static StackType_t g_uart_task_stack[APP_UART_TASK_STACK_DEPTH];
 #endif
 static StaticTask_t g_uart_tx_task_buffer;
-static StackType_t g_uart_tx_task_stack[UART_TX_TASK_STACK_DEPTH];
-#if BUTTON_FEATURE_ENABLE
+static StackType_t g_uart_tx_task_stack[APP_UART_TX_TASK_STACK_DEPTH];
+#if APP_BUTTON_FEATURE_ENABLE
 static StaticTask_t g_button_task_buffer;
-static StackType_t g_button_task_stack[BUTTON_TASK_STACK_DEPTH];
+static StackType_t g_button_task_stack[APP_BUTTON_TASK_STACK_DEPTH];
 #endif
 static StaticQueue_t g_uart_queue_buffer;
-static uint8_t g_uart_queue_storage[UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
+static uint8_t g_uart_queue_storage[APP_UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
 
 static void ws2812_task(void *argument)
 {
@@ -53,15 +53,15 @@ static void ws2812_task(void *argument)
             pixels[index].blue = 0U;
         }
         if (color_index == 0U) {
-            pixels[pixel_index].red = WS2812_BRIGHTNESS;
+            pixels[pixel_index].red = APP_WS2812_BRIGHTNESS;
         } else if (color_index == 1U) {
-            pixels[pixel_index].green = WS2812_BRIGHTNESS;
+            pixels[pixel_index].green = APP_WS2812_BRIGHTNESS;
         } else if (color_index == 2U) {
-            pixels[pixel_index].blue = WS2812_BRIGHTNESS;
+            pixels[pixel_index].blue = APP_WS2812_BRIGHTNESS;
         } else {
-            pixels[pixel_index].red = WS2812_BRIGHTNESS;
-            pixels[pixel_index].green = WS2812_BRIGHTNESS;
-            pixels[pixel_index].blue = WS2812_BRIGHTNESS;
+            pixels[pixel_index].red = APP_WS2812_BRIGHTNESS;
+            pixels[pixel_index].green = APP_WS2812_BRIGHTNESS;
+            pixels[pixel_index].blue = APP_WS2812_BRIGHTNESS;
         }
         board_ws2812_write(pixels);
 
@@ -77,7 +77,7 @@ static void ws2812_task(void *argument)
     }
 }
 
-#if OLED_TEST_TASK_ENABLE
+#if APP_OLED_TEST_TASK_ENABLE
 static void oled_test_task(void *argument)
 {
     uint32_t update_count = 0U;
@@ -114,7 +114,7 @@ static void oled_test_task(void *argument)
 }
 #endif
 
-#if BUTTON_FEATURE_ENABLE
+#if APP_BUTTON_FEATURE_ENABLE
 typedef struct {
     const uint8_t *data;
     size_t length;
@@ -138,7 +138,7 @@ static const button_message_t g_button_up_messages[BOARD_BUTTON_COUNT] = {
 static void button_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
-    const TickType_t interval = pdMS_TO_TICKS(BUTTON_TASK_INTERVAL_MS);
+    const TickType_t interval = pdMS_TO_TICKS(APP_BUTTON_TASK_INTERVAL_MS);
 
     (void)argument;
     for (;;) {
@@ -161,7 +161,7 @@ static void button_task(void *argument)
 }
 #endif
 
-#if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE && !IMU_TELEMETRY_ENABLE
+#if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE
 static void uart_echo_task(void *argument)
 {
     QueueHandle_t queue = (QueueHandle_t)argument;
@@ -175,25 +175,25 @@ static void uart_echo_task(void *argument)
 }
 #endif
 
-#if BUZZER_FEATURE_ENABLE
+#if APP_BUZZER_FEATURE_ENABLE
 static StaticTask_t g_buzzer_task_buffer;
-static StackType_t g_buzzer_task_stack[BUZZER_TASK_STACK_DEPTH];
+static StackType_t g_buzzer_task_stack[APP_BUZZER_TASK_STACK_DEPTH];
 
 static void buzzer_task(void *argument)
 {
     (void)argument;
     for (;;) {
         board_buzzer_start();
-        vTaskDelay(pdMS_TO_TICKS(BUZZER_ON_TIME_MS));
+        vTaskDelay(pdMS_TO_TICKS(APP_BUZZER_ON_TIME_MS));
         board_buzzer_stop();
-        vTaskDelay(pdMS_TO_TICKS(BUZZER_OFF_TIME_MS));
+        vTaskDelay(pdMS_TO_TICKS(APP_BUZZER_OFF_TIME_MS));
     }
 }
 #endif
 
-#if SERVO_FEATURE_ENABLE
+#if APP_SERVO_FEATURE_ENABLE
 static StaticTask_t g_servo_task_buffer;
-static StackType_t g_servo_task_stack[SERVO_TASK_STACK_DEPTH];
+static StackType_t g_servo_task_stack[APP_SERVO_TASK_STACK_DEPTH];
 
 static void servo_task(void *argument)
 {
@@ -202,7 +202,7 @@ static void servo_task(void *argument)
     (void)argument;
     for (;;) {
         g_servo_pulse_us = board_servo_set_angle_deg(g_servo_angle_deg);
-        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(SERVO_TASK_INTERVAL_MS));
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(APP_SERVO_TASK_INTERVAL_MS));
     }
 }
 #endif
@@ -211,45 +211,45 @@ void app_tasks_io_start(void)
 {
     QueueHandle_t uart_queue;
 
-    uart_queue = xQueueCreateStatic(UART_RX_QUEUE_LENGTH, sizeof(uint8_t),
+    uart_queue = xQueueCreateStatic(APP_UART_RX_QUEUE_LENGTH, sizeof(uint8_t),
                                      g_uart_queue_storage, &g_uart_queue_buffer);
     configASSERT(uart_queue != NULL);
     board_uart_enable_rx_interrupt(uart_queue);
 
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812",
-                                   WS2812_TASK_STACK_DEPTH, NULL,
+                                   APP_WS2812_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_ws2812_task_stack,
                                    &g_ws2812_task_buffer) != NULL);
-#if OLED_TEST_TASK_ENABLE
+#if APP_OLED_TEST_TASK_ENABLE
     configASSERT(xTaskCreateStatic(oled_test_task, "oled",
-                                   OLED_TEST_TASK_STACK_DEPTH, NULL,
+                                   APP_OLED_TEST_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_oled_test_task_stack,
                                    &g_oled_test_task_buffer) != NULL);
 #endif
-#if BUTTON_FEATURE_ENABLE
+#if APP_BUTTON_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(button_task, "buttons",
-                                   BUTTON_TASK_STACK_DEPTH, NULL,
+                                   APP_BUTTON_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_button_task_stack,
                                    &g_button_task_buffer) != NULL);
 #endif
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx",
-                                   UART_TX_TASK_STACK_DEPTH, NULL,
+                                   APP_UART_TX_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_uart_tx_task_stack,
                                    &g_uart_tx_task_buffer) != NULL);
-#if !VOFA_SPEED_PID_TELEMETRY_ENABLE && !GRAY_VOFA_TELEMETRY_ENABLE && !IMU_TELEMETRY_ENABLE
-    configASSERT(xTaskCreateStatic(uart_echo_task, "uart", UART_TASK_STACK_DEPTH,
+#if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(uart_echo_task, "uart", APP_UART_TASK_STACK_DEPTH,
                                    uart_queue, APP_TASK_PRIORITY,
                                    g_uart_task_stack, &g_uart_task_buffer) != NULL);
 #endif
-#if BUZZER_FEATURE_ENABLE
+#if APP_BUZZER_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(buzzer_task, "buzzer",
-                                   BUZZER_TASK_STACK_DEPTH, NULL,
+                                   APP_BUZZER_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_buzzer_task_stack,
                                    &g_buzzer_task_buffer) != NULL);
 #endif
-#if SERVO_FEATURE_ENABLE
+#if APP_SERVO_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(servo_task, "servo",
-                                   SERVO_TASK_STACK_DEPTH, NULL,
+                                   APP_SERVO_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_servo_task_stack,
                                    &g_servo_task_buffer) != NULL);
 #endif

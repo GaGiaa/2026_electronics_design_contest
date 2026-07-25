@@ -15,8 +15,8 @@ static volatile uint32_t g_grayscale_publish_sequence;
 volatile crsf_debug_state_t g_crsf_debug;
 #endif
 
-#if SERVO_FEATURE_ENABLE
-volatile uint32_t g_servo_angle_deg = SERVO_INITIAL_ANGLE_DEG;
+#if APP_SERVO_FEATURE_ENABLE
+volatile uint32_t g_servo_angle_deg = APP_SERVO_INITIAL_ANGLE_DEG;
 volatile uint32_t g_servo_pulse_us;
 #endif
 
@@ -34,8 +34,8 @@ void app_state_init(void)
 #if CRSF_REMOTE_CONTROL_ENABLE
     g_crsf_debug = (crsf_debug_state_t){0};
 #endif
-#if SERVO_FEATURE_ENABLE
-    g_servo_angle_deg = SERVO_INITIAL_ANGLE_DEG;
+#if APP_SERVO_FEATURE_ENABLE
+    g_servo_angle_deg = APP_SERVO_INITIAL_ANGLE_DEG;
     g_servo_pulse_us = 0U;
 #endif
 }

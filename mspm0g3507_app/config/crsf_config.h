@@ -1,6 +1,8 @@
 #ifndef CRSF_CONFIG_H
 #define CRSF_CONFIG_H
 
+#include "protocols/crsf/crsf_protocol.h"
+
 /* CRSF 遥控控制功能开关：1 表示启用，0 表示禁用。 */
 #ifndef CRSF_REMOTE_CONTROL_ENABLE
 #define CRSF_REMOTE_CONTROL_ENABLE 0U
@@ -44,5 +46,17 @@
 #define CRSF_CHANNEL_MAX 1811U
 /* 摇杆中位死区，占归一化量程的比例。 */
 #define CRSF_CHANNEL_DEADBAND 0.2f
+
+#if (CRSF_FORWARD_CHANNEL_INDEX >= CRSF_CHANNEL_COUNT) || \
+    (CRSF_TURN_CHANNEL_INDEX >= CRSF_CHANNEL_COUNT)
+#error "CRSF channel index must fit inside CRSF_CHANNEL_COUNT"
+#endif
+#if (CRSF_CHANNEL_MIN >= CRSF_CHANNEL_CENTER) || \
+    (CRSF_CHANNEL_CENTER >= CRSF_CHANNEL_MAX)
+#error "CRSF channel range must be strictly increasing"
+#endif
+#if (CRSF_LINK_TIMEOUT_MS == 0U)
+#error "CRSF_LINK_TIMEOUT_MS must be nonzero"
+#endif
 
 #endif

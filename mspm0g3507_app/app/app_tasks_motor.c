@@ -6,8 +6,9 @@
 #include <task.h>
 
 #include "algorithms/motor_control/motor_control.h"
-#include "app/app_profile.h"
 #include "app/app_state.h"
+#include "config/app_config.h"
+#include "config/crsf_config.h"
 #include "drivers/encoder/board_encoder.h"
 #include "drivers/motor/board_motor.h"
 #if CRSF_REMOTE_CONTROL_ENABLE
@@ -15,7 +16,7 @@
 #endif
 
 static StaticTask_t g_motor_task_buffer;
-static StackType_t g_motor_task_stack[MOTOR_TASK_STACK_DEPTH];
+static StackType_t g_motor_task_stack[APP_MOTOR_TASK_STACK_DEPTH];
 
 static void motor_task(void *argument)
 {
@@ -83,7 +84,7 @@ static void motor_task(void *argument)
 void app_tasks_motor_start(void)
 {
     configASSERT(xTaskCreateStatic(motor_task, "motor",
-                                   MOTOR_TASK_STACK_DEPTH, NULL,
+                                   APP_MOTOR_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_motor_task_stack,
                                    &g_motor_task_buffer) != NULL);
 }

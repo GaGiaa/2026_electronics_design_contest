@@ -66,7 +66,7 @@ static board_oled_status_t write_i2c(const uint8_t *data, uint16_t length)
         return BOARD_OLED_STATUS_BUS_ERROR;
     }
 
-    DL_I2C_startControllerTransfer(I2C_OLED_INST, OLED_I2C_ADDRESS,
+    DL_I2C_startControllerTransfer(I2C_OLED_INST, APP_OLED_I2C_ADDRESS,
                                    DL_I2C_CONTROLLER_DIRECTION_TX, length);
     timeout = BOARD_OLED_TIMEOUT_LOOPS;
     while (loaded < length) {

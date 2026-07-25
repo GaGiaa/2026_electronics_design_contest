@@ -3,16 +3,10 @@
 
 #include <stdint.h>
 
-#ifndef configMAX_TASK_NAME_LEN
-#define configMAX_TASK_NAME_LEN 16U
-#endif
-
-#define RTOS_MONITOR_MAX_TASKS 16U
-#define RTOS_MONITOR_TIMER_HZ 10000000UL
-#define RTOS_MONITOR_SAMPLE_INTERVAL_MS 1000U
+#include "config/rtos_monitor_config.h"
 
 typedef struct {
-    char name[configMAX_TASK_NAME_LEN]; /* 任务名称。 */
+    char name[RTOS_MONITOR_TASK_NAME_LENGTH]; /* 任务名称。 */
     uint32_t state;                     /* 任务当前状态，对应 eTaskState：0=eRunning（运行），1=eReady（就绪），2=eBlocked（阻塞），3=eSuspended（挂起），4=eDeleted（已删除待释放）。 */
     uint32_t priority;                  /* 任务当前优先级。 */
     uint32_t runtime_us;                /* 统计窗口内的任务运行时间，单位为微秒。 */

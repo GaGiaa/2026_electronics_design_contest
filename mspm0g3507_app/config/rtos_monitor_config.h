@@ -1,0 +1,24 @@
+#ifndef RTOS_MONITOR_CONFIG_H
+#define RTOS_MONITOR_CONFIG_H
+
+/* RTOS monitor resource and timing configuration. */
+#ifndef RTOS_MONITOR_MAX_TASKS
+#define RTOS_MONITOR_MAX_TASKS 16U
+#endif
+#ifndef RTOS_MONITOR_TIMER_HZ
+#define RTOS_MONITOR_TIMER_HZ 10000000UL
+#endif
+#ifndef RTOS_MONITOR_SAMPLE_INTERVAL_MS
+#define RTOS_MONITOR_SAMPLE_INTERVAL_MS 1000U
+#endif
+#ifndef RTOS_MONITOR_TASK_NAME_LENGTH
+#define RTOS_MONITOR_TASK_NAME_LENGTH 16U
+#endif
+
+#if (RTOS_MONITOR_MAX_TASKS == 0U) || (RTOS_MONITOR_TIMER_HZ == 0UL) || \
+    (RTOS_MONITOR_SAMPLE_INTERVAL_MS == 0U) || \
+    (RTOS_MONITOR_TASK_NAME_LENGTH < 2U)
+#error "RTOS monitor configuration values are invalid"
+#endif
+
+#endif

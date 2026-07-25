@@ -21,5 +21,5 @@ uint32_t board_servo_set_angle_deg(uint32_t angle_deg)
 
 void board_servo_init(void)
 {
-    (void)board_servo_set_angle_deg(SERVO_INITIAL_ANGLE_DEG);
+    (void)board_servo_set_angle_deg(APP_SERVO_INITIAL_ANGLE_DEG);
 }

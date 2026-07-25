@@ -6,23 +6,23 @@
 #include <task.h>
 
 #include "algorithms/motor_control/motor_control.h"
-#include "app/app_profile.h"
 #include "app/app_state.h"
+#include "config/app_config.h"
 #include "drivers/grayscale/board_grayscale.h"
 #include "drivers/uart/board_uart.h"
 #include "protocols/vofa/vofa_justfloat.h"
 #include "services/rtos_monitor/rtos_monitor.h"
 
-#if VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if APP_VOFA_SPEED_PID_TELEMETRY_ENABLE
 static StaticTask_t g_telemetry_task_buffer;
 static StackType_t g_telemetry_task_stack[
-    VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH];
+    APP_VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH];
 
 static void telemetry_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval =
-        pdMS_TO_TICKS(VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS);
+        pdMS_TO_TICKS(APP_VOFA_SPEED_PID_TELEMETRY_INTERVAL_MS);
     motor_control_wheel_status_t control[BOARD_MOTOR_COUNT];
     uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(VOFA_JUSTFLOAT_CHANNEL_COUNT)];
 
@@ -46,18 +46,18 @@ static void telemetry_task(void *argument)
 }
 #endif
 
-#if GRAY_VOFA_TELEMETRY_ENABLE
+#if APP_GRAY_VOFA_TELEMETRY_ENABLE
 static StaticTask_t g_gray_telemetry_task_buffer;
-static StackType_t g_gray_telemetry_task_stack[GRAY_TASK_STACK_DEPTH];
+static StackType_t g_gray_telemetry_task_stack[APP_GRAY_TASK_STACK_DEPTH];
 
 static void gray_vofa_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval =
-        pdMS_TO_TICKS(GRAY_VOFA_TELEMETRY_INTERVAL_MS);
+        pdMS_TO_TICKS(APP_GRAY_VOFA_TELEMETRY_INTERVAL_MS);
     board_grayscale_snapshot_t snapshot;
-    float channels[GRAY_VOFA_CHANNEL_COUNT];
-    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(GRAY_VOFA_CHANNEL_COUNT)];
+    float channels[APP_GRAY_VOFA_CHANNEL_COUNT];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(APP_GRAY_VOFA_CHANNEL_COUNT)];
     uint32_t channel;
 
     (void)argument;
@@ -75,7 +75,7 @@ static void gray_vofa_task(void *argument)
         channels[20U] = (float)snapshot.line_strength;
         channels[21U] = (float)snapshot.sequence;
         if (vofa_justfloat_encode(frame, sizeof(frame), channels,
-                                  GRAY_VOFA_CHANNEL_COUNT)) {
+                                  APP_GRAY_VOFA_CHANNEL_COUNT)) {
             board_uart_write(frame, sizeof(frame));
         }
         vTaskDelayUntil(&last_wake_time, interval);
@@ -83,31 +83,31 @@ static void gray_vofa_task(void *argument)
 }
 #endif
 
-#if RTOS_MONITOR_ENABLE
+#if APP_RTOS_MONITOR_ENABLE
 static StaticTask_t g_rtos_monitor_task_buffer;
-static StackType_t g_rtos_monitor_task_stack[RTOS_MONITOR_TASK_STACK_DEPTH];
+static StackType_t g_rtos_monitor_task_stack[APP_RTOS_MONITOR_TASK_STACK_DEPTH];
 #endif
 
 void app_tasks_telemetry_start(void)
 {
-#if VOFA_SPEED_PID_TELEMETRY_ENABLE
+#if APP_VOFA_SPEED_PID_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(
                      telemetry_task, "telemetry",
-                     VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH, NULL,
-                     VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY,
+                     APP_VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH, NULL,
+                     APP_VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY,
                      g_telemetry_task_stack, &g_telemetry_task_buffer) != NULL);
 #endif
-#if GRAY_VOFA_TELEMETRY_ENABLE
+#if APP_GRAY_VOFA_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(
-                     gray_vofa_task, "gray_vofa", GRAY_TASK_STACK_DEPTH, NULL,
-                     TELEMETRY_TASK_PRIORITY, g_gray_telemetry_task_stack,
+                     gray_vofa_task, "gray_vofa", APP_GRAY_TASK_STACK_DEPTH, NULL,
+                     APP_TELEMETRY_TASK_PRIORITY, g_gray_telemetry_task_stack,
                      &g_gray_telemetry_task_buffer) != NULL);
 #endif
-#if RTOS_MONITOR_ENABLE
+#if APP_RTOS_MONITOR_ENABLE
     configASSERT(xTaskCreateStatic(
                      rtos_monitor_task, "rtos_monitor",
-                     RTOS_MONITOR_TASK_STACK_DEPTH, NULL,
-                     TELEMETRY_TASK_PRIORITY, g_rtos_monitor_task_stack,
+                     APP_RTOS_MONITOR_TASK_STACK_DEPTH, NULL,
+                     APP_TELEMETRY_TASK_PRIORITY, g_rtos_monitor_task_stack,
                      &g_rtos_monitor_task_buffer) != NULL);
 #endif
 }

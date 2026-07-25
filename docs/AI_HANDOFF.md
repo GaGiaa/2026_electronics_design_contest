@@ -126,18 +126,29 @@ CH1（索引 0）控制差速转向；连续 100 ms 没有有效帧时四轮目�
 `services/`、`config/` 和 `platform/`。根目录旧头文件只作为兼容 include 入口，不能
 新增声明或实现。CCS 和 Keil 工程中每个实现文件只加入一次。
 
+应用配置由 `config/app_config.h` 统一维护，应用级编译宏使用 `APP_` 前缀；
+`app/app_profile.h` 只保留 `app_profile_t` 和 `app_profile_get()`。编码器机械参数与解码模式
+位于 `config/encoder_config.h`，RTOS monitor 资源和计时参数位于
+`config/rtos_monitor_config.h`。`config/FreeRTOSConfig.h` 从 monitor 配置派生
+`configMAX_TASK_NAME_LEN`，不再与服务头重复定义默认值。现有 PowerShell 构建参数名保持不变，
+但直接传入旧的应用级 `-D` 宏不再是支持的接口。
+
 `main.c` 只负责 SysConfig 初始化、调用 `app_startup()`、启动 FreeRTOS 调度器和异常
 停机处理。应用任务注册接口为 `app_startup()`、`app_tasks_motor_start()`、
 `app_tasks_sensor_start()`、`app_tasks_io_start()` 和 `app_tasks_telemetry_start()`。
 
-现有公开函数名、结构体名、构建宏、SWD 全局变量、UART 行为、CRSF 超时行为和默认功能
-开关保持不变。分层迁移不代表任何尚未完成的硬件验收已经完成。
+现有公开函数名、结构体名、PowerShell 构建参数、SWD 全局变量、UART 行为、CRSF 超时行为和默认功能
+开关保持不变；应用源码级配置宏已统一为 `APP_` 前缀。分层迁移不代表任何尚未完成的硬件验收已经完成。
 
 ## 已知验证与遗留风险
 
 此前已记录通过的验证包括电机控制、编码器模式 1/2、线跟踪、IMU Yaw、CRSF、VOFA
 JustFloat、G3507 应用静态集成、OLED、RTOS monitor、CCS/Keil 工程静态检查和可移植性
-检查。TI Clang 与 Keil 构建结果只能说明软件构建链路通过。
+检查。本轮额外通过 `test_config_ownership.ps1`、`test_config_validation.ps1`、RTOS monitor
+host test、CRSF、电机控制、舵机、IMU yaw、线跟踪和 VOFA 单元测试。TI Clang 与 Keil
+构建结果只能说明软件构建链路通过。
+
+本轮未执行 Flash 擦除、烧录、探针枚举、电机调试或任何实物验收操作。
 
 尚未完成或需要持续复核的硬件项目包括：
 

@@ -54,31 +54,31 @@ Invoke-CheckedCommand -FilePath $SysConfig -Arguments @('--script', (Join-Path $
 
 $commonCompilerArguments = @('-c', '@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', "-I$ProjectDir", "-I$ProjectDir\app", "-I$ProjectDir\drivers", "-I$ProjectDir\algorithms", "-I$ProjectDir\protocols", "-I$ProjectDir\services", "-I$ProjectDir\platform", "-I$ProjectDir\config", "-I$BuildDir", "-I$FreeRtosRoot\include", "-I$FreeRtosPort", "-I$SdkRoot\source\third_party\CMSIS\Core\Include", "-I$SdkRoot\source")
 if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
-    $commonCompilerArguments += "-DVOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
+    $commonCompilerArguments += "-DAPP_VOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('ImuTelemetryEnable')) {
-    $commonCompilerArguments += "-DIMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"
+    $commonCompilerArguments += "-DAPP_IMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('ImuYawEnable')) {
-    $commonCompilerArguments += "-DIMU_YAW_ENABLE=$ImuYawEnable"
+    $commonCompilerArguments += "-DAPP_IMU_YAW_ENABLE=$ImuYawEnable"
 }
 if ($PSBoundParameters.ContainsKey('GrayVofaTelemetryEnable')) {
-    $commonCompilerArguments += "-DGRAY_VOFA_TELEMETRY_ENABLE=$GrayVofaTelemetryEnable"
+    $commonCompilerArguments += "-DAPP_GRAY_VOFA_TELEMETRY_ENABLE=$GrayVofaTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $commonCompilerArguments += "-DBOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
 }
 if ($PSBoundParameters.ContainsKey('RtosMonitorEnable')) {
-    $commonCompilerArguments += "-DRTOS_MONITOR_ENABLE=$RtosMonitorEnable"
+    $commonCompilerArguments += "-DAPP_RTOS_MONITOR_ENABLE=$RtosMonitorEnable"
 }
 if ($PSBoundParameters.ContainsKey('CrsfRemoteControlEnable')) {
     $commonCompilerArguments += "-DCRSF_REMOTE_CONTROL_ENABLE=$CrsfRemoteControlEnable"
 }
 if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
-    $commonCompilerArguments += "-DOLED_TEST_TASK_ENABLE=$OledTestTaskEnable"
+    $commonCompilerArguments += "-DAPP_OLED_TEST_TASK_ENABLE=$OledTestTaskEnable"
 }
 if ($PSBoundParameters.ContainsKey('ServoFeatureEnable')) {
-    $commonCompilerArguments += "-DSERVO_FEATURE_ENABLE=$ServoFeatureEnable"
+    $commonCompilerArguments += "-DAPP_SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
 }
 $sources = @(
     @{ Source = (Join-Path $ProjectDir 'drivers\encoder\board_encoder.c'); Object = 'board_encoder.o' },

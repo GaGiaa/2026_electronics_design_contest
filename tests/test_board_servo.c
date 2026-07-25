@@ -20,16 +20,16 @@ int main(void)
     int passed = 1;
 
     passed &= check_equal("angle 0", board_servo_angle_to_pulse_us(0U),
-                         SERVO_MIN_PULSE_US);
+                         APP_SERVO_MIN_PULSE_US);
     passed &= check_equal("angle midpoint",
-                         board_servo_angle_to_pulse_us(SERVO_MAX_ANGLE_DEG / 2U),
-                         (SERVO_MIN_PULSE_US + SERVO_MAX_PULSE_US) / 2U);
+                         board_servo_angle_to_pulse_us(APP_SERVO_MAX_ANGLE_DEG / 2U),
+                         (APP_SERVO_MIN_PULSE_US + APP_SERVO_MAX_PULSE_US) / 2U);
     passed &= check_equal("angle max",
-                         board_servo_angle_to_pulse_us(SERVO_MAX_ANGLE_DEG),
-                         SERVO_MAX_PULSE_US);
+                         board_servo_angle_to_pulse_us(APP_SERVO_MAX_ANGLE_DEG),
+                         APP_SERVO_MAX_PULSE_US);
     passed &= check_equal("angle above max",
-                         board_servo_angle_to_pulse_us(SERVO_MAX_ANGLE_DEG + 100U),
-                         SERVO_MAX_PULSE_US);
+                         board_servo_angle_to_pulse_us(APP_SERVO_MAX_ANGLE_DEG + 100U),
+                         APP_SERVO_MAX_PULSE_US);
 
     return passed ? 0 : 1;
 }

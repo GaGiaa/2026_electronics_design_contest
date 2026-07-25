@@ -78,31 +78,31 @@ $projectFileContent = $null
 $projectFileBytes = $null
 $temporaryDefines = @()
 if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
-    $temporaryDefines += "VOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
+    $temporaryDefines += "APP_VOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('ImuTelemetryEnable')) {
-    $temporaryDefines += "IMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"
+    $temporaryDefines += "APP_IMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('ImuYawEnable')) {
-    $temporaryDefines += "IMU_YAW_ENABLE=$ImuYawEnable"
+    $temporaryDefines += "APP_IMU_YAW_ENABLE=$ImuYawEnable"
 }
 if ($PSBoundParameters.ContainsKey('GrayVofaTelemetryEnable')) {
-    $temporaryDefines += "GRAY_VOFA_TELEMETRY_ENABLE=$GrayVofaTelemetryEnable"
+    $temporaryDefines += "APP_GRAY_VOFA_TELEMETRY_ENABLE=$GrayVofaTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $temporaryDefines += "BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
 }
 if ($PSBoundParameters.ContainsKey('RtosMonitorEnable')) {
-    $temporaryDefines += "RTOS_MONITOR_ENABLE=$RtosMonitorEnable"
+    $temporaryDefines += "APP_RTOS_MONITOR_ENABLE=$RtosMonitorEnable"
 }
 if ($PSBoundParameters.ContainsKey('CrsfRemoteControlEnable')) {
     $temporaryDefines += "CRSF_REMOTE_CONTROL_ENABLE=$CrsfRemoteControlEnable"
 }
 if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
-    $temporaryDefines += "OLED_TEST_TASK_ENABLE=$OledTestTaskEnable"
+    $temporaryDefines += "APP_OLED_TEST_TASK_ENABLE=$OledTestTaskEnable"
 }
 if ($PSBoundParameters.ContainsKey('ServoFeatureEnable')) {
-    $temporaryDefines += "SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
+    $temporaryDefines += "APP_SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
 }
 if ($temporaryDefines.Count -gt 0) {
     $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)

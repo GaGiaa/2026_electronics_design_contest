@@ -30,7 +30,7 @@ uint32_t rtos_monitor_percent_x100(uint32_t part, uint32_t total)
 
 volatile rtos_monitor_snapshot_t g_rtos_monitor_snapshot;
 
-#if RTOS_MONITOR_ENABLE
+#if APP_RTOS_MONITOR_ENABLE
 
 static TaskStatus_t g_previous_task_status[RTOS_MONITOR_MAX_TASKS];
 static TaskStatus_t g_current_task_status[RTOS_MONITOR_MAX_TASKS];
@@ -45,7 +45,7 @@ static uint32_t runtime_ticks_to_us(configRUN_TIME_COUNTER_TYPE ticks)
 
 void rtos_monitor_runtime_timer_init(void)
 {
-#if RTOS_MONITOR_ENABLE
+#if APP_RTOS_MONITOR_ENABLE
     DL_Timer_stopCounter(RTOS_MONITOR_TIMER_INST);
     DL_Timer_setTimerCount(RTOS_MONITOR_TIMER_INST, 0U);
     DL_Timer_startCounter(RTOS_MONITOR_TIMER_INST);
@@ -54,7 +54,7 @@ void rtos_monitor_runtime_timer_init(void)
 
 uint32_t rtos_monitor_runtime_timer_now(void)
 {
-#if RTOS_MONITOR_ENABLE
+#if APP_RTOS_MONITOR_ENABLE
     return DL_Timer_getTimerCount(RTOS_MONITOR_TIMER_INST);
 #else
     return 0U;
@@ -115,12 +115,12 @@ static void publish_snapshot(UBaseType_t task_count,
                       previous->ulRunTimeCounter);
         snapshot->name[0] = '\0';
         for (uint32_t name_index = 0U;
-             name_index < configMAX_TASK_NAME_LEN;
+              name_index < RTOS_MONITOR_TASK_NAME_LENGTH;
              ++name_index) {
             snapshot->name[name_index] = '\0';
         }
         for (uint32_t name_index = 0U;
-             (name_index + 1U < configMAX_TASK_NAME_LEN) &&
+             (name_index + 1U < RTOS_MONITOR_TASK_NAME_LENGTH) &&
              (g_current_task_status[index].pcTaskName != NULL) &&
              (g_current_task_status[index].pcTaskName[name_index] != '\0');
              ++name_index) {

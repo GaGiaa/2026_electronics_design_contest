@@ -13,6 +13,7 @@
 #include "app/app_tasks_motor.h"
 #include "app/app_tasks_sensor.h"
 #include "app/app_tasks_telemetry.h"
+#include "config/app_config.h"
 #include "drivers/buzzer/board_buzzer.h"
 #include "drivers/encoder/board_encoder.h"
 #include "drivers/grayscale/board_grayscale.h"
@@ -56,7 +57,7 @@ void app_startup(void)
 
     (void)app_profile_get();
     app_state_init();
-#if BUTTON_FEATURE_ENABLE
+#if APP_BUTTON_FEATURE_ENABLE
     board_buttons_init();
 #endif
     board_encoder_init();
@@ -64,8 +65,8 @@ void app_startup(void)
     line_tracking_init(&g_line_tracking_state, 0);
     motor_control_init();
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
-    board_buzzer_init(BUZZER_FREQUENCY_HZ, BUZZER_DUTY_PERCENT);
-#if SERVO_FEATURE_ENABLE
+    board_buzzer_init(APP_BUZZER_FREQUENCY_HZ, APP_BUZZER_DUTY_PERCENT);
+#if APP_SERVO_FEATURE_ENABLE
     board_servo_init();
 #endif
 
