@@ -11,6 +11,11 @@
 除非用户明确授权，不得执行 Flash 擦除、烧录、探针枚举、GDB 服务或会暂停运行中电机的
 调试操作。
 
+本文档的职责是记录 AI 必读规则、当前工程状态、硬件事实、验证结果和遗留风险。其他文档
+的职责如下：`docs/SETUP.md` 记录跨电脑环境配置和构建操作，`docs/DEPENDENCIES.md`
+记录软件版本、工具链、源码和硬件依赖，`docs/CODING_STYLE.md` 记录 C 代码注释和接口
+文档规范。G3507 应用的具体功能、接线和调试说明见 `mspm0g3507_app/README.md`。
+
 ## 当前 Git 状态
 
 当前分支为 `develop`，当前合并结果为 `7d98698`。三个分支按以下顺序使用普通非快进
@@ -22,6 +27,10 @@
 - `7d98698`：合并 `develop_3`，加入编码器速度滤波、四轮速度 PID 和四通道速度遥测。
 
 本文档整理与功能合并分开保存，便于后续追踪和交接。
+
+G3507 应用工程分层迁移已单独提交为 `40510de`；当前工作区仍包含本轮文档整理改动，
+这些改动不改变本文档记录的 `7d98698` 合并基线。后续提交完成前，不得将文档整理视为
+新的功能 Git 基线。
 
 ## 工程与工具链
 
@@ -176,8 +185,8 @@ powershell -ExecutionPolicy Bypass -File tests\test_keil_mspm0g3507_app.ps1
 powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_oled.ps1
 ~~~
 
-Current CRSF transmitter mapping: CH3 (index 2) is forward/reverse from the left stick vertical axis; CH1 (index 0) is differential steering from the right stick horizontal axis.
-This mapping supersedes the earlier CH2/CH4 mapping described in older notes.
+当前 CRSF 发射机映射为：CH3（索引 2）由左摇杆竖直方向控制前进和后退；CH1（索引 0）由
+右摇杆水平方向控制差速转向。该映射覆盖旧记录中的 CH2/CH4 映射说明。
 
 构建通过只证明 SysConfig、编译、链接和静态集成检查通过，不代表硬件验收完成。
 
@@ -202,8 +211,6 @@ CCS workspace 导入并生成 Debug 配置后运行 `tools/build-mspm0l1306.ps1`
 TI Arm Clang 实际运行 `tools/build-mspm0g3507-app.ps1`，应用编译链接成功，生成
 `mspm0g3507_app/Debug/mspm0g3507_app.out`。
 
-### CCS 应用构建边界
-
 ## G3507 应用工程分层迁移（2026-07-25）
 
 `mspm0g3507_app` 现在为每个模块只保留一份规范实现。`app` 目录包含启动流程、编译期 profile、共享 SWD 状态以及电机、传感器、IO 和遥测任务注册实现；`drivers` 目录包含板级外设驱动；`algorithms` 目录包含可复用的控制与估计算法；`protocols` 目录包含 CRSF 和 VOFA；`services` 目录包含 `rtos_monitor`；`config` 目录包含 `app_config`、`crsf_config` 和 `FreeRTOSConfig`；`platform` 目录包含 G3507 中断分发。
@@ -216,6 +223,8 @@ TI Arm Clang 实际运行 `tools/build-mspm0g3507-app.ps1`，应用编译链接�
 MSPM0 SDK 内的 FreeRTOS 内核源文件编译输入。应用的跨电脑构建必须使用
 `tools/build-mspm0g3507-app.ps1`，脚本会从 `MSPM0_SDK_ROOT` 解析 FreeRTOS 头文件、
 TI Arm Clang 移植层和内核源文件，并加入仓库内的 `algorithms/pid` 目录。
+
+### CCS 应用构建边界
 
 因此，下载代码后直接在全新 CCS workspace 中点击 `Project -> Build Project` 不是该
 应用的受支持可复现构建流程；缺少配置时会出现 `FreeRTOS.h`、`pid.h` 找不到，补齐

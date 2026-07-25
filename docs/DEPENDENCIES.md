@@ -2,6 +2,10 @@
 
 本文档说明本仓库在 Windows 环境下进行构建、开发、调试和烧录所需的软硬件依赖。
 
+本文档是软件版本、工具链和工程依赖的权威来源。跨电脑安装和构建步骤见
+`docs/SETUP.md`，AI 交接规则和当前验证状态见 `docs/AI_HANDOFF.md`，C 代码注释规范见
+`docs/CODING_STYLE.md`。
+
 ## 1. 基础软件环境
 
 - Windows
@@ -111,11 +115,16 @@ powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistU
 - SDK FreeRTOS Kernel；
 - SDK TI Arm Clang FreeRTOS port；
 - 本地 `FreeRTOSConfig.h`；
-- 本地 `motor_pid` PID 模块；
+- 本地 `mspm0g3507_app/algorithms/pid` PID 模块；
 - SysConfig 生成的 `ti_msp_dl_config.c` 和 `ti_msp_dl_config.h`；
 - CMSIS Core headers。
 
 项目没有依赖外部 MotorLib 的完整代码，只保留了仓库内的 PID 核心代码。
+
+G3507 应用源码按以下职责分层：`app/` 负责应用启动、任务和共享状态；`drivers/` 负责
+板级外设；`algorithms/` 负责可复用算法；`protocols/` 负责 CRSF 和 VOFA；`services/`
+负责可复用服务；`config/` 负责配置；`platform/` 负责芯片相关中断分发。每个实现文件
+只在 CCS 和 Keil 工程中加入一次。
 
 ## 7. 运行时硬件依赖
 

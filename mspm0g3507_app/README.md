@@ -1,328 +1,261 @@
-# MSPM0G3507 WS2812 application
+# MSPM0G3507 WS2812 应用工程
 
-## Layered source layout
+本文档说明 G3507 应用工程的源码分层、构建方式、硬件连接、功能开关和调试方法。
+仓库级依赖、环境配置和 AI 交接规则分别见：
 
-The application source is organized for reuse across future G3507
-applications:
+- [`docs/AI_HANDOFF.md`](../docs/AI_HANDOFF.md)：AI 必读规则、当前工程状态、硬件事实和遗留风险；
+- [`docs/DEPENDENCIES.md`](../docs/DEPENDENCIES.md)：软件版本、工具链、源码和硬件依赖；
+- [`docs/SETUP.md`](../docs/SETUP.md)：跨电脑环境配置和构建操作；
+- [`docs/CODING_STYLE.md`](../docs/CODING_STYLE.md)：C 代码注释和接口文档规范。
 
-`text
-app/         application startup, profile, shared state, and RTOS tasks
-drivers/     board and peripheral drivers; no application task policy
-algorithms/  PID, encoder decoding/filtering, line tracking, yaw, and control
-protocols/   CRSF and VOFA framing/mixing
-services/    reusable RTOS services such as the task monitor
-config/      application, CRSF, and FreeRTOS configuration
-platform/    G3507 interrupt dispatch
-`
+## 分层源码布局
 
-Each implementation exists in one canonical directory and is added once to
-both CCS and Keil. Root-level legacy headers remain compatibility include
-entry points; they only include the canonical header and contain no duplicate
-declarations or implementation. New code should include canonical paths.
+应用源码按便于后续 G3507 应用复用的方式组织：
 
-`main.c` only initializes SysConfig, calls `app_startup()`, starts the
-FreeRTOS scheduler, and handles the fatal-stop loop. Application composition
-belongs in `app/`. The public task registration API is
-`app_tasks_motor_start()`, `app_tasks_sensor_start()`,
-`app_tasks_io_start()`, and `app_tasks_telemetry_start()`. Compile-time
-profile switches and SWD-visible state names remain unchanged.
+```text
+app/         应用启动、编译期 profile、共享状态和 FreeRTOS 任务
+drivers/     板级和外设驱动，不包含应用任务策略
+algorithms/  PID、编码器解码与滤波、线跟踪、yaw 和电机控制算法
+protocols/   CRSF 和 VOFA 帧处理与混控
+services/    可复用的 FreeRTOS 服务，例如任务监控
+config/      应用、CRSF 和 FreeRTOS 配置
+platform/    G3507 中断分发
+```
 
-Independent MSPM0G3507 FreeRTOS application. UART0 uses PA10/PA11 at 115200
-8-N-1. PB22 drives four 5 V WS2812 LEDs through a level shifter; all supplies
-must share ground. SPI1 PICO drives PB22 at 2.666667 MHz; PB9 is the unused
-SPI clock output. Each WS2812 bit is encoded as `100` for zero or `110` for
-one, providing 0.375 us and 0.75 us high intervals respectively.
+每个模块只在规范目录中保留一份实现，并在 CCS 和 Keil 工程中各加入一次。根目录旧头文件
+继续作为兼容 include 入口，只包含规范头文件，不包含重复声明或实现。新代码应使用规范路径。
 
-Build with `tools/build-mspm0g3507-app.ps1`. Output is
-`mspm0g3507_app/Debug/mspm0g3507_app.out`.
+`main.c` 只负责 SysConfig 初始化、调用 `app_startup()`、启动 FreeRTOS 调度器和异常停机
+循环。应用组合逻辑属于 `app/`。公开的任务注册接口为 `app_tasks_motor_start()`、
+`app_tasks_sensor_start()`、`app_tasks_io_start()` 和 `app_tasks_telemetry_start()`。
+编译期 profile 开关和可通过 SWD 观察的状态名称保持不变。
 
-## CCS project and portable build
+这是一个独立的 MSPM0G3507 FreeRTOS 应用工程。UART0 使用 PA10/PA11，配置为 115200、
+8-N-1。PB22 通过电平转换器驱动四颗 5 V WS2812，所有电源必须共地。SPI1 PICO 输出到
+PB22，频率为 2.666667 MHz；PB9 是未使用的 SPI 时钟输出。WS2812 的每一位分别编码为
+`100`（0）或 `110`（1），对应 0.375 us 和 0.75 us 的高电平时间。
 
-The `.project`, `.cproject`, and `.ccsproject` files are kept for CCS source
-navigation, SysConfig editing, and target/debug configuration. The FreeRTOS
-kernel sources are installed inside the local MSPM0 SDK rather than stored in
-this repository, so the imported CCS project does not describe a complete
-standalone application build. Clicking `Project > Build Project` in a fresh
-workspace can therefore report `FreeRTOS.h` or `pid.h` not found, and a stale
-CCS workspace can also select an older SDK or SysConfig installation.
+使用 `tools/build-mspm0g3507-app.ps1` 构建，输出文件为
+`mspm0g3507_app/Debug/mspm0g3507_app.out`。
 
-Use the repository build script for a reproducible application build. It adds
-the SDK FreeRTOS include and port directories, the repository `algorithms/pid`
-include directory, and all required FreeRTOS kernel sources:
+## CCS 工程与可移植构建
+
+`.project`、`.cproject` 和 `.ccsproject` 用于 CCS 源码浏览、SysConfig 编辑以及目标和
+调试配置。FreeRTOS 内核源码安装在本机 MSPM0 SDK 中，不存储在本仓库内，因此导入的 CCS
+工程并不描述一个完整的独立应用构建。全新的 workspace 中直接点击
+`Project > Build Project` 可能出现找不到 `FreeRTOS.h` 或 `pid.h`；过期的 CCS workspace
+还可能选择旧版本的 SDK 或 SysConfig。
+
+可复现的应用构建应使用仓库构建脚本。脚本会加入 SDK 中的 FreeRTOS include 和 port 目录、
+仓库内 `algorithms/pid` 的 include 目录，以及所需的 FreeRTOS 内核源文件：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistUserEnvironment
 powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 ```
 
-If the CCS GUI must build the application, configure that local project with
-the same SDK FreeRTOS include/port directories and `algorithms/pid` include
-directory, then add `list.c`, `queue.c`, `tasks.c`, `portable\TI_ARM_CLANG\ARM_CM0\port.c`,
-and `portasm.c` from that SDK to the project and link their objects. This is a
-per-computer CCS workspace configuration; do not replace it with absolute
-paths in the repository.
+如果必须使用 CCS 图形界面构建，需要在本机工程中配置相同的 SDK FreeRTOS include/port
+目录和 `algorithms/pid` include 目录，然后将 SDK 中的 `list.c`、`queue.c`、`tasks.c`、
+`portable\TI_ARM_CLANG\ARM_CM0\port.c` 和 `portasm.c` 加入工程并链接对应对象。这属于
+每台电脑自己的 CCS workspace 配置，不应替换为仓库中的绝对路径。
 
-The static integration test is `tests/test_mspm0g3507_app.ps1`. The animation
-lights one pixel every 500 ms at channel value 16, cycling red, green, blue,
-and white across pixels 1 through 4. Hardware acceptance requires observing
-the LEDs and echoing continuous UART input; no Flash operation is implied by
-the build or test commands.
+静态集成测试为 `tests/test_mspm0g3507_app.ps1`。动画每 500 ms 点亮一个像素，通道值为
+16，依次在四个像素上循环显示红、绿、蓝和白色。硬件验收需要实际观察 LED 并持续回显
+UART 输入；构建或测试命令本身不会执行 Flash 操作。
 
-The application CPU runs at 80 MHz from the board's 40 MHz HFXT and SYSPLL.
-Four 10 kHz, two-input PWM hardware channels use PA12/PA13, PA28/PA31,
-PA29/PB27, and PB4/PB5. The logical-wheel calibration maps front-left to
-PA29/PB27, front-right to PB4/PB5, rear-left to PA28/PA31, and rear-right to
-PA12/PA13. The logical rear-left wheel reverses the PWM input order because
-its motor polarity is opposite. `BOARD_MOTOR_DIRECTION_FORWARD` therefore
-means vehicle-forward motion for every logical wheel.
-`board_motor_set_signed_duty()` converts signed duty commands into the existing
-forward/reverse dual-PWM mapping. Positive duty means vehicle-forward motion and
-negative duty means reverse. The motor supply, driver and MCU must share ground.
-Hardware acceptance starts with one wheel at a low duty cycle and requires explicit
-authorization before any Flash write.
+应用 CPU 由板载 40 MHz HFXT 和 SYSPLL 运行在 80 MHz。四路 10 kHz、双输入 PWM 硬件通道
+使用 PA12/PA13、PA28/PA31、PA29/PB27 和 PB4/PB5。逻辑轮位映射为：前左 PA29/PB27、
+前右 PB4/PB5、后左 PA28/PA31、后右 PA12/PA13。后左电机的极性相反，因此逻辑轮位的
+PWM 输入顺序被反向处理。`BOARD_MOTOR_DIRECTION_FORWARD` 对所有逻辑轮位都表示车辆前进。
+`board_motor_set_signed_duty()` 将带符号的占空比转换为现有的正转/反转双 PWM 映射；正值
+表示车辆前进，负值表示倒车。电机电源、电机驱动器和 MCU 必须共地。硬件验收应从单个轮子
+的低占空比开始；任何 Flash 写入操作都必须事先获得明确授权。
 
-Each wheel also has an AB incremental encoder. Hardware calibration found that the
-physical wheel inputs do not match the original SysConfig names. The corrected
-logical mapping in `mspm0g3507_app.syscfg` is front-left from PA15/PB24,
-front-right from PA17/PA22 (direction inverted), rear-left from PA14/PA9, and
-rear-right from PA16/PB20 (direction inverted). Inputs use
-pull-ups; each A phase interrupts on both edges and the B phase determines
-direction. `board_encoder` declares the wheel motor mechanics explicitly: a 13-line
-encoder on the motor shaft and a 20:1 gearbox derive 260 output-shaft lines per
-wheel revolution. The default `BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE` counts
-both A-phase edges and therefore derives 520 counts per output-shaft revolution.
-Set the compile-time `BOARD_ENCODER_DECODE_MODE` to
-`BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4` to count both edges of both AB
-phases through the quadrature state decoder; it then derives 1040 counts per output
-shaft revolution. Rebuild and flash after changing the mode, then verify one manual
-output-shaft turn at low speed before using the speed loop. The wheel diameter is
-48 mm.
-Every 10 ms motor-task iteration samples the signed encoder delta, accumulated count
-and calculated mm/s speed before updating PWM. It runs one incremental PID speed
-controller per wheel. `algorithms/pid/` is a controlled copy of only the platform-
-independent PID core from the external MotorLib; CAN protocols, STM32 HAL, DJI, and
-RobStride code are intentionally not included. The SWD-writable
-`volatile g_motor_speed_targets_mm_s[4]` array supplies normal four-wheel mm/s
-targets and starts with all targets at zero.
+每个轮位还有一个 AB 增量编码器。硬件校准发现，实际物理输入与原始 SysConfig 名称不一致。
+当前 `mspm0g3507_app.syscfg` 中的逻辑映射为：前左 PA15/PB24、前右 PA17/PA22（方向反向）、
+后左 PA14/PA9、后右 PA16/PB20（方向反向）。输入使用上拉；每个 A 相在双沿触发中断，
+B 相用于判断方向。`board_encoder` 明确声明电机机械参数：电机轴编码器为 13 线，减速比为
+20:1，因此每个轮位输出轴每转有 260 条机械线。
 
-`volatile g_motor_debug` provides a single-wheel SWD override. Set `enable`, select
-`wheel`, and choose `MOTOR_CONTROL_DEBUG_MODE_STOP`,
-`MOTOR_CONTROL_DEBUG_MODE_PWM`, or `MOTOR_CONTROL_DEBUG_MODE_SPEED`. PWM mode uses
-signed `target_duty_percent`; speed mode uses `target_speed_mm_per_s` and writable
-`speed_pid_params` (`kp`, `ki`, `kd`, `output_limit`, `deadband`). By default, speed
-debug uses the selected wheel's entry in `g_default_speed_pid_params`; set
-`use_speed_pid_override` to `true` to explicitly use the values in `speed_pid_params`
-for the selected wheel. Output is clamped to signed 100 percent. When enabled, debug stops all non-selected wheels. Enabling
-debug or changing its wheel or mode resets controller state and holds every wheel at
-zero for one 10 ms control step before output resumes. Do not set breakpoints while a
-motor is moving.
+默认 `BOARD_ENCODER_DECODE_MODE_A_PHASE_DUAL_EDGE` 统计 A 相双沿，因此每个输出轴转一圈
+得到 520 counts。将编译期 `BOARD_ENCODER_DECODE_MODE` 设置为
+`BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4` 后，会通过正交状态解码器统计 AB 两相
+的双沿，此时每个输出轴转一圈得到 1040 counts。修改模式后需要重新构建和烧录，并在使用
+速度环之前低速手动转动输出轴一圈进行确认。轮径为 48 mm。
 
-For observation, `g_encoder_samples[BOARD_MOTOR_COUNT]` is a volatile global
-snapshot written by the 10 ms motor task and can be watched through SWD without
-adding breakpoints. For speed-loop tuning, set the compile-time
-`VOFA_SPEED_PID_TELEMETRY_ENABLE` switch in `app/app_profile.h` from `0U` to `1U` and select
-JustFloat in VOFA+. The lower-priority telemetry task sends one fixed 20-byte frame
-every 10 ms. Its four float32 channels follow `g_motor_debug.wheel` and are ordered
-as `target_speed_mm_per_s`, `instant_feedback_speed_mm_per_s`,
-`feedback_speed_mm_per_s`, and `output_duty_percent`; the frame ends in
-`00 00 80 7F`.
+电机任务每次 10 ms 的迭代依次采样带符号编码器增量、累积计数和计算得到的 mm/s 速度，
+然后更新 PWM。每个轮位使用一个增量式 PID 速度控制器。`algorithms/pid/` 是从外部
+MotorLib 中受控复制的、仅包含平台无关 PID 核心的目录；CAN 协议、STM32 HAL、DJI 和
+RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_speed_targets_mm_s[4]`
+提供普通的四轮 mm/s 目标值，初始时所有目标均为 0。
 
-When VOFA mode is enabled, it owns UART0 output: the UART echo task is not
-created. IMU yaw telemetry and speed-loop VOFA telemetry are compile-time
-mutually exclusive. Do not send text to UART0 while VOFA mode is enabled. Frames are still queued through
-`board_uart_write()` and emitted by the dedicated UART TX task, so the motor task
-and encoder ISR never block on the UART. If `g_motor_debug.wheel` is invalid, the
-telemetry task safely sends the front-left wheel status. For initial validation, use
-the debugger without breakpoints to turn one wheel by hand and confirm count sign
-and isolation before driving the chassis at low duty.
+`volatile g_motor_debug` 提供单轮 SWD 调试覆盖。设置 `enable`，选择 `wheel`，再选择
+`MOTOR_CONTROL_DEBUG_MODE_STOP`、`MOTOR_CONTROL_DEBUG_MODE_PWM` 或
+`MOTOR_CONTROL_DEBUG_MODE_SPEED`。PWM 模式使用带符号的 `target_duty_percent`；速度模式
+使用 `target_speed_mm_per_s` 和可写的 `speed_pid_params`（`kp`、`ki`、`kd`、
+`output_limit`、`deadband`）。默认情况下，速度调试使用所选轮位在
+`g_default_speed_pid_params` 中的参数；将 `use_speed_pid_override` 设为 `true` 后，才会
+明确使用 `speed_pid_params` 中的参数。输出被限制在带符号的 100% 范围内。调试启用后，
+所有未选中的轮位都会停止。启用调试或修改轮位、模式时，控制器状态会复位，并在输出恢复
+前让所有轮位保持一个 10 ms 控制周期的 0 输出。电机运动时不要设置断点。
 
-For grayscale observation, build with `-VofaSpeedPidTelemetryEnable 0
--GrayVofaTelemetryEnable 1` and select JustFloat at 115200 baud. The gray task
-sends a 22-channel, 92-byte little-endian float32 frame every 100 ms:
+为便于观察，10 ms 电机任务会写入 `volatile g_encoder_samples[BOARD_MOTOR_COUNT]` 快照，
+可通过 SWD 观察，不需要增加断点。调试速度环时，将 `app/app_profile.h` 中的编译期开关
+`VOFA_SPEED_PID_TELEMETRY_ENABLE` 从 `0U` 改为 `1U`，并在 VOFA+ 中选择 JustFloat。
+低优先级遥测任务每 10 ms 发送一个固定 20 字节帧。四个 `float32` 通道跟随
+`g_motor_debug.wheel`，顺序为 `target_speed_mm_per_s`、`instant_feedback_speed_mm_per_s`、
+`feedback_speed_mm_per_s` 和 `output_duty_percent`；帧尾为 `00 00 80 7F`。
 
-| Channel | Value |
+启用 VOFA 模式后，UART0 输出由该模式独占，不会创建 UART 回显任务。IMU yaw 遥测和速度环
+VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发送文本。帧仍然通过
+`board_uart_write()` 放入队列，并由专用 UART TX 任务发送，因此电机任务和编码器 ISR 不会
+阻塞在 UART 上。如果 `g_motor_debug.wheel` 无效，遥测任务会安全地发送前左轮状态。初次
+验证时，不要设置断点；使用调试器手动转动一个轮子，确认计数符号和轮位隔离后，再以低占空比
+驱动车体。
+
+观察灰度传感器时，使用 `-VofaSpeedPidTelemetryEnable 0 -GrayVofaTelemetryEnable 1` 构建，
+并在 115200 baud 下选择 JustFloat。灰度任务每 100 ms 发送一个 22 通道、92 字节的小端
+`float32` 帧：
+
+| 通道 | 内容 |
 | --- | --- |
 | 0..7 | `raw[0..7]` |
 | 8..15 | `normalized[0..7]` |
-| 16 | `digital` (`1=white`, `0=black`) |
-| 17 | `black_mask` (`bit N` maps to `channel[N]`, `1=black`) |
+| 16 | `digital`（`1=白色`，`0=黑色`） |
+| 17 | `black_mask`（第 N 位对应 `channel[N]`，`1=黑色`） |
 | 18 | `black_count` |
 | 19 | `line_error` |
 | 20 | `line_strength` |
 | 21 | `sequence` |
 
-The frame tail is `00 00 80 7F`. Speed and grayscale VOFA telemetry are mutually
-exclusive and enabling both is a compile-time error. In either VOFA mode UART
-echo and BMI160 text output are suppressed. The grayscale fields are observation
-only; this change does not modify motor targets or PWM output. For initial
-validation, move a black line across the sensor and confirm that `normalized`,
-`black_mask`, `line_error`, and `sequence` change together.
+帧尾为 `00 00 80 7F`。速度和灰度 VOFA 遥测互斥，同时启用会触发编译期错误。在任一
+VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度字段仅用于观察，本次改动不改变
+电机目标或 PWM 输出。初次验证时，让黑线经过传感器，确认 `normalized`、`black_mask`、
+`line_error` 和 `sequence` 同步变化。
 
-PA2 drives a passive buzzer through TIMG8 CCP1. `app/app_profile.h` provides the
-compile-time `BUZZER_FEATURE_ENABLE`, `BUZZER_FREQUENCY_HZ`,
-`BUZZER_DUTY_PERCENT`, `BUZZER_ON_TIME_MS`, and `BUZZER_OFF_TIME_MS` macros.
-The defaults are disabled, 2000 Hz, 50 percent, 200 ms on, and 1800 ms off.
-When enabled, a dedicated static FreeRTOS task repeats the on/off interval;
-when disabled, the PWM is initialized with a zero compare value and no buzzer
-task is created. The passive buzzer driver circuit and MCU must share ground.
+PA2 通过 TIMG8 CCP1 驱动无源蜂鸣器。`app/app_profile.h` 提供编译期宏
+`BUZZER_FEATURE_ENABLE`、`BUZZER_FREQUENCY_HZ`、`BUZZER_DUTY_PERCENT`、
+`BUZZER_ON_TIME_MS` 和 `BUZZER_OFF_TIME_MS`。默认值依次为关闭、2000 Hz、50%、200 ms
+开启和 1800 ms 关闭。启用后创建独立的静态 FreeRTOS 任务，重复开关周期；禁用时 PWM
+比较值初始化为 0，不创建蜂鸣器任务。无源蜂鸣器驱动电路和 MCU 必须共地。
 
-BMI160 uses the independent SPI0 controller. The module wiring is `SCK` to PB18,
-`SDI`/MOSI to PB17, `SDO`/MISO to PB19, and active-low `CS` to PB0. PA21 is
-reserved for a future data-ready interrupt and is not used by the first version.
-SPI1 remains dedicated to WS2812. The BMI160 module must use 3.3 V and share
-ground with the MCU; do not power both VIN and 3V3 unless the module schematic
-explicitly requires it. In SPI mode, SA0 is not an address setting.
+BMI160 使用独立的 SPI0 控制器。模块接线为 `SCK` 到 PB18、`SDI`/MOSI 到 PB17、
+`SDO`/MISO 到 PB19、低有效 `CS` 到 PB0。PA21 预留给未来的数据就绪中断，第一版不使用。
+SPI1 仍专用于 WS2812。BMI160 模块必须使用 3.3 V 并与 MCU 共地；除非模块原理图明确要求，
+不要同时给 VIN 和 3V3 供电。在 SPI 模式下，SA0 不是地址配置项。
 
-At startup the driver generates one CS low-to-high dummy SPI transaction, as
-required by the Bosch reference flow to select SPI after power-up. Then
-`board_bmi160.c/.h` validates the `CHIP_ID` (`0xD1`), performs the soft reset,
-starts the accelerometer and gyroscope, and configures 100 Hz with ±4g and
-±500dps ranges. The driver performs the official post-reset SPI communication
-test and waits 1 ms after each register write. It also verifies the error,
-power-mode, ODR, bandwidth, and range registers before reporting success. A
-static FreeRTOS task reads the 12-byte acceleration-plus-
-gyroscope register block (`0x0C` through `0x17`, gyro first) every 10 ms. The SPI controller uses Motorola mode 3 to match
-the Bosch reference example. IMU yaw telemetry, when enabled with
-`IMU_YAW_ENABLE`, uses the existing static UART frame queue for JustFloat frames.
-SPI transactions have bounded timeouts;
-initialization retries after one second and three consecutive read failures
-trigger reinitialization.
+启动时，驱动会按照 Bosch 参考流程产生一次 CS 低到高的空 SPI 事务，以便上电后切换到 SPI
+模式。随后 `board_bmi160.c/.h` 校验 `CHIP_ID`（`0xD1`），执行软复位，启动加速度计和
+陀螺仪，并将采样配置为 100 Hz、±4g 和 ±500dps。驱动执行官方复位后的 SPI 通信测试，
+每次寄存器写入后等待 1 ms，并在报告成功前检查错误、电源模式、ODR、带宽和量程寄存器。
+静态 FreeRTOS 任务每 10 ms 读取 12 字节的加速度加陀螺仪寄存器块（`0x0C` 到 `0x17`，
+陀螺仪在前）。SPI 控制器使用 Motorola mode 3，以匹配 Bosch 参考示例。启用 IMU yaw 遥测
+时，使用现有的静态 UART 帧队列发送 JustFloat 帧。SPI 事务有有限超时；初始化失败后每秒
+重试一次，连续三次读取失败会触发重新初始化。
 
-The implementation has passed the static integration check and TI Clang build.
-Hardware validation confirmed `CHIP_ID=0xD1`, approximately 1g on stationary Z
-acceleration, and near-zero stationary gyroscope output. No Flash write is
-performed by the build and test commands.
+该实现已经通过静态集成检查和 TI Clang 构建。硬件验证已确认 `CHIP_ID=0xD1`、静止时 Z
+轴加速度约为 1g，以及静止陀螺仪输出接近 0。构建和测试命令不会执行 Flash 写入；这些
+软件结果不替代尚未完成的完整硬件验收。
 
-`app/app_profile.h` provides the compile-time `IMU_TELEMETRY_ENABLE` switch. It defaults
-to `0U`; when enabled together with `IMU_YAW_ENABLE`, it sends one 16-byte
-JustFloat frame every 10 ms through the existing UART frame queue. The three
-float32 channels are `yaw_deg`, `yaw_rate_dps`, and `gyro_bias_z_dps`, followed
-by the standard `00 00 80 7F` tail. BMI160 initialization and sampling continue
-regardless of this output switch.
+`app/app_profile.h` 提供编译期开关 `IMU_TELEMETRY_ENABLE`，默认值为 `0U`。当它与
+`IMU_YAW_ENABLE` 同时启用时，每 10 ms 通过现有 UART 帧队列发送一个 16 字节 JustFloat 帧。
+三个 `float32` 通道为 `yaw_deg`、`yaw_rate_dps` 和 `gyro_bias_z_dps`，之后是标准的
+`00 00 80 7F` 帧尾。无论该输出开关是否启用，BMI160 初始化和采样都会继续运行。
 
-PA7, PB12, PA8, and PA30 are four external-pull-up, active-low button inputs.
-The independent static `button_task` scans them every 10 ms and confirms a
-state after two consecutive samples. Stable press and release edges are sent
-through the serialized UART frame queue in pin order using lines such as
-`key,pa7=down\r\n` and `key,pa7=up\r\n`. SysConfig leaves the internal resistor
-disabled and does not enable GPIO interrupts for these inputs. The button task
-uses a 128-word stack; the TI Clang map reports a 512-byte stack, 76-byte task
-control block, and 12 bytes of button driver state. `app/app_profile.h` provides the
-compile-time `BUTTON_FEATURE_ENABLE` switch, defaulting to `0U`. Setting it to
-`1U` enables button initialization, state scanning, UART reports, and the
-button task's static RAM while keeping the SysConfig pin definitions unchanged.
-## Eight-channel grayscale sensor
+PA7、PB12、PA8 和 PA30 是四个外部上拉、低有效按键输入。独立的静态 `button_task` 每
+10 ms 扫描一次，并在连续两次采样一致后确认状态。稳定的按下和释放边沿按照引脚顺序，
+通过串行 UART 帧队列发送，例如 `key,pa7=down\r\n` 和 `key,pa7=up\r\n`。SysConfig 关闭
+内部电阻，也不为这些输入启用 GPIO 中断。按键任务使用 128 字的栈；TI Clang map 报告的
+栈大小为 512 字节，任务控制块为 76 字节，按键驱动状态为 12 字节。`app/app_profile.h`
+提供编译期开关 `BUTTON_FEATURE_ENABLE`，默认值为 `0U`。设为 `1U` 后启用按键初始化、
+状态扫描、UART 报告和按键任务的静态 RAM，同时保持 SysConfig 引脚定义不变。
 
-The Ganv no-MCU eight-channel sensor uses a 74HC4051 analog multiplexer. Wire
-AD0 to PB13, AD1 to PB1, AD2 to PB23, and OUT to PA27. Leave EN floating; the
-sensor's internal pulldown keeps it enabled. Connect sensor ground to MCU
-ground and power the sensor from a stable separate 5 V supply.
+## 八路灰度传感器
 
-`board_grayscale.c/.h` selects channels in address order: channel 0 is 000 and
-channel 7 is 111. Every channel waits approximately 1 us after address change
-and averages eight single 12-bit ADC conversions. The driver exposes raw and
-0..4095 normalized arrays plus an eight-bit hysteresis result. `digital` uses
-1 for white and 0 for black. The application derives `black_mask`, where bit N
-corresponds to channel N and 1 means black, together with `black_count`,
-`line_strength`, and the signed integer `line_error`.
+Ganv 无 MCU 八路传感器使用 74HC4051 模拟多路复用器。将 AD0 连接 PB13、AD1 连接 PB1、
+AD2 连接 PB23、OUT 连接 PA27。EN 悬空；传感器内部下拉会使其保持使能。传感器地线连接
+MCU 地线，传感器使用稳定的独立 5 V 电源供电。
 
-The optional one-dimensional vehicle yaw estimator is implemented in
-`board_imu_yaw.c/.h` and runs inside the existing 10 ms `imu_task`; it does not
-create another FreeRTOS task. It converts the BMI160 Z gyro using the configured
-`+/-500 dps` range, estimates the startup gyro bias during 100 stationary
-samples, and fuses gyro yaw rate with the left/right differential encoder rate
-using 98% gyro and 2% encoder weighting. The initial track width is configured
-by `IMU_YAW_TRACK_WIDTH_MM` in `app/app_profile.h`; the measured left/right wheel-center
-distance is 130 mm. The default
-`IMU_YAW_ENABLE` value is `0U`; set it to `1U` to enable the estimator.
-The estimator assumes the vehicle frame is `+X` forward, `+Y` left, `+Z` up,
-with positive Z gyro rate meaning a left turn. Change
-`BOARD_IMU_YAW_GYRO_Z_SIGN` to `-1.0f` if the installed sensor has the opposite
-Z direction.
+`board_grayscale.c/.h` 按地址顺序选择通道：通道 0 为 000，通道 7 为 111。每次地址切换
+后等待约 1 us，然后对 12 位 ADC 进行 8 次单次转换并求平均。驱动提供原始数组、0..4095
+归一化数组和 8 位滞回结果。`digital` 使用 `1` 表示白色，`0` 表示黑色。应用生成
+`black_mask`，其中第 N 位对应通道 N，1 表示黑色，同时生成 `black_count`、`line_strength`
+和带符号整数 `line_error`。
 
-When both `IMU_YAW_ENABLE` and `IMU_TELEMETRY_ENABLE` are `1U`, the IMU task
-sends the three-channel JustFloat yaw frame described above. The yaw is
-relative to the startup heading and is normalized to `[-180, 180)`; a six-axis
-IMU cannot provide an absolute yaw reference without a magnetometer or another
-external heading source.
+可选的一维车辆 yaw 估计器实现在 `board_imu_yaw.c/.h` 中，并运行在现有 10 ms 的
+`imu_task` 内，不会创建额外的 FreeRTOS 任务。它使用配置的 `+/-500 dps` 量程转换
+BMI160 Z 轴陀螺仪数据，在启动时通过 100 个静止样本估计陀螺仪零偏，并以 98% 陀螺仪和
+2% 编码器的权重融合左右差速编码器角速度。初始轮距由 `app/app_profile.h` 中的
+`IMU_YAW_TRACK_WIDTH_MM` 配置；测得的左右轮中心距离为 130 mm。`IMU_YAW_ENABLE` 默认值
+为 `0U`，设为 `1U` 可启用估计器。
 
-The default `VOFA_SPEED_PID_TELEMETRY_ENABLE` value is `0U`. For the yaw UART
-test, build with `-VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1
--ImuYawEnable 1`; VOFA speed telemetry and IMU yaw telemetry cannot be enabled
-together.
+估计器假设车辆坐标系为 `+X` 向前、`+Y` 向左、`+Z` 向上，Z 轴正角速度表示左转。如果
+安装的传感器 Z 轴方向相反，将 `BOARD_IMU_YAW_GYRO_Z_SIGN` 改为 `-1.0f`。
 
-`app/app_startup.c` uses the measured per-channel calibration values:
+当 `IMU_YAW_ENABLE` 和 `IMU_TELEMETRY_ENABLE` 都为 `1U` 时，IMU 任务发送前文所述的
+三通道 JustFloat yaw 帧。yaw 相对于启动时的朝向，并归一化到 `[-180, 180)`；六轴 IMU
+没有磁力计或其他外部航向来源时，无法提供绝对 yaw 参考。
+
+`VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认值为 `0U`。进行 yaw UART 测试时，使用以下参数构建：
+
+```text
+-VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1
+```
+
+VOFA 速度遥测和 IMU yaw 遥测不能同时启用。
+
+`app/app_startup.c` 使用实测的逐通道标定值：
 
 ```text
 white = {2834, 3064, 2150, 1924, 3099, 3032, 3182, 2467}
 black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 ```
 
-`line_error` is calculated from normalized analog values using blackness
-`4095-normalized[i]` and weights `{-3500,-2500,-1500,-500,500,1500,2500,3500}`.
-When total blackness is zero it holds the previous error. It is currently an
-observation input only; it does not change motor targets or PWM output.
-`GRAY_VOFA_TELEMETRY_ENABLE` defaults to `0U`. Set it through the build script to
-emit the binary frame described above. The volatile `g_grayscale_snapshot` is
-available for SWD observation even when telemetry is disabled. Build success does
-not constitute physical sensor acceptance.
+`line_error` 根据归一化模拟值计算黑度 `4095-normalized[i]`，使用权重
+`{-3500,-2500,-1500,-500,500,1500,2500,3500}`。当黑度总和为 0 时保持之前的误差。
+当前这些数据仅用于观察，不会改变电机目标或 PWM 输出。`GRAY_VOFA_TELEMETRY_ENABLE`
+默认值为 `0U`，可以通过构建脚本设置为 1 以发送前文描述的二进制帧。即使遥测关闭，
+仍可通过 SWD 观察 volatile 的 `g_grayscale_snapshot`。构建成功不代表灰度传感器实物验收
+完成。
 
-## FreeRTOS CPU and task monitor
+## FreeRTOS CPU 与任务监控
 
-The optional `rtos_monitor` module is disabled by default and does not use
-UART0. Pass `-RtosMonitorEnable 1` to the application or Keil PowerShell build
-script to enable a static
-monitor task that updates `g_rtos_monitor_snapshot` every 1000 ms for SWD
-observation. The snapshot contains total CPU and idle percentages, task names,
-states, priorities, runtime percentages, runtime in microseconds, and stack
-high-water marks in `StackType_t` words. `sequence` is odd while a snapshot is
-being published and even after the update is complete.
+可选的 `rtos_monitor` 模块默认关闭，不占用 UART0。向应用或 Keil PowerShell 构建脚本传入
+`-RtosMonitorEnable 1` 可启用静态监控任务。该任务每 1000 ms 更新一次
+`g_rtos_monitor_snapshot`，供 SWD 观察总 CPU 利用率、空闲率、任务名称、状态、优先级、
+运行时间占比、微秒级运行时间以及栈高水位标记。发布快照时 `sequence` 为奇数，更新完成
+后为偶数。
 
-For manual configuration, edit `config/app_config.h` and set
-`RTOS_MONITOR_ENABLE` to `1U`. `app/app_profile.h` and
-`config/FreeRTOSConfig.h` both include this
-shared header, so there is only one source-level switch. The build parameter is
-still useful for automated or temporary builds and overrides the header default
-without changing the file.
+手动配置时，编辑 `config/app_config.h` 并将 `RTOS_MONITOR_ENABLE` 设为 `1U`。
+`app/app_profile.h` 和 `config/FreeRTOSConfig.h` 都包含这个共享头文件，因此只有一个
+源码级开关。构建参数适合自动化或临时构建，并会覆盖头文件默认值，但不会修改文件。
 
-The runtime counter uses the unconnected `TIMG12` timer. The timer runs at
-10 MHz from BUSCLK divided by 8; this is the highest stable free-running rate
-available without changing the existing timer assignments. `timer_hz` in the
-snapshot records the actual rate. Runtime time includes interrupt execution in
-the task that was interrupted, so the first version does not report a separate
-ISR percentage. The counter is 32-bit and the monitor uses unsigned deltas for
-each sampling window. However, the bundled FreeRTOS kernel does not fully
-protect its per-task cumulative runtime counters from timer wrap. At 10 MHz
-the counter wraps after approximately 429 seconds, so long continuous runs
-may make per-task values inaccurate after that point.
-## CRSF remote control
+运行时计数器使用未连接引脚的 `TIMG12` 定时器。定时器由 BUSCLK 除以 8 后以 10 MHz 运行；
+在不改变现有定时器分配的情况下，这是可用的最高稳定自由运行频率。快照中的 `timer_hz`
+记录实际频率。运行时间包含被中断任务执行期间的时间，因此第一版不会单独报告 ISR 占比。
+计数器为 32 位，监控窗口使用无符号差值处理每个采样窗口的回绕。但是，随附的 FreeRTOS
+内核没有完整保护每个任务累计运行时间计数器的定时器回绕。在 10 MHz 时基下，计数器约
+429 秒回绕一次；长时间连续运行后，任务级数值可能不准确。
 
-The optional CRSF remote-control path uses UART3 at 420000 baud, 8-N-1, with
-PB3 as RX and PB2 as TX. Connect the receiver TX output to PB3 and share MCU
-ground. The firmware only receives CRSF data; it never uploads telemetry or
-other frames to the receiver. The receiver output must be 3.3 V, non-inverted
-UART TTL.
+## CRSF 遥控输入
 
-Build the remote-control variant with
-`tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 1`. The default build
-keeps CRSF control disabled. CH3 (channel index 2) controls forward/reverse
-and CH1 (channel index 0) controls differential steering. The standard CRSF
-range 172..1811 is mapped around 992 with a 20 percent deadband. The default
-maximum wheel target is 800 mm/s and can be changed with
-`CRSF_MAX_SPEED_MM_PER_S`.
+可选的 CRSF 遥控链路使用 UART3，速率 420000 baud、8-N-1，PB3 为 RX，PB2 为 TX。将接收机
+TX 输出连接到 PB3，并与 MCU 共地。固件只接收 CRSF 数据，不向接收机上传遥测或其他帧。
+接收机输出必须是 3.3 V、非反相 UART TTL。
 
-The four targets use left/right differential mixing and are normalized together
-when the combined command exceeds the configured maximum. If no valid packed
-RC frame arrives for 100 ms, all four targets are set to zero. Direction signs
-can be adjusted with `CRSF_FORWARD_SIGN` and `CRSF_TURN_SIGN`. When the CRSF
-compile-time switch is enabled, the SWD single-wheel debug override is compiled
-out for that build; UART0 remains available for existing debug and VOFA output.
+使用 `tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 1` 构建遥控版本。默认构建
+保持 CRSF 控制关闭。CH3（通道索引 2）控制前进和后退，CH1（通道索引 0）控制差速转向。
+标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20% 死区。默认最大轮速目标为
+800 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
 
-For SWD observation, expand the volatile `g_crsf_debug` structure. Its fields are
-`channels.channels[0..15]`, `link_active`, `last_valid_time_ms`,
-`valid_frame_count`, `crc_error_count`, `frame_error_count`, and
-`rx_overflow_count`. `channels.channels[2]` is CH3 and
-`channels.channels[0]` is CH1.
+四个轮目标使用左右差速混控；当组合命令超过配置的最大值时，四个目标统一归一化。如果
+连续 100 ms 没有收到有效的打包 RC 帧，四个轮目标全部置零。方向符号可以通过
+`CRSF_FORWARD_SIGN` 和 `CRSF_TURN_SIGN` 调整。启用 CRSF 编译开关时，SWD 单轮调试覆盖
+路径会被编译排除；UART0 仍可用于现有调试和 VOFA 输出。
 
-Host protocol and mixer tests are in `tests/test_crsf.ps1`. Hardware acceptance
-must first be performed with the wheels lifted or the motor supply disconnected.
+通过 SWD 观察时，可以展开 volatile 的 `g_crsf_debug` 结构体。其字段包括
+`channels.channels[0..15]`、`link_active`、`last_valid_time_ms`、`valid_frame_count`、
+`crc_error_count`、`frame_error_count` 和 `rx_overflow_count`。其中
+`channels.channels[2]` 是 CH3，`channels.channels[0]` 是 CH1。
+
+协议和混控主机测试位于 `tests/test_crsf.ps1`。硬件验收前必须先让车轮悬空，或断开电机电源。

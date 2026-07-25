@@ -4,15 +4,16 @@
 工程。源码路径均使用仓库相对路径。TI SDK、SysConfig、CCS、Keil、Arm GNU
 GDB、Python、pyOCD 和 CMSIS-Pack 都属于每台电脑需要单独安装的本地依赖。
 
+相关文档职责如下：`docs/DEPENDENCIES.md` 是版本和依赖的权威来源，
+`docs/AI_HANDOFF.md` 记录当前工程状态和安全边界，`docs/CODING_STYLE.md` 记录 C 代码
+注释与接口文档规范，`mspm0g3507_app/README.md` 记录 G3507 应用的具体功能和调试方法。
+
 ## 所需版本
 
-- CCS 20.2，或与工程兼容的版本
-- MSPM0 SDK 2.11.00.07
-- SysConfig 1.26.2
-- TI Arm Clang 4.0.3.LTS
-- Keil MDK 5.43a，Keil 构建需要 Arm Compiler 6.24
-- Python 3，用于配置 pyOCD
-- pyOCD `>=0.45,<0.46`
+具体版本和兼容范围以 `docs/DEPENDENCIES.md` 的“版本基线”章节为准。本机需要安装
+CCS、MSPM0 SDK、SysConfig、TI Arm Clang、Keil MDK、Arm Compiler、Python 3、pyOCD
+以及对应的 CMSIS-Pack。当前支持的核心版本包括 MSPM0 SDK 2.11.00.07、SysConfig
+1.26.2 和 TI Arm Clang 4.0.3.LTS；完整版本基线仍以 `docs/DEPENDENCIES.md` 为准。
 
 请使用 Keil Pack Installer 安装 G3507 对应的 CMSIS-Pack。在仓库根目录执行
 `tools\install-g3507-debug-tools.ps1`，配置本地 pyOCD 环境并下载 G3507 Pack。
