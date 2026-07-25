@@ -50,7 +50,7 @@ foreach ($path in @($profile, $appConfig, $encoderConfig, $encoderHeader,
     }
 }
 
-Assert-Contains -Path $appConfig -Pattern '#define APP_IMU_YAW_ENABLE\s+0U' `
+Assert-Contains -Path $appConfig -Pattern '#define APP_IMU_YAW_ENABLE\s+1U' `
     -Description 'Application configuration must own the prefixed IMU yaw switch'
 Assert-Contains -Path $appConfig -Pattern '#define APP_BUZZER_FEATURE_ENABLE\s+0U' `
     -Description 'Application configuration must own the prefixed buzzer switch'
