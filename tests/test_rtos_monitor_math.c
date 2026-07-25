@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "rtos_monitor.h"
+#include "services/rtos_monitor/rtos_monitor.h"
 
 static int expect_u32(const char *name, uint32_t actual, uint32_t expected)
 {

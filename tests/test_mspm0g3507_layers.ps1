@@ -79,12 +79,48 @@ foreach ($relativePath in $expectedDirectories) {
 $main = Join-Path $projectDir 'main.c'
 $startup = Join-Path $projectDir 'app\app_startup.c'
 $interrupts = Join-Path $projectDir 'platform\g3507_interrupts.c'
-$compatMotorHeader = Join-Path $projectDir 'board_motor.h'
 $canonicalMotorHeader = Join-Path $projectDir 'drivers\motor\board_motor.h'
 $canonicalPid = Join-Path $projectDir 'algorithms\pid\pid.c'
+$compatibilityFiles = @(
+    'app_config.h',
+    'board_bmi160.h',
+    'board_buttons.h',
+    'board_buzzer.h',
+    'board_crsf_uart.h',
+    'board_encoder.h',
+    'board_grayscale.h',
+    'board_imu_yaw.h',
+    'board_motor.h',
+    'board_oled.h',
+    'board_oled_font.h',
+    'board_servo.h',
+    'board_servo_math.h',
+    'board_uart.h',
+    'board_ws2812.h',
+    'crsf_config.h',
+    'crsf_control.h',
+    'crsf_protocol.h',
+    'encoder_quadrature.h',
+    'encoder_speed_filter.h',
+    'FreeRTOSConfig.h',
+    'line_tracking.h',
+    'motor_control.h',
+    'rtos_monitor.h',
+    'vofa_justfloat.h',
+    'motor_pid\app_math.h',
+    'motor_pid\pid.h',
+    'motor_pid\pid_config.h'
+)
 
-foreach ($path in @($main, $startup, $interrupts, $compatMotorHeader, $canonicalMotorHeader, $canonicalPid)) {
+foreach ($path in @($main, $startup, $interrupts, $canonicalMotorHeader, $canonicalPid)) {
     Assert-Path -Path $path -Description 'layer migration file'
+}
+
+foreach ($relativePath in $compatibilityFiles) {
+    $path = Join-Path $projectDir $relativePath
+    if (Test-Path -LiteralPath $path) {
+        throw "compatibility include entry must be removed: $path"
+    }
 }
 
 Assert-Contains -Path $main -Pattern '#include "app/app_startup\.h"' -Description 'main must call the application startup layer'
@@ -94,9 +130,6 @@ Assert-NotContains -Path $main -Pattern 'UART_0_INST_IRQHandler' -Description 'U
 Assert-Contains -Path $startup -Pattern 'app_tasks_motor_start\(\)' -Description 'startup must register motor tasks'
 Assert-Contains -Path $interrupts -Pattern 'UART_0_INST_IRQHandler' -Description 'platform must own UART0 interrupt'
 Assert-Contains -Path $interrupts -Pattern 'GROUP1_IRQHandler' -Description 'platform must own encoder group interrupt'
-Assert-Contains -Path $compatMotorHeader -Pattern '#include "drivers/motor/board_motor\.h"' -Description 'root motor header must be a compatibility wrapper'
-Assert-NotContains -Path $compatMotorHeader -Pattern 'board_motor_set_signed_duty' -Description 'compatibility header must not duplicate declarations'
-
 $algorithmFiles = Get-ChildItem -LiteralPath (Join-Path $projectDir 'algorithms') -Recurse -File -Include '*.c', '*.h'
 foreach ($file in $algorithmFiles) {
     Assert-NotContains -Path $file.FullName -Pattern 'ti_msp_dl_config\.h' -Description 'algorithm must not depend on generated hardware configuration'

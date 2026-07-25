@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "board_imu_yaw.h"
+#include "algorithms/imu_yaw/board_imu_yaw.h"
 
 #define TEST_DT_S 0.01f
 #define TEST_TRACK_WIDTH_MM 100.0f

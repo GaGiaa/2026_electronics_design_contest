@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "vofa_justfloat.h"
+#include "protocols/vofa/vofa_justfloat.h"
 
 #define GRAY_TEST_CHANNEL_COUNT 22U
 

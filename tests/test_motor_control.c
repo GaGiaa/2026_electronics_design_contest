@@ -2,12 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "board_encoder.h"
-#include "encoder_quadrature.h"
-#include "encoder_speed_filter.h"
-#include "motor_control.h"
-#include "pid.h"
-#include "vofa_justfloat.h"
+#include "drivers/encoder/board_encoder.h"
+#include "algorithms/encoder/encoder_quadrature.h"
+#include "algorithms/encoder/encoder_speed_filter.h"
+#include "algorithms/motor_control/motor_control.h"
+#include "algorithms/pid/pid.h"
+#include "protocols/vofa/vofa_justfloat.h"
 
 static void expect_close(float actual, float expected, float tolerance, const char *message)
 {

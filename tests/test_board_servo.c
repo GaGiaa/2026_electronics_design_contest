@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "board_servo_math.h"
+#include "drivers/servo/board_servo_math.h"
 
 static int check_equal(const char *name, uint32_t actual, uint32_t expected)
 {

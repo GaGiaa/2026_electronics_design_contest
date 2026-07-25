@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "board_motor.h"
-#include "crsf_control.h"
-#include "crsf_protocol.h"
+#include "drivers/motor/board_motor.h"
+#include "protocols/crsf/crsf_control.h"
+#include "protocols/crsf/crsf_protocol.h"
 
 static uint8_t crc8_dvb_s2(const uint8_t *data, size_t length)
 {

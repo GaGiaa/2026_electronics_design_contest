@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include "line_tracking.h"
+#include "algorithms/line_tracking/line_tracking.h"
 
 static void test_all_white_reports_lost_line(void)
 {

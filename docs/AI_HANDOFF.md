@@ -144,8 +144,9 @@ CH1（索引 0）控制差速转向，SB/CH5 使用通道数组索引 6 控制�
 ## 分层迁移事实
 
 `mspm0g3507_app` 的规范实现位于 `app/`、`drivers/`、`algorithms/`、`protocols/`、
-`services/`、`config/` 和 `platform/`。根目录旧头文件只作为兼容 include 入口，不能
-新增声明或实现。CCS 和 Keil 工程中每个实现文件只加入一次。
+`services/`、`config/` 和 `platform/`。分层迁移遗留的根目录兼容头文件和 PID 旧目录的
+转发头文件已经全部移除；新代码和测试必须直接引用规范路径。CCS 和 Keil 工程中每个
+实现文件只加入一次。
 
 应用配置由 `config/app_config.h` 统一维护，应用级编译宏使用 `APP_` 前缀；
 `app/app_profile.h` 只保留 `app_profile_t` 和 `app_profile_get()`。编码器机械参数与解码模式

@@ -26,8 +26,9 @@ config/      应用、编码器、CRSF、RTOS monitor 和 FreeRTOS 配置
 platform/    G3507 中断分发
 ```
 
-每个模块只在规范目录中保留一份实现，并在 CCS 和 Keil 工程中各加入一次。根目录旧头文件
-继续作为兼容 include 入口，只包含规范头文件，不包含重复声明或实现。新代码应使用规范路径。
+每个模块只在规范目录中保留一份实现，并在 CCS 和 Keil 工程中各加入一次。迁移期间的根目录
+兼容 include 入口已经全部移除；新代码和测试必须直接使用规范路径。工程根目录仍保留在
+编译器 include 搜索路径中，用于解析 `drivers/...`、`algorithms/...` 等规范目录。
 
 `main.c` 只负责 SysConfig 初始化、调用 `app_startup()`、启动 FreeRTOS 调度器和异常停机
 循环。应用组合逻辑属于 `app/`。公开的任务注册接口为 `app_tasks_motor_start()`、
