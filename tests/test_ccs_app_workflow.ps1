@@ -36,10 +36,11 @@ function Assert-NotContains {
 
 $appReadme = Join-Path $ProjectRoot 'mspm0g3507_app\README.md'
 $setup = Join-Path $ProjectRoot 'docs\SETUP.md'
+$dependencies = Join-Path $ProjectRoot 'docs\DEPENDENCIES.md'
 $handoff = Join-Path $ProjectRoot 'docs\AI_HANDOFF.md'
 $buildScript = Join-Path $ProjectRoot 'tools\build-mspm0g3507-app.ps1'
 
-foreach ($path in @($appReadme, $setup, $handoff, $buildScript)) {
+foreach ($path in @($appReadme, $setup, $dependencies, $handoff, $buildScript)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "CCS app workflow documentation is incomplete: $path is missing."
     }
@@ -48,8 +49,8 @@ foreach ($path in @($appReadme, $setup, $handoff, $buildScript)) {
 Assert-Contains -Path $appReadme -Pattern 'tools/build-mspm0g3507-app\.ps1' -Description 'App README must name the canonical build script'
 Assert-Contains -Path $appReadme -Pattern 'CCS.*Build|Build.*CCS|CCS.*编译|CCS.*构建' -Description 'App README must explain the CCS GUI build boundary'
 Assert-Contains -Path $appReadme -Pattern 'FreeRTOS\.h|FreeRTOS' -Description 'App README must explain the external FreeRTOS dependency'
-Assert-Contains -Path $setup -Pattern 'MSPM0 SDK 2\.11\.00\.07' -Description 'Setup guide must pin the supported SDK version'
-Assert-Contains -Path $setup -Pattern 'sysconfig_1\.26\.2|SysConfig 1\.26\.2' -Description 'Setup guide must pin the supported SysConfig version'
+Assert-Contains -Path $dependencies -Pattern 'MSPM0 SDK.*2\.11\.00\.07' -Description 'Dependency guide must pin the supported SDK version'
+Assert-Contains -Path $dependencies -Pattern 'SysConfig.*1\.26\.2' -Description 'Dependency guide must pin the supported SysConfig version'
 Assert-Contains -Path $setup -Pattern 'build-mspm0g3507-app\.ps1' -Description 'Setup guide must provide the portable app build command'
 Assert-Contains -Path $handoff -Pattern 'CCS.*workspace|FreeRTOS.*include|Project.*Build' -Description 'Handoff must document the CCS app build boundary'
 Assert-Contains -Path $buildScript -Pattern 'FreeRtosRoot' -Description 'Build script must resolve FreeRTOS from the selected SDK'

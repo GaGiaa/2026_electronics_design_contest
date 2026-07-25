@@ -1,12 +1,16 @@
 # MSPM0G3507 WS2812 应用工程
 
-本文档说明 G3507 应用工程的源码分层、构建方式、硬件连接、功能开关和调试方法。
+本文档说明 G3507 应用工程的源码分层、构建方式、硬件连接、功能开关和调试方法。项目
+总览和 AI 接手顺序见根目录 [`README.md`](../README.md)。
 仓库级依赖、环境配置和 AI 交接规则分别见：
 
 - [`docs/AI_HANDOFF.md`](../docs/AI_HANDOFF.md)：AI 必读规则、当前工程状态、硬件事实和遗留风险；
 - [`docs/DEPENDENCIES.md`](../docs/DEPENDENCIES.md)：软件版本、工具链、源码和硬件依赖；
 - [`docs/SETUP.md`](../docs/SETUP.md)：跨电脑环境配置和构建操作；
 - [`docs/CODING_STYLE.md`](../docs/CODING_STYLE.md)：C 代码注释和接口文档规范。
+
+Keil MDK 的工程模板、构建产物和 Keil 调试说明见
+[`keil/mspm0g3507_app/README.md`](../keil/mspm0g3507_app/README.md)。
 
 ## 分层源码布局
 

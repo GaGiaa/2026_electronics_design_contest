@@ -2,18 +2,20 @@
 
 这是一个用于 MSPM0L1306 核心板的 CCS 20.2 工程，包含两个初始功能：
 
+项目总览见根目录 [`README.md`](../README.md)，工具版本和依赖见
+[`docs/DEPENDENCIES.md`](../docs/DEPENDENCIES.md)，跨电脑构建步骤见
+[`docs/SETUP.md`](../docs/SETUP.md)。
+
 - PA3 上的 LED 每 500 ms 翻转一次。
 - UART0 使用 PA8（TX）和 PA9（RX），以 115200 8-N-1 配置回显接收到的字节。
 
 ## 工具
 
-- CCS：20.2，或 CCS 工程声明的兼容版本
-- MSPM0 SDK：2.11.00.07
-- SysConfig：1.26.2
 - 调试探针：Horco CMSIS-DAP v2
 - PC 串口：使用本机分配给开发板的 COM 端口
 
-CCS 用于导入工程、编辑 SysConfig 和构建。Horco 探针是通用的 CMSIS-DAP v2
+工具版本和兼容范围以 [`docs/DEPENDENCIES.md`](../docs/DEPENDENCIES.md) 为准。CCS 用于导入工程、
+编辑 SysConfig 和构建。Horco 探针是通用的 CMSIS-DAP v2
 探针，CCS 20.2 无法直接将其识别为 XDS 调试探针，因此使用 pyOCD 进行 Flash
 烧录和 SWD 调试。
 
@@ -48,6 +50,9 @@ CCS 用于导入工程、编辑 SysConfig 和构建。Horco 探针是通用的 C
 3. 打开 `mspm0l1306_bringup.syscfg`，查看或修改图形化配置。
 4. 构建 Debug 配置。
 5. 运行 `..\tools\flash-and-debug.ps1 -Action Load`，擦除并烧录 ELF。
+
+第 5 步会擦除并写入目标板 Flash，只能在确认目标芯片、接线和用户授权后执行。普通
+构建、探针列表和 GDB server 操作不会写入 Flash。
 
 ## VS Code 工作流程
 

@@ -2,9 +2,9 @@
 
 本文档说明本仓库在 Windows 环境下进行构建、开发、调试和烧录所需的软硬件依赖。
 
-本文档是软件版本、工具链和工程依赖的权威来源。跨电脑安装和构建步骤见
-`docs/SETUP.md`，AI 交接规则和当前验证状态见 `docs/AI_HANDOFF.md`，C 代码注释规范见
-`docs/CODING_STYLE.md`。
+本文档是软件版本、工具链和工程依赖的唯一权威来源。跨电脑安装和构建步骤见
+`docs/SETUP.md`，AI 交接规则和当前验证状态见 `docs/AI_HANDOFF.md`，C 代码和文档写作
+规范见 `docs/CODING_STYLE.md`，项目地图见根目录 `README.md`。
 
 ## 1. 基础软件环境
 
@@ -16,14 +16,7 @@
 
 ## 2. TI CCS 构建依赖
 
-推荐版本如下：
-
-| 组件 | 推荐版本 |
-| --- | --- |
-| Code Composer Studio | 20.2 或兼容版本 |
-| MSPM0 SDK | 2.11.00.07 |
-| SysConfig | 1.26.2 |
-| TI Arm Clang | 4.0.3.LTS |
+CCS、MSPM0 SDK、SysConfig 和 TI Arm Clang 的固定版本见第 9 节“版本基线”。
 
 MSPM0 SDK 提供以下工程依赖：
 
@@ -47,11 +40,8 @@ CCS 工程可用于源码浏览、SysConfig 和调试配置。直接点击 CCS �
 
 ## 3. Keil 构建依赖
 
-- Keil MDK：5.43a；
-- Arm Compiler：6.24；
-- MSPM0 SDK：2.11.00.07；
-- SysConfig：1.26.2；
-- MSPM0G3507 对应 CMSIS-Pack。
+- Keil MDK、Arm Compiler、MSPM0 SDK 和 SysConfig 的固定版本见第 9 节“版本基线”；
+- 还需要安装 MSPM0G3507 对应 CMSIS-Pack。
 
 Keil 工程使用：
 
@@ -124,9 +114,19 @@ powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistU
 G3507 应用源码按以下职责分层：`app/` 负责应用启动、任务和共享状态；`drivers/` 负责
 板级外设；`algorithms/` 负责可复用算法；`protocols/` 负责 CRSF 和 VOFA；`services/`
 负责可复用服务；`config/` 负责配置；`platform/` 负责芯片相关中断分发。每个实现文件
-只在 CCS 和 Keil 工程中加入一次。
+只在 CCS 和 Keil 工程中加入一次，根目录旧头文件只作为兼容 include 入口。
 
-## 7. 运行时硬件依赖
+## 7. 工程依赖矩阵
+
+| 工程 | 主要源码依赖 | 构建入口 |
+| --- | --- | --- |
+| `mspm0l1306_bringup/` | MSPM0L1306 DriverLib、SysConfig 生成文件、L1306 linker | `tools/build-mspm0l1306.ps1` |
+| `mspm0g3507_bringup/` | MSPM0G3507 DriverLib、SysConfig 生成文件、G3507 linker | `tools/build-mspm0g3507.ps1` |
+| `mspm0g3507_freertos/` | G3507 DriverLib、SDK FreeRTOS Kernel、工程 `FreeRTOSConfig.h` | `tools/build-mspm0g3507-freertos.ps1` |
+| `mspm0g3507_app/` | G3507 DriverLib、SDK FreeRTOS Kernel、TI Arm Clang port、`algorithms/pid` 和分层应用源码 | `tools/build-mspm0g3507-app.ps1` |
+| `keil/mspm0g3507_app/` | Keil Arm Compiler、SDK FreeRTOS Kernel、本地 `freertos_port/ARM_CM0` 和共享 G3507 应用源码 | `tools/build-keil-mspm0g3507-app.ps1` |
+
+## 8. 运行时硬件依赖
 
 G3507 主应用依赖以下实际硬件：
 
@@ -143,7 +143,7 @@ G3507 主应用依赖以下实际硬件：
 以及交接文档为准。更换核心板、芯片型号或 SysConfig 工程时，不得混用 G3507 和
 L1306 的设备包、启动文件、linker、SysConfig 或引脚配置。
 
-## 8. 版本基线
+## 9. 版本基线
 
 构建时应尽量固定使用以下版本组合：
 

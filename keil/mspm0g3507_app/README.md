@@ -4,12 +4,16 @@
 应用源码共享自 `../../mspm0g3507_app`；原始的 `.project`、`.cproject` 和
 SysConfig 源文件仍由 CCS 工程维护。
 
+项目总览见 [`../../README.md`](../../README.md)，当前状态和硬件风险见
+[`../../docs/AI_HANDOFF.md`](../../docs/AI_HANDOFF.md)，工具版本和依赖见
+[`../../docs/DEPENDENCIES.md`](../../docs/DEPENDENCIES.md)。共享应用功能说明见
+[`../../mspm0g3507_app/README.md`](../../mspm0g3507_app/README.md)。
+
 ## 前置条件
 
-- Keil MDK 5.43a，使用 Arm Compiler 6.24
-- MSPM0 SDK 2.11.00.07
-- SysConfig 1.26.2
-- 已安装 CMSIS-Pack：`TexasInstruments.MSPM0G1X0X_G3X0X_DFP.1.3.1`
+工具版本和兼容范围以 [`../../docs/DEPENDENCIES.md`](../../docs/DEPENDENCIES.md) 为准。
+本工程还要求安装 G3507 对应的 CMSIS-Pack，并使用工程配置指定的设备、Flash 算法和
+SVD 文件。
 
 执行 `tools\install-g3507-debug-tools.ps1` 下载 pyOCD 使用的 Pack，然后使用
 Keil Pack Installer 安装同一个 Pack。在 Texas Instruments 设备系列中选择
@@ -104,7 +108,7 @@ AD0=PB13、AD1=PB1、AD2=PB23、OUT=PA27，EN 悬空，传感器使用独立稳�
 可选的 `board_imu_yaw.c` 航向估算器会编译进共享应用工程，并在现有 IMU 任务中
 运行。当 `IMU_YAW_ENABLE` 从默认值 `0U` 改为 `1U` 后，该估算器才会启用。它使用
 BMI160 Z 轴陀螺仪、启动时陀螺仪零偏校准，以及左右轮编码器差速计算，并使用
-`main.c` 中的 `IMU_YAW_TRACK_WIDTH_MM`。实测左右轮中心距离为 130 mm，车辆坐标系
+`mspm0g3507_app/app/app_profile.h` 中的 `IMU_YAW_TRACK_WIDTH_MM`。实测左右轮中心距离为 130 mm，车辆坐标系
 为 +X 向前、+Y 向左、+Z 向上。将 `IMU_TELEMETRY_ENABLE` 也设为 `1U`，即可通过
 UART 观察航向字段。
 

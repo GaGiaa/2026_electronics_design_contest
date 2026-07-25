@@ -4,16 +4,16 @@
 工程。源码路径均使用仓库相对路径。TI SDK、SysConfig、CCS、Keil、Arm GNU
 GDB、Python、pyOCD 和 CMSIS-Pack 都属于每台电脑需要单独安装的本地依赖。
 
-相关文档职责如下：`docs/DEPENDENCIES.md` 是版本和依赖的权威来源，
+相关文档职责如下：`docs/DEPENDENCIES.md` 是版本和依赖的唯一权威来源，
 `docs/AI_HANDOFF.md` 记录当前工程状态和安全边界，`docs/CODING_STYLE.md` 记录 C 代码
-注释与接口文档规范，`mspm0g3507_app/README.md` 记录 G3507 应用的具体功能和调试方法。
+和文档写作规范，根目录 `README.md` 记录项目地图和 AI 接手顺序。各工程的功能、接线
+和调试说明见对应工程目录中的 `README.md`。
 
-## 所需版本
+## 工具安装
 
 具体版本和兼容范围以 `docs/DEPENDENCIES.md` 的“版本基线”章节为准。本机需要安装
 CCS、MSPM0 SDK、SysConfig、TI Arm Clang、Keil MDK、Arm Compiler、Python 3、pyOCD
-以及对应的 CMSIS-Pack。当前支持的核心版本包括 MSPM0 SDK 2.11.00.07、SysConfig
-1.26.2 和 TI Arm Clang 4.0.3.LTS；完整版本基线仍以 `docs/DEPENDENCIES.md` 为准。
+以及对应的 CMSIS-Pack。
 
 请使用 Keil Pack Installer 安装 G3507 对应的 CMSIS-Pack。在仓库根目录执行
 `tools\install-g3507-debug-tools.ps1`，配置本地 pyOCD 环境并下载 G3507 Pack。
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistU
 可以在当前 PowerShell 会话中设置以下环境变量，也可以把对应参数传给构建脚本：
 
 ```powershell
-$env:MSPM0_SDK_ROOT = 'C:\path\to\mspm0_sdk_2_11_00_07'
-$env:SYSCONFIG_ROOT = 'C:\path\to\sysconfig_1.26.2'
+$env:MSPM0_SDK_ROOT = 'C:\path\to\mspm0_sdk'
+$env:SYSCONFIG_ROOT = 'C:\path\to\sysconfig'
 $env:TI_ARM_CLANG = 'C:\path\to\tiarmclang.exe'
 $env:CCS_ROOT = 'C:\path\to\ccs'
 $env:KEIL_ROOT = 'C:\path\to\Keil_v5'
@@ -61,8 +61,8 @@ Keil 源文件 `keil\mspm0g3507_app\mspm0g3507_app.uvprojx` 是工程模板。
 构建脚本和 VS Code 打开任务会根据当前 SDK 路径生成本地文件
 `mspm0g3507_app.local.uvprojx`。该文件已被 Git 忽略。
 
-构建命令不会擦除或写入 Flash。Flash 烧录必须通过单独的 pyOCD 或 Keil 操作
-明确执行，并且执行前需要确认已连接的目标板。
+构建命令不会擦除或写入 Flash。Flash 烧录必须通过单独的 pyOCD 或 Keil 操作明确执行，
+并且执行前需要用户明确授权、确认目标板和确认目标芯片。
 
 ## CCS 与 VS Code
 
@@ -82,16 +82,20 @@ powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistU
 powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 ```
 
-如果 CCS Build Console 出现类似
-`D:\ti\mspm0_sdk_2_10_00_04` 或 `sysconfig_1.28.0`，说明当前 CCS
-workspace 绑定了旧产品。安装并选择 MSPM0 SDK `2.11.00.07`、SysConfig
-`1.26.2`，删除旧 workspace 中的同名工程后，在全新的 workspace 中重新导入；
-然后确认构建命令使用当前 clone 的项目目录。不要把该机器上的绝对路径提交到
-Git。
+如果 CCS Build Console 出现旧 SDK 或旧 SysConfig 路径，说明当前 CCS workspace
+绑定了旧产品。请按照 `docs/DEPENDENCIES.md` 的版本基线重新选择工具，删除旧 workspace
+中的同名工程后，在全新的 workspace 中重新导入；然后确认构建命令使用当前 clone 的
+项目目录。不要把该机器上的绝对路径提交到 Git。
 
 请根据 `.vscode/extensions.json` 安装推荐的 VS Code 扩展，然后在 VS Code 中打开
 仓库根目录。构建任务调用 PowerShell 脚本；调试任务需要先启动 pyOCD GDB
 服务器，并正确配置 `ARM_GDB_PATH`。
+
+## 文档维护
+
+开发完成后必须先更新 `docs/AI_HANDOFF.md`。工具版本或环境变量变化时更新
+`docs/DEPENDENCIES.md`；构建流程变化时更新本文档和受影响工程 README。文档正文使用
+中文，命令、路径、函数名、宏名、协议名称和工具名称保持原样。
 
 ## 团队 Git 协作
 
