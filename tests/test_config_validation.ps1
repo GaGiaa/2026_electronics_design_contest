@@ -47,6 +47,15 @@ Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_SERVO_TASK_INTERVAL_MS=0U') `
     -Description 'servo task period is zero'
 Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH=0U') `
+    -Description 'IMU VOFA task stack depth is zero'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_IMU_VOFA_TELEMETRY_INTERVAL_MS=0U') `
+    -Description 'IMU VOFA telemetry period is zero'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_IMU_TELEMETRY_ENABLE=1U') `
+    -Description 'IMU telemetry is enabled without yaw'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_VOFA_SPEED_PID_TELEMETRY_ENABLE=1U',
                '-DAPP_IMU_TELEMETRY_ENABLE=1U', '-DAPP_IMU_YAW_ENABLE=1U') `
     -Description 'conflicting telemetry modes'

@@ -164,9 +164,9 @@ SPI1 仍专用于 WS2812。BMI160 模块必须使用 3.3 V 并与 MCU 共地；�
 软件结果不替代尚未完成的完整硬件验收。
 
 `config/app_config.h` 提供编译期开关 `APP_IMU_TELEMETRY_ENABLE`，默认值为 `0U`。当它与
-`APP_IMU_YAW_ENABLE` 同时启用时，每 10 ms 通过现有 UART 帧队列发送一个 16 字节 JustFloat 帧。
-三个 `float32` 通道为 `yaw_deg`、`yaw_rate_dps` 和 `gyro_bias_z_dps`，之后是标准的
-`00 00 80 7F` 帧尾。无论该输出开关是否启用，BMI160 初始化和采样都会继续运行。
+`APP_IMU_YAW_ENABLE` 同时启用时，独立遥测任务按配置周期通过现有 UART 帧队列发送一个
+16 字节 JustFloat 帧。三个 `float32` 通道为 `yaw_deg`、`yaw_rate_dps` 和 `gyro_bias_z_dps`，
+之后是标准的 `00 00 80 7F` 帧尾。IMU 采样是否运行由 `APP_IMU_YAW_ENABLE` 单独决定。
 
 PA7、PB12、PA8 和 PA30 是四个外部上拉、低有效按键输入。独立的静态 `button_task` 每
 10 ms 扫描一次，并在连续两次采样一致后确认状态。稳定的按下和释放边沿按照引脚顺序，
@@ -188,19 +188,22 @@ MCU 地线，传感器使用稳定的独立 5 V 电源供电。
 `black_mask`，其中第 N 位对应通道 N，1 表示黑色，同时生成 `black_count`、`line_strength`
 和带符号整数 `line_error`。
 
-可选的一维车辆 yaw 估计器实现在 `board_imu_yaw.c/.h` 中，并运行在现有 10 ms 的
-`imu_task` 内，不会创建额外的 FreeRTOS 任务。它使用配置的 `+/-500 dps` 量程转换
-BMI160 Z 轴陀螺仪数据，在启动时通过 100 个静止样本估计陀螺仪零偏，并以 98% 陀螺仪和
-2% 编码器的权重融合左右差速编码器角速度。初始轮距由 `config/app_config.h` 中的
-`APP_IMU_YAW_TRACK_WIDTH_MM` 配置；测得的左右轮中心距离为 130 mm。`APP_IMU_YAW_ENABLE` 默认值
-为 `0U`，设为 `1U` 可启用估计器。
+可选的一维车辆 yaw 估计器实现在 `board_imu_yaw.c/.h` 中。只有
+`APP_IMU_YAW_ENABLE=1U` 时才会创建 10 ms 的 `imu_task`；该任务负责 BMI160 初始化、采样、
+失败重试和 yaw 更新。它使用配置的 `+/-500 dps` 量程转换 BMI160 Z 轴陀螺仪数据，在启动时
+通过 100 个静止样本估计陀螺仪零偏，并以 98% 陀螺仪和 2% 编码器的权重融合左右差速编码器
+角速度。初始轮距由 `config/app_config.h` 中的 `APP_IMU_YAW_TRACK_WIDTH_MM` 配置；测得的
+左右轮中心距离为 130 mm。`APP_IMU_YAW_ENABLE` 默认值为 `0U`，关闭时不创建 IMU 采样任务。
 
 估计器假设车辆坐标系为 `+X` 向前、`+Y` 向左、`+Z` 向上，Z 轴正角速度表示左转。如果
 安装的传感器 Z 轴方向相反，将 `BOARD_IMU_YAW_GYRO_Z_SIGN` 改为 `-1.0f`。
 
-当 `APP_IMU_YAW_ENABLE` 和 `APP_IMU_TELEMETRY_ENABLE` 都为 `1U` 时，IMU 任务发送前文所述的
-三通道 JustFloat yaw 帧。yaw 相对于启动时的朝向，并归一化到 `[-180, 180)`；六轴 IMU
-没有磁力计或其他外部航向来源时，无法提供绝对 yaw 参考。
+当 `APP_IMU_YAW_ENABLE` 和 `APP_IMU_TELEMETRY_ENABLE` 都为 `1U` 时，独立的
+`imu_vofa_task` 按 `APP_IMU_VOFA_TELEMETRY_INTERVAL_MS` 周期读取 yaw 快照，并发送前文所述的
+三通道 JustFloat yaw 帧。默认周期为 10 ms，独立任务使用
+`APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH` 栈配置。yaw 任务通过 `app_state` 发布带有效标志的
+快照；BMI160 初始化或采样无效时，VOFA 任务跳过发送，不发送过期帧。yaw 相对于启动时的朝向，
+并归一化到 `[-180, 180)`；六轴 IMU 没有磁力计或其他外部航向来源时，无法提供绝对 yaw 参考。
 
 `APP_VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认值为 `0U`。进行 yaw UART 测试时，使用以下参数构建：
 
@@ -209,6 +212,10 @@ BMI160 Z 轴陀螺仪数据，在启动时通过 100 个静止样本估计陀螺
 ```
 
 VOFA 速度遥测和 IMU yaw 遥测不能同时启用。
+
+`ImuYawEnable` 和 `ImuTelemetryEnable` 这两个 PowerShell 参数保持兼容；可选的
+`ImuVofaTelemetryIntervalMs` 参数覆盖独立的 IMU VOFA 发送周期。关闭 yaw 时，
+`app_profile_t.enable_imu` 为 `false`，且不会生成 BMI160 任务。
 
 `app/app_startup.c` 使用实测的逐通道标定值：
 

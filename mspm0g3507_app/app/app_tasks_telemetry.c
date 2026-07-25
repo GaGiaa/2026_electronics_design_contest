@@ -13,6 +13,33 @@
 #include "protocols/vofa/vofa_justfloat.h"
 #include "services/rtos_monitor/rtos_monitor.h"
 
+#if APP_IMU_TELEMETRY_ENABLE
+static StaticTask_t g_imu_vofa_task_buffer;
+static StackType_t g_imu_vofa_task_stack[
+    APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH];
+
+static void imu_vofa_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval =
+        pdMS_TO_TICKS(APP_IMU_VOFA_TELEMETRY_INTERVAL_MS);
+    app_imu_yaw_snapshot_t snapshot;
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(3U)];
+
+    (void)argument;
+    for (;;) {
+        app_state_imu_yaw_snapshot_copy(&snapshot);
+        if (snapshot.valid &&
+            vofa_justfloat_encode3(frame, sizeof(frame), snapshot.yaw_deg,
+                                    snapshot.yaw_rate_dps,
+                                    snapshot.gyro_bias_z_dps)) {
+            board_uart_write(frame, sizeof(frame));
+        }
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
+
 #if APP_VOFA_SPEED_PID_TELEMETRY_ENABLE
 static StaticTask_t g_telemetry_task_buffer;
 static StackType_t g_telemetry_task_stack[
@@ -90,6 +117,13 @@ static StackType_t g_rtos_monitor_task_stack[APP_RTOS_MONITOR_TASK_STACK_DEPTH];
 
 void app_tasks_telemetry_start(void)
 {
+#if APP_IMU_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(
+                     imu_vofa_task, "imu_vofa",
+                     APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH, NULL,
+                     APP_TELEMETRY_TASK_PRIORITY, g_imu_vofa_task_stack,
+                     &g_imu_vofa_task_buffer) != NULL);
+#endif
 #if APP_VOFA_SPEED_PID_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(
                      telemetry_task, "telemetry",

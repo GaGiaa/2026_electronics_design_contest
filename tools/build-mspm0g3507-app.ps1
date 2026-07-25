@@ -8,6 +8,8 @@ param(
     [int] $VofaSpeedPidTelemetryEnable,
     [ValidateSet(0, 1)]
     [int] $ImuTelemetryEnable,
+    [ValidateRange(1, 60000)]
+    [int] $ImuVofaTelemetryIntervalMs,
     [ValidateSet(0, 1)]
     [int] $ImuYawEnable,
     [ValidateSet(0, 1)]
@@ -58,6 +60,9 @@ if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
 }
 if ($PSBoundParameters.ContainsKey('ImuTelemetryEnable')) {
     $commonCompilerArguments += "-DAPP_IMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('ImuVofaTelemetryIntervalMs')) {
+    $commonCompilerArguments += "-DAPP_IMU_VOFA_TELEMETRY_INTERVAL_MS=$ImuVofaTelemetryIntervalMs"
 }
 if ($PSBoundParameters.ContainsKey('ImuYawEnable')) {
     $commonCompilerArguments += "-DAPP_IMU_YAW_ENABLE=$ImuYawEnable"

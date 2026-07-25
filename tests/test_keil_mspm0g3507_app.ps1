@@ -132,6 +132,7 @@ Assert-Contains -Path $buildScript -Pattern 'mspm0g3507_app\.uvprojx' -Descripti
 Assert-Contains -Path $buildScript -Pattern 'EncoderDecodeMode' -Description 'Keil build must support an explicit encoder decode mode'
 Assert-Contains -Path $buildScript -Pattern 'VofaSpeedPidTelemetryEnable' -Description 'Keil build must support a temporary VOFA override'
 Assert-Contains -Path $buildScript -Pattern 'ImuTelemetryEnable' -Description 'Keil build must support a temporary IMU telemetry override'
+Assert-Contains -Path $buildScript -Pattern 'ImuVofaTelemetryIntervalMs' -Description 'Keil build must support a temporary IMU VOFA interval override'
 Assert-Contains -Path $buildScript -Pattern 'ImuYawEnable' -Description 'Keil build must support a temporary IMU yaw override'
 Assert-Contains -Path $buildScript -Pattern 'projectFileBytes' -Description 'Keil build must restore temporary project defines'
 Assert-Contains -Path $buildScript -Pattern 'VofaSpeedPidTelemetryEnable' -Description 'Keil build must support an explicit speed VOFA telemetry mode'

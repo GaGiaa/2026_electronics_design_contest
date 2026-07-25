@@ -140,11 +140,20 @@ CH1（索引 0）控制差速转向；连续 100 ms 没有有效帧时四轮目�
 现有公开函数名、结构体名、PowerShell 构建参数、SWD 全局变量、UART 行为、CRSF 超时行为和默认功能
 开关保持不变；应用源码级配置宏已统一为 `APP_` 前缀。分层迁移不代表任何尚未完成的硬件验收已经完成。
 
+IMU yaw 与 IMU VOFA 遥测采用独立任务边界：`APP_IMU_YAW_ENABLE=1U` 时创建 `imu_task`，负责
+BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENABLE=1U` 时创建独立的
+`imu_vofa_task`。两个任务通过 `app_state` 的 `app_imu_yaw_snapshot_t` 快照接口通信，快照包含
+三个 yaw 浮点值、`valid` 和序列号，并使用序列保护跨任务复制。无效采样期间不发送 VOFA 帧。
+`APP_IMU_VOFA_TELEMETRY_INTERVAL_MS` 与 `APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH` 分别配置
+独立遥测周期和栈大小；`ImuYawEnable`、`ImuTelemetryEnable` 等既有 PowerShell 参数继续保留。
+由于该方案明确采用 yaw 开关控制 IMU 任务，关闭 `APP_IMU_YAW_ENABLE` 时不会初始化或读取 BMI160，
+同时 `app_profile_t.enable_imu` 为 `false`。
+
 ## 已知验证与遗留风险
 
 此前已记录通过的验证包括电机控制、编码器模式 1/2、线跟踪、IMU Yaw、CRSF、VOFA
 JustFloat、G3507 应用静态集成、OLED、RTOS monitor、CCS/Keil 工程静态检查和可移植性
-检查。本轮额外通过 `test_config_ownership.ps1`、`test_config_validation.ps1`、RTOS monitor
+检查。本轮额外增加 IMU yaw app-state host test，并通过 `test_config_ownership.ps1`、`test_config_validation.ps1`、RTOS monitor
 host test、CRSF、电机控制、舵机、IMU yaw、线跟踪和 VOFA 单元测试。TI Clang 与 Keil
 构建结果只能说明软件构建链路通过。
 

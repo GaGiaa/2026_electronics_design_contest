@@ -16,6 +16,16 @@ extern volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 extern volatile board_grayscale_snapshot_t g_grayscale_snapshot;
 extern line_tracking_state_t g_line_tracking_state;
 
+#if APP_IMU_YAW_ENABLE
+typedef struct {
+    float yaw_deg;
+    float yaw_rate_dps;
+    float gyro_bias_z_dps;
+    bool valid;
+    uint32_t sequence;
+} app_imu_yaw_snapshot_t;
+#endif
+
 #if CRSF_REMOTE_CONTROL_ENABLE
 typedef struct {
     crsf_channels_t channels;
@@ -46,6 +56,13 @@ void app_state_motor_control_snapshot_copy(
     motor_control_wheel_status_t control[BOARD_MOTOR_COUNT]);
 void app_state_grayscale_publish(const board_grayscale_snapshot_t *snapshot);
 void app_state_grayscale_snapshot_copy(board_grayscale_snapshot_t *snapshot);
+
+#if APP_IMU_YAW_ENABLE
+void app_state_imu_yaw_publish(float yaw_deg, float yaw_rate_dps,
+                               float gyro_bias_z_dps);
+void app_state_imu_yaw_invalidate(void);
+void app_state_imu_yaw_snapshot_copy(app_imu_yaw_snapshot_t *snapshot);
+#endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
 void app_state_crsf_snapshot_copy(crsf_control_input_t *input);

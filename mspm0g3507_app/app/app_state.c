@@ -2,14 +2,20 @@
 
 #include <stddef.h>
 
+#if CRSF_REMOTE_CONTROL_ENABLE
 #include <FreeRTOS.h>
 #include <task.h>
+#endif
 
 volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 volatile board_grayscale_snapshot_t g_grayscale_snapshot;
 line_tracking_state_t g_line_tracking_state;
 static volatile uint32_t g_encoder_sample_sequence;
 static volatile uint32_t g_grayscale_publish_sequence;
+#if APP_IMU_YAW_ENABLE
+static volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
+static volatile uint32_t g_imu_yaw_publish_sequence;
+#endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
 volatile crsf_debug_state_t g_crsf_debug;
@@ -31,6 +37,10 @@ void app_state_init(void)
     g_line_tracking_state = (line_tracking_state_t){0};
     g_encoder_sample_sequence = 0U;
     g_grayscale_publish_sequence = 0U;
+#if APP_IMU_YAW_ENABLE
+    g_imu_yaw_snapshot = (app_imu_yaw_snapshot_t){0};
+    g_imu_yaw_publish_sequence = 0U;
+#endif
 #if CRSF_REMOTE_CONTROL_ENABLE
     g_crsf_debug = (crsf_debug_state_t){0};
 #endif
@@ -156,6 +166,52 @@ void app_state_grayscale_snapshot_copy(board_grayscale_snapshot_t *snapshot)
         }
     }
 }
+
+#if APP_IMU_YAW_ENABLE
+void app_state_imu_yaw_publish(float yaw_deg, float yaw_rate_dps,
+                               float gyro_bias_z_dps)
+{
+    ++g_imu_yaw_publish_sequence;
+    g_imu_yaw_snapshot.yaw_deg = yaw_deg;
+    g_imu_yaw_snapshot.yaw_rate_dps = yaw_rate_dps;
+    g_imu_yaw_snapshot.gyro_bias_z_dps = gyro_bias_z_dps;
+    g_imu_yaw_snapshot.valid = true;
+    ++g_imu_yaw_snapshot.sequence;
+    ++g_imu_yaw_publish_sequence;
+}
+
+void app_state_imu_yaw_invalidate(void)
+{
+    ++g_imu_yaw_publish_sequence;
+    g_imu_yaw_snapshot.valid = false;
+    ++g_imu_yaw_snapshot.sequence;
+    ++g_imu_yaw_publish_sequence;
+}
+
+void app_state_imu_yaw_snapshot_copy(app_imu_yaw_snapshot_t *snapshot)
+{
+    uint32_t begin_sequence;
+    uint32_t end_sequence;
+
+    if (snapshot == NULL) {
+        return;
+    }
+    for (;;) {
+        begin_sequence = g_imu_yaw_publish_sequence;
+        if ((begin_sequence & 1U) == 0U) {
+            snapshot->yaw_deg = g_imu_yaw_snapshot.yaw_deg;
+            snapshot->yaw_rate_dps = g_imu_yaw_snapshot.yaw_rate_dps;
+            snapshot->gyro_bias_z_dps = g_imu_yaw_snapshot.gyro_bias_z_dps;
+            snapshot->valid = g_imu_yaw_snapshot.valid;
+            snapshot->sequence = g_imu_yaw_snapshot.sequence;
+            end_sequence = g_imu_yaw_publish_sequence;
+            if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
+                break;
+            }
+        }
+    }
+}
+#endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
 void app_state_crsf_snapshot_copy(crsf_control_input_t *input)

@@ -5,7 +5,7 @@
 
 static const app_profile_t g_app_profile = {
     .enable_motor_control = true,
-    .enable_imu = true,
+    .enable_imu = (APP_IMU_YAW_ENABLE != 0U),
     .enable_grayscale = true,
     .enable_crsf = (CRSF_REMOTE_CONTROL_ENABLE != 0U),
     .enable_oled = (APP_OLED_TEST_TASK_ENABLE != 0U),
