@@ -157,14 +157,15 @@ VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度 VOFA
 
 `algorithms/line_control/` 使用现有 `PID_Position` 实现灰度位置误差到左右差速速度的
 外环，随后由现有四轮速度 PID 跟踪每个轮位的 mm/s 目标。位置式 PID 默认参数为
-`kp=0.08f`、`ki=0`、`kd=0`，转向输出上限为 300 mm/s；可通过 `volatile`
+`kp=0.4f`、`ki=0`、`kd=0`，默认转向符号为 `-1.0f`，转向输出上限为 300 mm/s；可通过 `volatile`
 `g_line_control_debug` 使用 SWD 覆盖 PID 参数、最大转向速度、轮速上限、转向符号、
 黑度阈值和丢线时间。`g_drive_control_snapshot` 通过 `app_state` 提供模式、SB、灰度、
 PID、四轮目标和反馈速度的序列保护快照，供 SWD 观察和后续 VOFA 扩展。
 
 循迹有效判据要求灰度 `sequence` 非零、本次采样 `adc_timeout_mask` 为 0，并满足
-`line_strength` 进入阈值 800；已有效后使用退出阈值 400。丢线时冻结 PID 并保持上次
-转向输出最多 100 ms，超时后四轮目标清零并复位 PID。
+`line_strength` 进入阈值 10000；已有效后使用退出阈值 5000。丢线时冻结 PID 并保持上次
+转向输出最多 100 ms，超时后四轮目标清零并复位 PID。由于单个通道的最大黑度为 4095，
+该进入阈值隐含黑线通常覆盖约三个以上通道；窄线覆盖范围仍需结合灰度 VOFA 和实车验证。
 
 ### 巡线 VOFA 遥测
 

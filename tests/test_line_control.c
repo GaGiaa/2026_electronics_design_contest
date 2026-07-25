@@ -40,6 +40,37 @@ static line_control_input_t make_input(int32_t error, uint32_t strength,
     return input;
 }
 
+static void test_default_configuration(void)
+{
+    line_control_state_t state;
+    line_control_output_t output;
+    line_control_input_t input;
+
+    line_control_init(&state);
+    input = make_input(1000, 9999U, 0U, 1U, 200.0f, 0U);
+    line_control_step(&state, &input, &output);
+    assert(!output.line_valid);
+
+    input = make_input(1000, 10000U, 0U, 2U, 200.0f, 10U);
+    line_control_step(&state, &input, &output);
+    assert(output.line_valid);
+    assert_close(output.pid_p_out, -400.0f, 0.001f);
+    assert_close(output.turn_speed_mm_per_s, 300.0f, 0.001f);
+    assert_close(output.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_LEFT],
+                 500.0f, 0.001f);
+    assert_close(output.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_RIGHT],
+                 -100.0f, 0.001f);
+
+    input = make_input(1000, 5000U, 0U, 3U, 200.0f, 20U);
+    line_control_step(&state, &input, &output);
+    assert(output.line_valid);
+    assert_close(output.turn_speed_mm_per_s, 300.0f, 0.001f);
+
+    input = make_input(1000, 4999U, 0U, 4U, 200.0f, 30U);
+    line_control_step(&state, &input, &output);
+    assert(!output.line_valid);
+}
+
 static void test_center_line_keeps_left_and_right_equal(void)
 {
     line_control_state_t state;
@@ -171,6 +202,7 @@ static void test_repeated_sequence_does_not_update_pid(void)
 
 int main(void)
 {
+    test_default_configuration();
     test_center_line_keeps_left_and_right_equal();
     test_positive_error_turns_right_and_negative_error_turns_left();
     test_wheel_targets_are_scaled_to_maximum_speed();
