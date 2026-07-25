@@ -50,6 +50,12 @@ Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH=0U') `
     -Description 'IMU VOFA task stack depth is zero'
 Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_LINE_CONTROL_VOFA_TELEMETRY_TASK_STACK_DEPTH=0U') `
+    -Description 'line control VOFA task stack depth is zero'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_LINE_CONTROL_VOFA_TELEMETRY_INTERVAL_MS=0U') `
+    -Description 'line control VOFA telemetry period is zero'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_IMU_VOFA_TELEMETRY_INTERVAL_MS=0U') `
     -Description 'IMU VOFA telemetry period is zero'
 Assert-ConfigCompileFails -Header 'config/app_config.h' `
@@ -59,6 +65,10 @@ Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_VOFA_SPEED_PID_TELEMETRY_ENABLE=1U',
                '-DAPP_IMU_TELEMETRY_ENABLE=1U', '-DAPP_IMU_YAW_ENABLE=1U') `
     -Description 'conflicting telemetry modes'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE=1U',
+               '-DAPP_GRAY_VOFA_TELEMETRY_ENABLE=1U') `
+    -Description 'line control and grayscale telemetry modes conflict'
 Assert-ConfigCompileFails -Header 'config/encoder_config.h' `
     -Defines @('-DBOARD_ENCODER_DECODE_MODE=99U') `
     -Description 'unsupported encoder decode mode'

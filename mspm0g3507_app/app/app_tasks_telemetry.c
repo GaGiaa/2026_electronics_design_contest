@@ -73,6 +73,66 @@ static void vofa_speed_pid_telemetry_task(void *argument)
 }
 #endif
 
+#if APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE
+static StaticTask_t g_line_control_vofa_task_buffer;
+static StackType_t g_line_control_vofa_task_stack[
+    APP_LINE_CONTROL_VOFA_TELEMETRY_TASK_STACK_DEPTH];
+
+static void line_control_vofa_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval =
+        pdMS_TO_TICKS(APP_LINE_CONTROL_VOFA_TELEMETRY_INTERVAL_MS);
+    app_drive_control_snapshot_t drive;
+    motor_control_wheel_status_t control[BOARD_MOTOR_COUNT];
+    float channels[APP_LINE_CONTROL_CHANNEL_COUNT];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(APP_LINE_CONTROL_CHANNEL_COUNT)];
+
+    (void)argument;
+    for (;;) {
+        app_state_drive_control_snapshot_copy(&drive);
+        app_state_motor_control_snapshot_copy(control);
+
+        channels[0U] = (float)drive.mode;
+        channels[1U] = drive.link_active ? 1.0f : 0.0f;
+        channels[2U] = (float)drive.line_error;
+        channels[3U] = (float)drive.line_strength;
+        channels[4U] = drive.line_valid ? 1.0f : 0.0f;
+        channels[5U] = (float)drive.lost_line_ms;
+        channels[6U] = (float)drive.adc_timeout_mask;
+        channels[7U] = drive.base_speed_mm_per_s;
+        channels[8U] = drive.turn_speed_mm_per_s;
+        channels[9U] =
+            (drive.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_LEFT] +
+             drive.wheel_targets_mm_per_s[BOARD_MOTOR_REAR_LEFT]) * 0.5f;
+        channels[10U] =
+            (drive.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_RIGHT] +
+             drive.wheel_targets_mm_per_s[BOARD_MOTOR_REAR_RIGHT]) * 0.5f;
+        channels[11U] =
+            (control[BOARD_MOTOR_FRONT_LEFT].feedback_speed_mm_per_s +
+             control[BOARD_MOTOR_REAR_LEFT].feedback_speed_mm_per_s) * 0.5f;
+        channels[12U] =
+            (control[BOARD_MOTOR_FRONT_RIGHT].feedback_speed_mm_per_s +
+             control[BOARD_MOTOR_REAR_RIGHT].feedback_speed_mm_per_s) * 0.5f;
+        channels[13U] =
+            (control[BOARD_MOTOR_FRONT_LEFT].output_duty_percent +
+             control[BOARD_MOTOR_REAR_LEFT].output_duty_percent) * 0.5f;
+        channels[14U] =
+            (control[BOARD_MOTOR_FRONT_RIGHT].output_duty_percent +
+             control[BOARD_MOTOR_REAR_RIGHT].output_duty_percent) * 0.5f;
+        channels[15U] = drive.pid_p_out;
+        channels[16U] = drive.pid_i_out;
+        channels[17U] = drive.pid_d_out;
+
+        if (vofa_justfloat_encode(frame, sizeof(frame), channels,
+                                  APP_LINE_CONTROL_CHANNEL_COUNT)) {
+            board_uart_write(frame, sizeof(frame));
+        }
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
+
 #if APP_GRAY_VOFA_TELEMETRY_ENABLE
 static StaticTask_t g_gray_telemetry_task_buffer;
 static StackType_t g_gray_telemetry_task_stack[APP_GRAY_TASK_STACK_DEPTH];
@@ -131,6 +191,13 @@ void app_tasks_telemetry_start(void)
                      APP_VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY,
                      g_vofa_speed_pid_telemetry_task_stack,
                      &g_vofa_speed_pid_telemetry_task_buffer) != NULL);
+#endif
+#if APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(
+                     line_control_vofa_task, "line_control_vofa",
+                     APP_LINE_CONTROL_VOFA_TELEMETRY_TASK_STACK_DEPTH, NULL,
+                     APP_TELEMETRY_TASK_PRIORITY, g_line_control_vofa_task_stack,
+                     &g_line_control_vofa_task_buffer) != NULL);
 #endif
 #if APP_GRAY_VOFA_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(

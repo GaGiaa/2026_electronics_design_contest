@@ -79,6 +79,9 @@ Assert-Condition ($rootText -match 'docs/AI_HANDOFF\.md') 'Root README is missin
 Assert-Condition ($handoffText -match 'AI ') 'AI_HANDOFF is missing the AI handoff section.'
 Assert-Condition ($handoffText -match 'docs/DEPENDENCIES\.md') 'AI_HANDOFF is missing documentation ownership links.'
 Assert-Condition ($handoffText -notmatch '40510de') 'AI_HANDOFF contains an obsolete migration commit.'
+Assert-Condition ($texts['mspm0g3507_app/README.md'] -match 'APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE') 'G3507 README is missing line control VOFA configuration.'
+Assert-Condition ($texts['mspm0g3507_app/README.md'] -match 'APP_LINE_CONTROL_CHANNEL_COUNT') 'G3507 README is missing line control VOFA channel count.'
+Assert-Condition ($handoffText -match 'APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE') 'AI_HANDOFF is missing line control VOFA telemetry documentation.'
 
 foreach ($relativePath in $markdownFiles) {
     Assert-Condition ($texts[$relativePath] -notmatch 'motor_pid') "文档包含失效 motor_pid 路径：$relativePath"

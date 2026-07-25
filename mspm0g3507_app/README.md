@@ -119,8 +119,8 @@ RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_spee
 `g_motor_debug.wheel`，顺序为 `target_speed_mm_per_s`、`instant_feedback_speed_mm_per_s`、
 `feedback_speed_mm_per_s` 和 `output_duty_percent`；帧尾为 `00 00 80 7F`。
 
-启用 VOFA 模式后，UART0 输出由该模式独占，不会创建 UART 回显任务。IMU yaw 遥测和速度环
-VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发送文本。帧仍然通过
+启用 VOFA 模式后，UART0 输出由该模式独占，不会创建 UART 回显任务。速度环、灰度、巡线和
+IMU yaw VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发送文本。帧仍然通过
 `board_uart_write()` 放入队列，并由专用 UART TX 任务发送，因此电机任务和编码器 ISR 不会
 阻塞在 UART 上。如果 `g_motor_debug.wheel` 无效，遥测任务会安全地发送前左轮状态。初次
 验证时，不要设置断点；使用调试器手动转动一个轮子，确认计数符号和轮位隔离后，再以低占空比
@@ -147,7 +147,7 @@ VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发送文�
 `volatile g_grayscale_debug` 镜像，用于观察每个通道的 `white`、`black`、`gray_white`、`gray_black` 标定值，
 以及 `digital` 和 `sequence`。该镜像不会反向修改驱动内部的私有标定数组。
 
-帧尾为 `00 00 80 7F`。速度和灰度 VOFA 遥测互斥，同时启用会触发编译期错误。在任一
+帧尾为 `00 00 80 7F`。速度、灰度、巡线和 IMU VOFA 遥测互斥，同时启用会触发编译期错误。在任一
 VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度 VOFA 字段仅用于观察；高档循迹
 使用同一个灰度快照，但不改变该 VOFA 帧的通道定义。灰度快照
 额外提供 `adc_timeout_mask`，用于防止 ADC 超时被误判为黑线。初次验证时，让黑线经过传感器，
@@ -164,8 +164,46 @@ PID、四轮目标和反馈速度的序列保护快照，供 SWD 观察和后续
 
 循迹有效判据要求灰度 `sequence` 非零、本次采样 `adc_timeout_mask` 为 0，并满足
 `line_strength` 进入阈值 800；已有效后使用退出阈值 400。丢线时冻结 PID 并保持上次
-转向输出最多 100 ms，超时后四轮目标清零并复位 PID。本轮不新增线控 VOFA 帧，已有灰度、
-速度 PID 和 IMU JustFloat 格式保持不变。
+转向输出最多 100 ms，超时后四轮目标清零并复位 PID。
+
+### 巡线 VOFA 遥测
+
+巡线遥测默认由 `APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE=0U` 关闭，通过
+`-LineControlVofaTelemetryEnable 1` 开启；使用巡线遥测时必须关闭
+其他 UART 遥测，例如：
+
+```text
+-LineControlVofaTelemetryEnable 1 -LineControlVofaTelemetryIntervalMs 20
+-GrayVofaTelemetryEnable 0 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 0
+```
+
+任务每 20 ms 发送一个由 `APP_LINE_CONTROL_CHANNEL_COUNT=18U` 定义的 18 通道、76 字节小端
+`float32` JustFloat 帧。通道顺序如下：
+
+| 通道 | 内容 |
+| --- | --- |
+| 0 | 底盘模式 |
+| 1 | CRSF 链路状态 |
+| 2 | `line_error` |
+| 3 | `line_strength` |
+| 4 | `line_valid` |
+| 5 | `lost_line_ms` |
+| 6 | `adc_timeout_mask` |
+| 7 | 基础速度 |
+| 8 | 转向/PID 总输出 |
+| 9 | 左侧目标速度 |
+| 10 | 右侧目标速度 |
+| 11 | 左侧平均反馈速度 |
+| 12 | 右侧平均反馈速度 |
+| 13 | 左侧平均 PWM |
+| 14 | 右侧平均 PWM |
+| 15 | PID P 输出 |
+| 16 | PID I 输出 |
+| 17 | PID D 输出 |
+
+目标速度来自 `g_drive_control_snapshot`，反馈速度和 PWM 来自四轮电机状态快照，左右侧分别
+对前后轮取平均。遥测任务通过现有 UART TX 队列发送，不直接访问巡线 PID 内部状态，也不支持
+通过 VOFA 下发参数。
 
 PA2 通过 TIMG8 CCP1 驱动无源蜂鸣器。`config/app_config.h` 提供编译期宏
 `APP_BUZZER_FEATURE_ENABLE`、`APP_BUZZER_FREQUENCY_HZ`、`APP_BUZZER_DUTY_PERCENT`、
@@ -257,7 +295,7 @@ black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
 `{-3500,-2500,-1500,-500,500,1500,2500,3500}`。当黑度总和为 0 时保持之前的误差。
 当前这些标定数据由灰度任务和高档循迹控制共同读取；灰度 VOFA 帧仍只用于观察。
 `APP_GRAY_VOFA_TELEMETRY_ENABLE`
-默认值为 `0U`，可以通过构建脚本设置为 1 以发送前文描述的二进制帧。即使遥测关闭，
+当前配置默认值为 `1U`，需要调试巡线遥测时通过构建脚本设置为 0。即使遥测关闭，
 仍可通过 SWD 观察 volatile 的 `g_grayscale_snapshot`。构建成功不代表灰度传感器实物验收
 完成。
 
