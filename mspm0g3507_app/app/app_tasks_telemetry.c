@@ -41,11 +41,11 @@ static void imu_vofa_task(void *argument)
 #endif
 
 #if APP_VOFA_SPEED_PID_TELEMETRY_ENABLE
-static StaticTask_t g_telemetry_task_buffer;
-static StackType_t g_telemetry_task_stack[
+static StaticTask_t g_vofa_speed_pid_telemetry_task_buffer;
+static StackType_t g_vofa_speed_pid_telemetry_task_stack[
     APP_VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH];
 
-static void telemetry_task(void *argument)
+static void vofa_speed_pid_telemetry_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval =
@@ -126,10 +126,11 @@ void app_tasks_telemetry_start(void)
 #endif
 #if APP_VOFA_SPEED_PID_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(
-                     telemetry_task, "telemetry",
+                     vofa_speed_pid_telemetry_task, "vofa_speed_pid",
                      APP_VOFA_SPEED_PID_TELEMETRY_TASK_STACK_DEPTH, NULL,
                      APP_VOFA_SPEED_PID_TELEMETRY_TASK_PRIORITY,
-                     g_telemetry_task_stack, &g_telemetry_task_buffer) != NULL);
+                     g_vofa_speed_pid_telemetry_task_stack,
+                     &g_vofa_speed_pid_telemetry_task_buffer) != NULL);
 #endif
 #if APP_GRAY_VOFA_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(
