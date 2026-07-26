@@ -18,8 +18,9 @@ typedef struct {
     crsf_drive_mode_t mode;
     /* CRSF 帧链路是否在超时窗口内。 */
     bool link_active;
-    /* SB 原始通道值和灰度线控观察量。 */
+    /* SB/SC 原始通道值和灰度线控观察量。 */
     uint16_t sb_raw;
+    uint16_t sc_raw;
     int32_t line_error;
     uint32_t line_strength;
     uint8_t adc_timeout_mask;
@@ -32,6 +33,10 @@ typedef struct {
     float pid_i_out;
     float pid_d_out;
     float pid_output;
+    bool yaw_valid;
+    float yaw_target_deg;
+    float yaw_feedback_deg;
+    float yaw_error_deg;
     float wheel_targets_mm_per_s[BOARD_MOTOR_COUNT];
     float wheel_feedback_mm_per_s[BOARD_MOTOR_COUNT];
     uint32_t line_sequence;

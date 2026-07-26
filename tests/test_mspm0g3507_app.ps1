@@ -93,6 +93,8 @@ $lineTracking = Join-Path $projectDir 'algorithms\line_tracking\line_tracking.c'
 $lineTrackingHeader = Join-Path $projectDir 'algorithms\line_tracking\line_tracking.h'
 $lineControl = Join-Path $projectDir 'algorithms\line_control\line_control.c'
 $lineControlHeader = Join-Path $projectDir 'algorithms\line_control\line_control.h'
+$yawControl = Join-Path $projectDir 'algorithms\yaw_control\yaw_control.c'
+$yawControlHeader = Join-Path $projectDir 'algorithms\yaw_control\yaw_control.h'
 $grayscaleUnitTest = Join-Path $ProjectRoot 'tests\test_board_grayscale.c'
 $grayscaleUnitTestScript = Join-Path $ProjectRoot 'tests\test_board_grayscale.ps1'
 $grayscaleUnitTestSupport = Join-Path $ProjectRoot 'tests\test_support\ti_msp_dl_config.h'
@@ -124,7 +126,7 @@ $launch = Join-Path $ProjectRoot '.vscode\launch.json'
 $gitIgnore = Join-Path $ProjectRoot '.gitignore'
 $keilProject = Join-Path $ProjectRoot 'keil\mspm0g3507_app\mspm0g3507_app.uvprojx'
 
-foreach ($path in @($projectDir, $main, $ws2812, $ws2812Header, $buzzer, $buzzerHeader, $servo, $servoHeader, $servoMath, $appConfig, $encoderConfig, $monitorConfig, $bmi160, $bmi160Header, $imuYaw, $imuYawHeader, $buttons, $buttonsHeader, $grayscale, $grayscaleHeader, $lineTracking, $lineTrackingHeader, $lineControl, $lineControlHeader, $grayscaleUnitTest, $grayscaleUnitTestScript, $grayscaleUnitTestSupport, $uart, $crsfUart, $crsfProtocol, $crsfProtocolHeader, $crsfControl, $crsfControlHeader, $crsfConfig, $motor, $motorHeader, $encoder, $encoderHeader, $motorControl, $motorControlHeader, $motorPid, $motorPidHeader, $vofaJustFloat, $vofaJustFloatHeader, $syscfg, $rtosConfig, $ccsBuildConfig,
+foreach ($path in @($projectDir, $main, $ws2812, $ws2812Header, $buzzer, $buzzerHeader, $servo, $servoHeader, $servoMath, $appConfig, $encoderConfig, $monitorConfig, $bmi160, $bmi160Header, $imuYaw, $imuYawHeader, $buttons, $buttonsHeader, $grayscale, $grayscaleHeader, $lineTracking, $lineTrackingHeader, $lineControl, $lineControlHeader, $yawControl, $yawControlHeader, $grayscaleUnitTest, $grayscaleUnitTestScript, $grayscaleUnitTestSupport, $uart, $crsfUart, $crsfProtocol, $crsfProtocolHeader, $crsfControl, $crsfControlHeader, $crsfConfig, $motor, $motorHeader, $encoder, $encoderHeader, $motorControl, $motorControlHeader, $motorPid, $motorPidHeader, $vofaJustFloat, $vofaJustFloatHeader, $syscfg, $rtosConfig, $ccsBuildConfig,
                         $buildScript, $flashScript, $tasks, $launch, $gitIgnore)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "MSPM0G3507 app project is incomplete: $path is missing."
@@ -181,6 +183,7 @@ Assert-Contains -Path $crsfControl -Pattern 'CRSF_CHANNEL_DEADBAND' -Description
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MAX_SPEED_MM_PER_S\s+800\.0f' -Description 'CRSF control must default to 800 mm/s'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_REMOTE_CONTROL_ENABLE 1U' -Description 'CRSF control must default to enabled'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MODE_CHANNEL_INDEX\s+6U' -Description 'CRSF mode must use CH5 array index 6'
+Assert-Contains -Path $crsfConfig -Pattern 'CRSF_SC_CHANNEL_INDEX\s+7U' -Description 'CRSF SC must use channel array index 7'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MODE_LOW_MAX\s+700U' -Description 'CRSF low mode threshold'
 Assert-Contains -Path $crsfConfig -Pattern 'CRSF_MODE_HIGH_MIN\s+1300U' -Description 'CRSF high mode threshold'
 Assert-Contains -Path $main -Pattern 'GROUP1_IRQHandler' -Description 'Application must provide the GPIOA interrupt handler for encoder A phases'
@@ -426,6 +429,15 @@ Assert-Contains -Path $lineControlHeader -Pattern 'line_control_step' -Descripti
 Assert-Contains -Path $lineControlHeader -Pattern 'g_line_control_debug' -Description 'Line control must expose SWD debug parameters'
 Assert-Contains -Path $lineControl -Pattern 'PID_Position_Calc' -Description 'Line control must use the positional PID'
 Assert-Contains -Path $lineControl -Pattern 'lost_line_timeout_ms' -Description 'Line control must implement a lost-line timeout'
+Assert-Contains -Path $yawControlHeader -Pattern 'yaw_control_state_t' -Description 'Yaw control must expose its state type'
+Assert-Contains -Path $yawControlHeader -Pattern 'g_yaw_control_debug' -Description 'Yaw control must expose SWD debug parameters'
+Assert-Contains -Path $yawControl -Pattern 'PID_Position_Calc' -Description 'Yaw control must use the positional PID'
+Assert-Contains -Path $yawControl -Pattern 'APP_YAW_CONTROL_INTERVAL_MS' -Description 'Yaw control must use its 50 ms interval'
+Assert-Contains -Path $main -Pattern 'CRSF_DRIVE_MODE_YAW_HOLD' -Description 'Motor task must implement yaw hold mode'
+Assert-Contains -Path $main -Pattern 'app_state_imu_yaw_snapshot_copy' -Description 'Yaw hold must read the IMU yaw snapshot'
+Assert-Contains -Path $main -Pattern 'yaw_control_step' -Description 'Motor task must call the yaw controller'
+Assert-Contains -Path $main -Pattern 'yaw_output\.wheel_targets_mm_per_s' -Description 'Yaw hold must publish yaw wheel targets'
+Assert-Contains -Path $main -Pattern 'yaw_control_reset' -Description 'Yaw hold must reset on invalid mode or feedback'
 Assert-Contains -Path $lineTracking -Pattern 'BOARD_GRAYSCALE_ADC_MAX\s*-\s*normalized' -Description 'Line tracking must derive blackness from normalized values'
 Assert-Contains -Path $lineTracking -Pattern '-3500.*-2500.*-1500.*-500' -Description 'Line tracking must define signed channel weights'
 Assert-Contains -Path $buildScript -Pattern 'line_tracking\.c' -Description 'CCS build must compile line tracking'
@@ -649,5 +661,6 @@ Assert-Contains -Path $keilProject -Pattern 'board_crsf_uart\.c' -Description 'K
 Assert-Contains -Path $keilProject -Pattern 'crsf_protocol\.c' -Description 'Keil project must include the CRSF parser'
 Assert-Contains -Path $keilProject -Pattern 'crsf_control\.c' -Description 'Keil project must include the CRSF mixer'
 Assert-Contains -Path $keilProject -Pattern 'line_control\.c' -Description 'Keil project must include line control'
+Assert-Contains -Path $keilProject -Pattern 'yaw_control\.c' -Description 'Keil project must include yaw control'
 
 Write-Host 'PASS: MSPM0G3507 app static integration checks passed.'

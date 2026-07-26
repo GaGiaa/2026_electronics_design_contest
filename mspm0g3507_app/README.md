@@ -159,8 +159,8 @@ VOFA 模式下，UART 回显和 BMI160 文本输出都会被抑制。灰度 VOFA
 外环，随后由现有四轮速度 PID 跟踪每个轮位的 mm/s 目标。位置式 PID 默认参数为
 `kp=0.4f`、`ki=0`、`kd=0`，默认转向符号为 `-1.0f`，转向输出上限为 300 mm/s；可通过 `volatile`
 `g_line_control_debug` 使用 SWD 覆盖 PID 参数、最大转向速度、轮速上限、转向符号、
-黑度阈值和丢线时间。`g_drive_control_snapshot` 通过 `app_state` 提供模式、SB、灰度、
-PID、四轮目标和反馈速度的序列保护快照，供 SWD 观察和后续 VOFA 扩展。
+黑度阈值和丢线时间。`g_drive_control_snapshot` 通过 `app_state` 提供模式、SB/SC、灰度、
+PID、yaw 诊断、四轮目标和反馈速度的序列保护快照，供 SWD 观察和后续 VOFA 扩展。
 
 循迹有效判据要求灰度 `sequence` 非零、本次采样 `adc_timeout_mask` 为 0，并满足
 `line_strength` 进入阈值 800；已有效后使用退出阈值 400。丢线时冻结 PID 并保持上次
@@ -172,6 +172,19 @@ PID、四轮目标和反馈速度的序列保护快照，供 SWD 观察和后续
 后的首个有效样本直接初始化滤波器。外环未到更新时间时保持上一次差速速度目标，但灰度有效性、ADC
 超时和丢线安全判定仍按 10 ms 执行。当前保持 `PID_POSITION_VARIANT_BASIC`，位置 PID 的 `Ki/Kd`
 仍为 0；`g_line_control_debug.line_error_filter_time_constant_ms` 可用于调节滤波时间常数。
+
+### yaw 锁定闭环
+
+`algorithms/yaw_control/` 使用 IMU yaw 快照实现底盘方向锁定。新增的
+`volatile g_yaw_control_debug` 可通过 SWD 设置 `target_yaw_deg`、位置 PID 参数、
+最大转向速度、轮速上限和 `turn_sign`。默认目标角为 `0 deg`，位置环默认 `kp=0.4f`、
+`ki=0`、`kd=0`，转向上限为 `300 mm/s`，轮速上限为 `800 mm/s`，默认 `turn_sign=-1.0f`。
+
+位置环由 `APP_YAW_CONTROL_INTERVAL_MS=50U` 控制；首次获得有效 yaw 时立即计算，之后每
+50 ms 更新一次，10 ms 电机任务在两次更新之间保持转向输出，并继续由四轮速度 PID 生成 PWM。
+目标角和反馈角按最短路径归一化到 `[-180, 180)`。IMU 快照无效、基础速度非法或
+`APP_IMU_YAW_ENABLE=0U` 时，yaw 模式清零四轮目标并复位 PID；SWD 写入非法目标角、PID 或限速参数时也会安全停车。跨越 ±180° 时会清除 PID 微分历史，避免角度环绕产生尖峰。yaw 模式不使用 CH1 右摇杆，
+只使用 CH3 左摇杆控制基础前进速度。
 
 ### 巡线 VOFA 遥测
 
@@ -334,12 +347,13 @@ TX 输出连接到 PB3，并与 MCU 共地。固件只接收 CRSF 数据，不�
 
 `CRSF_REMOTE_CONTROL_ENABLE` 默认值为 `1U`。使用
 `tools/build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 0` 可以构建不创建 CRSF 接收任务的
-SWD 调试版本。CH3（通道索引 2）控制前进和后退，CH1（通道索引 0）控制差速转向，SB/CH5
-（通道数组索引 6）控制底盘模式。标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20%
+SWD 调试版本。CH3（通道索引 2）控制前进和后退，CH1（通道索引 0）控制手动模式差速转向，SB/CH5
+（通道数组索引 6）和 SC（通道数组索引 7）共同控制底盘模式。标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20%
 死区。默认最大轮速目标为 800 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
 
-SB 低档（小于 700）使底盘空闲，中档（700 到 1299）使用 CH1/CH3 手动差速，高档（不小于
-1300）使用 CH3 作为基础速度并进入黑线循迹。模式切换时先输出一个 10 ms 的四轮零目标，
+SB 低档（小于 700）使底盘空闲。SB 中档（700 到 1299）且 SC 低档（小于 700）使用
+CH1/CH3 手动差速，SC 中档（700 到 1299）进入 yaw 锁定，SC 高档（不小于 1300）安全停车。
+SB 高档（不小于 1300）使用 CH3 作为基础速度并进入黑线循迹，忽略 SC。模式切换时先输出一个 10 ms 的四轮零目标，
 连续 100 ms 没有收到有效的打包 RC 帧时也会清零。方向符号可以通过 `CRSF_FORWARD_SIGN`
 和 `CRSF_TURN_SIGN` 调整。`CRSF_REMOTE_CONTROL_ENABLE=0U` 时保留 `g_motor_debug` 单轮
 SWD 调试覆盖路径；UART0 仍可用于现有调试和 VOFA 输出。
@@ -348,6 +362,8 @@ SWD 调试覆盖路径；UART0 仍可用于现有调试和 VOFA 输出。
 `channels.channels[0..15]`、`link_active`、`last_valid_time_ms`、`valid_frame_count`、
 `crc_error_count`、`frame_error_count` 和 `rx_overflow_count`。其中
 `channels.channels[2]` 是 CH3，`channels.channels[0]` 是 CH1，`channels.channels[6]` 是
-CH5/SB。线控状态可通过 `g_drive_control_snapshot` 观察。
+CH5/SB，`channels.channels[7]` 是 SC。线控和 yaw 锁定状态可通过
+`g_drive_control_snapshot` 观察。
 
-协议和混控主机测试位于 `tests/test_crsf.ps1`。硬件验收前必须先让车轮悬空，或断开电机电源。
+协议和混控主机测试位于 `tests/test_crsf.ps1`，yaw 控制单元测试位于
+`tests/test_yaw_control.ps1`。硬件验收前必须先让车轮悬空，或断开电机电源。

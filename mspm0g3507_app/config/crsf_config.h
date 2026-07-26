@@ -33,6 +33,11 @@
 #define CRSF_MODE_CHANNEL_INDEX 6U
 #endif
 
+/* 当前发射机 SC 三档开关使用接收机通道数组索引 7。 */
+#ifndef CRSF_SC_CHANNEL_INDEX
+#define CRSF_SC_CHANNEL_INDEX 7U
+#endif
+
 /* SB 原始值低于/高于这两个阈值时分别进入低档/高档。 */
 #ifndef CRSF_MODE_LOW_MAX
 #define CRSF_MODE_LOW_MAX 700U
@@ -62,7 +67,8 @@
 
 #if (CRSF_FORWARD_CHANNEL_INDEX >= CRSF_CHANNEL_COUNT) || \
     (CRSF_TURN_CHANNEL_INDEX >= CRSF_CHANNEL_COUNT) || \
-    (CRSF_MODE_CHANNEL_INDEX >= CRSF_CHANNEL_COUNT)
+    (CRSF_MODE_CHANNEL_INDEX >= CRSF_CHANNEL_COUNT) || \
+    (CRSF_SC_CHANNEL_INDEX >= CRSF_CHANNEL_COUNT)
 #error "CRSF channel index must fit inside CRSF_CHANNEL_COUNT"
 #endif
 #if (CRSF_CHANNEL_MIN >= CRSF_CHANNEL_CENTER) || \
