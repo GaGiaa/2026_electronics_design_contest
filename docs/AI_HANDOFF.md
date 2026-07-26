@@ -137,7 +137,8 @@ SB 低档为空闲，SB 中档且 SC 低档为手动、SC 中档为 yaw 锁定�
 默认转向符号为 `-1.0f`，转向输出上限为 300 mm/s。`g_line_control_debug` 提供 SWD 可写的 PID、轮速、转向符号、
 灰度阈值和丢线时间参数；新增 `algorithms/yaw_control/` 及可写的
 `g_yaw_control_debug`，用于设置目标 yaw、yaw 位置 PID、转向限幅和符号。yaw 位置环默认
-50 ms 更新，10 ms 电机速度环执行四轮目标；`g_drive_control_snapshot` 通过 `app_state` 提供模式、SB/SC、
+`kp=15.0f`、`ki=0`、`kd=0`、死区 `0.1 deg`，转向上限 `700 mm/s`，轮速上限 `800 mm/s`，
+默认 `turn_sign=-1.0f`；位置环按 50 ms 更新，10 ms 电机速度环执行四轮目标；`g_drive_control_snapshot` 通过 `app_state` 提供模式、SB/SC、
 灰度、yaw 诊断、PID、四轮目标和反馈速度的序列保护快照。
 
 巡线位置外环默认周期由 `APP_LINE_CONTROL_INTERVAL_MS` 配置，默认值为 50 ms；灰度采样任务和四轮速度
@@ -236,6 +237,9 @@ host test、CRSF、电机控制、舵机、IMU yaw、线跟踪和 VOFA 单元测
 本次巡线参数修订将默认 `turn_sign` 调整为 `-1.0f`，位置式 PID `kp` 调整为 `0.4f`，并将
 灰度有效进入/退出阈值调整为 `800/400`。新增主机单元测试覆盖默认参数的有效判定、转向
 方向和比例输出；本次验证仍仅覆盖软件行为，未执行 Flash、GDB、烧录、电机调试或实车循迹验收。
+
+本轮 Yaw 参数修订将默认位置式 PID `kp` 调整为 `15.0f`，增加 `0.1 deg` 死区，并将转向
+输出上限调整为 `700 mm/s`；主机测试补充覆盖编译期默认参数的转向输出、死区和限幅行为。
 
 本轮未执行 Flash 擦除、烧录、探针枚举、电机调试或任何实物验收操作。巡线 VOFA 帧的实际
 VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。

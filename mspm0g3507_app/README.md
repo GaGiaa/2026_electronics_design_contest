@@ -177,8 +177,9 @@ PID、yaw 诊断、四轮目标和反馈速度的序列保护快照，供 SWD �
 
 `algorithms/yaw_control/` 使用 IMU yaw 快照实现底盘方向锁定。新增的
 `volatile g_yaw_control_debug` 可通过 SWD 设置 `target_yaw_deg`、位置 PID 参数、
-最大转向速度、轮速上限和 `turn_sign`。默认目标角为 `0 deg`，位置环默认 `kp=0.4f`、
-`ki=0`、`kd=0`，转向上限为 `300 mm/s`，轮速上限为 `800 mm/s`，默认 `turn_sign=-1.0f`。
+最大转向速度、轮速上限和 `turn_sign`。默认目标角为 `0 deg`，位置环默认 `kp=15.0f`、
+`ki=0`、`kd=0`、死区为 `0.1 deg`，转向上限为 `700 mm/s`，轮速上限为 `800 mm/s`，
+默认 `turn_sign=-1.0f`。
 
 位置环由 `APP_YAW_CONTROL_INTERVAL_MS=50U` 控制；首次获得有效 yaw 时立即计算，之后每
 50 ms 更新一次，10 ms 电机任务在两次更新之间保持转向输出，并继续由四轮速度 PID 生成 PWM。

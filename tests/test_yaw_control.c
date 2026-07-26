@@ -35,6 +35,26 @@ static yaw_control_input_t make_input(float yaw_deg, bool valid,
     return input;
 }
 
+static void test_compiled_defaults_are_applied(void)
+{
+    yaw_control_state_t state;
+    yaw_control_output_t output;
+    yaw_control_input_t input;
+
+    reset_debug();
+    g_yaw_control_debug.use_pid_override = false;
+    g_yaw_control_debug.max_turn_speed_mm_per_s = 700.0f;
+    yaw_control_init(&state);
+
+    input = make_input(-60.0f, true, 0.0f, 0U);
+    yaw_control_step(&state, &input, &output);
+    assert_close(output.turn_speed_mm_per_s, -700.0f, 0.001f);
+
+    input = make_input(-0.05f, true, 0.0f, 50U);
+    yaw_control_step(&state, &input, &output);
+    assert_close(output.turn_speed_mm_per_s, 0.0f, 0.001f);
+}
+
 static void test_first_valid_sample_calculates_and_mixes(void)
 {
     yaw_control_state_t state;
@@ -200,6 +220,7 @@ static void test_invalid_debug_pid_stops_safely(void)
 int main(void)
 {
     assert(APP_YAW_CONTROL_INTERVAL_MS == 50U);
+    test_compiled_defaults_are_applied();
     test_first_valid_sample_calculates_and_mixes();
     test_position_loop_updates_only_every_50_ms();
     test_yaw_error_wraps_across_boundary();

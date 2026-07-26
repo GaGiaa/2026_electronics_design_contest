@@ -7,17 +7,17 @@
 #include "config/app_config.h"
 #include "config/crsf_config.h"
 
-#define YAW_CONTROL_DEFAULT_MAX_TURN_SPEED_MM_PER_S 300.0f
+#define YAW_CONTROL_DEFAULT_MAX_TURN_SPEED_MM_PER_S 700.0f
 #define YAW_CONTROL_DEFAULT_MAX_WHEEL_SPEED_MM_PER_S CRSF_MAX_SPEED_MM_PER_S
 #define YAW_CONTROL_DEFAULT_TURN_SIGN -1.0f
-#define YAW_CONTROL_DEFAULT_KP 0.4f
+#define YAW_CONTROL_DEFAULT_KP 15.0f
 
 static const PID_Position_Param_Config g_default_pid_params = {
     .kp = YAW_CONTROL_DEFAULT_KP,
     .ki = 0.0f,
     .kd = 0.0f,
     .output_limit = YAW_CONTROL_DEFAULT_MAX_TURN_SPEED_MM_PER_S,
-    .deadband = 0.0f,
+    .deadband = 0.1f,
 };
 
 volatile yaw_control_debug_t g_yaw_control_debug = {
