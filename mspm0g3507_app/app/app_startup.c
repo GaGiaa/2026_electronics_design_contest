@@ -14,6 +14,7 @@
 #include "app/app_tasks_sensor.h"
 #include "app/app_tasks_telemetry.h"
 #include "config/app_config.h"
+#include "drivers/buttons/board_buttons.h"
 #include "drivers/buzzer/board_buzzer.h"
 #include "drivers/encoder/board_encoder.h"
 #include "drivers/grayscale/board_grayscale.h"
@@ -57,9 +58,7 @@ void app_startup(void)
 
     (void)app_profile_get();
     app_state_init();
-#if APP_BUTTON_FEATURE_ENABLE
     board_buttons_init();
-#endif
     board_encoder_init();
     board_grayscale_init(grayscale_white, grayscale_black);
     line_tracking_init(&g_line_tracking_state, 0);

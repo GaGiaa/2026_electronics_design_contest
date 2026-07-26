@@ -13,6 +13,7 @@ static void assert_float_equal(float actual, float expected)
 
 int main(void)
 {
+    app_button_snapshot_t buttons;
     app_imu_yaw_snapshot_t snapshot;
     app_drive_control_snapshot_t drive = {0};
     app_drive_control_snapshot_t copied_drive = {0};
@@ -21,8 +22,23 @@ int main(void)
     assert(g_encoder_sample_sequence == 0U);
     assert(g_grayscale_publish_sequence == 0U);
     assert(g_drive_control_publish_sequence == 0U);
+    assert(g_button_publish_sequence == 0U);
     assert(g_imu_yaw_publish_sequence == 0U);
     assert(!g_imu_yaw_snapshot.valid);
+
+    app_state_buttons_snapshot_copy(&buttons);
+    assert(buttons.pressed_mask == 0U);
+    assert(buttons.pressed_edge_mask == 0U);
+    assert(buttons.released_edge_mask == 0U);
+    assert(buttons.sequence == 0U);
+
+    app_state_buttons_publish(0x05U, 0x01U, 0x02U);
+    app_state_buttons_snapshot_copy(&buttons);
+    assert(buttons.pressed_mask == 0x05U);
+    assert(buttons.pressed_edge_mask == 0x01U);
+    assert(buttons.released_edge_mask == 0x02U);
+    assert(buttons.sequence == 1U);
+    assert(g_button_publish_sequence == 2U);
 
     app_state_encoder_cycle_begin();
     assert(g_encoder_sample_sequence == 1U);

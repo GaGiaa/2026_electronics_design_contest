@@ -14,6 +14,7 @@ typedef enum {
 } board_button_t;
 
 typedef struct {
+    uint32_t stable_pressed_mask;
     uint32_t pressed_mask;
     uint32_t released_mask;
 } board_buttons_events_t;

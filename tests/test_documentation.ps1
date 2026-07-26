@@ -82,6 +82,9 @@ Assert-Condition ($handoffText -notmatch '40510de') 'AI_HANDOFF contains an obso
 Assert-Condition ($texts['mspm0g3507_app/README.md'] -match 'APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE') 'G3507 README is missing line control VOFA configuration.'
 Assert-Condition ($texts['mspm0g3507_app/README.md'] -match 'APP_LINE_CONTROL_CHANNEL_COUNT') 'G3507 README is missing line control VOFA channel count.'
 Assert-Condition ($handoffText -match 'APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE') 'AI_HANDOFF is missing line control VOFA telemetry documentation.'
+Assert-Condition ($texts['mspm0g3507_app/README.md'] -match 'APP_BUTTON_VOFA_TELEMETRY_ENABLE') 'G3507 README is missing button VOFA telemetry configuration.'
+Assert-Condition ($handoffText -match 'app_state_buttons_publish') 'AI_HANDOFF is missing button input snapshot documentation.'
+Assert-Condition ($handoffText -notmatch 'APP_BUTTON_FEATURE_ENABLE|key,pa7=down|key,pa7=up') 'Documentation contains the removed button text telemetry design.'
 
 foreach ($relativePath in $markdownFiles) {
     Assert-Condition ($texts[$relativePath] -notmatch 'motor_pid') "文档包含失效 motor_pid 路径：$relativePath"

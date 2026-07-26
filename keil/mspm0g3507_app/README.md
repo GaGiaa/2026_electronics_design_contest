@@ -42,8 +42,15 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 必须启用 short enum 和 short wchar ABI 设置：
 `vShortEn=1`、`vShortWch=1`。
 
-两种 VOFA 遥测模式默认关闭：
-`APP_VOFA_SPEED_PID_TELEMETRY_ENABLE=0U` 和 `APP_GRAY_VOFA_TELEMETRY_ENABLE=0U`。
+按键、速度、灰度、巡线和 IMU VOFA 遥测模式默认关闭。按键遥测可通过以下参数临时开启：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 `
+  -ButtonVofaTelemetryEnable 1
+```
+
+`APP_BUTTON_VOFA_TELEMETRY_ENABLE`、`APP_VOFA_SPEED_PID_TELEMETRY_ENABLE` 和
+`APP_GRAY_VOFA_TELEMETRY_ENABLE` 默认值均为 `0U`。
 构建灰度 JustFloat 配置时，执行：
 
 ```powershell
@@ -62,8 +69,9 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 `
 - 通道 20：`line_strength`
 - 通道 21：`sequence`
 
-所有值均为小端序 `float32`，JustFloat 帧尾为 `00 00 80 7F`。速度 VOFA 和灰度
-VOFA 模式不能同时启用。灰度 `line_error` 仅用于观察，不会驱动电机目标或 PWM。
+所有值均为小端序 `float32`，JustFloat 帧尾为 `00 00 80 7F`。按键遥测帧为 20 字节，
+通道顺序为 `PA7、PB12、PA8、PA30`，按下为 `1.0f`，释放为 `0.0f`。所有 UART VOFA
+模式不能同时启用。灰度 `line_error` 仅用于观察，不会驱动电机目标或 PWM。
 构建成功不代表传感器已经完成实物验收。
 
 ## 从 VS Code 打开

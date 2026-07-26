@@ -30,10 +30,8 @@ static StackType_t g_uart_task_stack[APP_UART_TASK_STACK_DEPTH];
 #endif
 static StaticTask_t g_uart_tx_task_buffer;
 static StackType_t g_uart_tx_task_stack[APP_UART_TX_TASK_STACK_DEPTH];
-#if APP_BUTTON_FEATURE_ENABLE
 static StaticTask_t g_button_task_buffer;
 static StackType_t g_button_task_stack[APP_BUTTON_TASK_STACK_DEPTH];
-#endif
 static StaticQueue_t g_uart_queue_buffer;
 static uint8_t g_uart_queue_storage[APP_UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
 
@@ -153,27 +151,6 @@ static void oled_test_task(void *argument)
 }
 #endif
 
-#if APP_BUTTON_FEATURE_ENABLE
-typedef struct {
-    const uint8_t *data;
-    size_t length;
-} button_message_t;
-
-#define BUTTON_MESSAGE(text) { (const uint8_t *)(text), sizeof(text) - 1U }
-static const button_message_t g_button_down_messages[BOARD_BUTTON_COUNT] = {
-    BUTTON_MESSAGE("key,pa7=down\r\n"),
-    BUTTON_MESSAGE("key,pb12=down\r\n"),
-    BUTTON_MESSAGE("key,pa8=down\r\n"),
-    BUTTON_MESSAGE("key,pa30=down\r\n")
-};
-static const button_message_t g_button_up_messages[BOARD_BUTTON_COUNT] = {
-    BUTTON_MESSAGE("key,pa7=up\r\n"),
-    BUTTON_MESSAGE("key,pb12=up\r\n"),
-    BUTTON_MESSAGE("key,pa8=up\r\n"),
-    BUTTON_MESSAGE("key,pa30=up\r\n")
-};
-#undef BUTTON_MESSAGE
-
 static void button_task(void *argument)
 {
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -182,25 +159,13 @@ static void button_task(void *argument)
     (void)argument;
     for (;;) {
         board_buttons_events_t events = board_buttons_scan();
-        uint32_t button;
-
-        for (button = 0U; button < BOARD_BUTTON_COUNT; ++button) {
-            uint32_t mask = 1U << button;
-            if ((events.pressed_mask & mask) != 0U) {
-                board_uart_write(g_button_down_messages[button].data,
-                                 g_button_down_messages[button].length);
-            }
-            if ((events.released_mask & mask) != 0U) {
-                board_uart_write(g_button_up_messages[button].data,
-                                 g_button_up_messages[button].length);
-            }
-        }
+        app_state_buttons_publish(events.stable_pressed_mask,
+                                  events.pressed_mask, events.released_mask);
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }
-#endif
 
-#if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE
+#if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE && !APP_BUTTON_VOFA_TELEMETRY_ENABLE
 static void uart_echo_task(void *argument)
 {
     QueueHandle_t queue = (QueueHandle_t)argument;
@@ -267,17 +232,15 @@ void app_tasks_io_start(void)
                                    APP_TASK_PRIORITY, g_oled_test_task_stack,
                                    &g_oled_test_task_buffer) != NULL);
 #endif
-#if APP_BUTTON_FEATURE_ENABLE
     configASSERT(xTaskCreateStatic(button_task, "buttons",
                                    APP_BUTTON_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_button_task_stack,
                                    &g_button_task_buffer) != NULL);
-#endif
     configASSERT(xTaskCreateStatic(board_uart_tx_task, "uart_tx",
                                    APP_UART_TX_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_uart_tx_task_stack,
                                    &g_uart_tx_task_buffer) != NULL);
-#if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE
+#if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE && !APP_BUTTON_VOFA_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", APP_UART_TASK_STACK_DEPTH,
                                    uart_queue, APP_TASK_PRIORITY,
                                    g_uart_task_stack, &g_uart_task_buffer) != NULL);

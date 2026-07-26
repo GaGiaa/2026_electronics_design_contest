@@ -10,10 +10,12 @@
 volatile board_encoder_sample_t g_encoder_samples[BOARD_MOTOR_COUNT];
 volatile board_grayscale_snapshot_t g_grayscale_snapshot;
 volatile app_drive_control_snapshot_t g_drive_control_snapshot;
+volatile app_button_snapshot_t g_button_snapshot;
 line_tracking_state_t g_line_tracking_state;
 volatile uint32_t g_encoder_sample_sequence;
 volatile uint32_t g_grayscale_publish_sequence;
 volatile uint32_t g_drive_control_publish_sequence;
+volatile uint32_t g_button_publish_sequence;
 #if APP_IMU_YAW_ENABLE
 volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
 volatile uint32_t g_imu_yaw_publish_sequence;
@@ -37,10 +39,12 @@ void app_state_init(void)
     }
     g_grayscale_snapshot = (board_grayscale_snapshot_t){0};
     g_drive_control_snapshot = (app_drive_control_snapshot_t){0};
+    g_button_snapshot = (app_button_snapshot_t){0};
     g_line_tracking_state = (line_tracking_state_t){0};
     g_encoder_sample_sequence = 0U;
     g_grayscale_publish_sequence = 0U;
     g_drive_control_publish_sequence = 0U;
+    g_button_publish_sequence = 0U;
 #if APP_IMU_YAW_ENABLE
     g_imu_yaw_snapshot = (app_imu_yaw_snapshot_t){0};
     g_imu_yaw_publish_sequence = 0U;
@@ -257,6 +261,38 @@ void app_state_drive_control_snapshot_copy(
             end_sequence = g_drive_control_publish_sequence;
             if ((begin_sequence == end_sequence) &&
                 ((end_sequence & 1U) == 0U)) {
+                break;
+            }
+        }
+    }
+}
+
+void app_state_buttons_publish(uint32_t pressed_mask,
+                               uint32_t pressed_edge_mask,
+                               uint32_t released_edge_mask)
+{
+    ++g_button_publish_sequence;
+    g_button_snapshot.pressed_mask = pressed_mask;
+    g_button_snapshot.pressed_edge_mask = pressed_edge_mask;
+    g_button_snapshot.released_edge_mask = released_edge_mask;
+    ++g_button_snapshot.sequence;
+    ++g_button_publish_sequence;
+}
+
+void app_state_buttons_snapshot_copy(app_button_snapshot_t *snapshot)
+{
+    uint32_t begin_sequence;
+    uint32_t end_sequence;
+
+    if (snapshot == NULL) {
+        return;
+    }
+    for (;;) {
+        begin_sequence = g_button_publish_sequence;
+        if ((begin_sequence & 1U) == 0U) {
+            *snapshot = g_button_snapshot;
+            end_sequence = g_button_publish_sequence;
+            if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
                 break;
             }
         }
