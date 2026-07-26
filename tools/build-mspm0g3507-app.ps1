@@ -7,6 +7,8 @@ param(
     [ValidateSet(0, 1)]
     [int] $VofaSpeedPidTelemetryEnable,
     [ValidateSet(0, 1)]
+    [int] $ButtonVofaTelemetryEnable,
+    [ValidateSet(0, 1)]
     [int] $ImuTelemetryEnable,
     [ValidateRange(1, 60000)]
     [int] $ImuVofaTelemetryIntervalMs,
@@ -61,6 +63,9 @@ Invoke-CheckedCommand -FilePath $SysConfig -Arguments @('--script', (Join-Path $
 $commonCompilerArguments = @('-c', '@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', "-I$ProjectDir", "-I$ProjectDir\app", "-I$ProjectDir\drivers", "-I$ProjectDir\algorithms", "-I$ProjectDir\protocols", "-I$ProjectDir\services", "-I$ProjectDir\platform", "-I$ProjectDir\config", "-I$BuildDir", "-I$FreeRtosRoot\include", "-I$FreeRtosPort", "-I$SdkRoot\source\third_party\CMSIS\Core\Include", "-I$SdkRoot\source")
 if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
     $commonCompilerArguments += "-DAPP_VOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('ButtonVofaTelemetryEnable')) {
+    $commonCompilerArguments += "-DAPP_BUTTON_VOFA_TELEMETRY_ENABLE=$ButtonVofaTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('ImuTelemetryEnable')) {
     $commonCompilerArguments += "-DAPP_IMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"

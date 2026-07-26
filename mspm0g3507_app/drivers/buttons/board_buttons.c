@@ -61,6 +61,9 @@ board_buttons_events_t board_buttons_scan(void)
                 events.released_mask |= (1U << button);
             }
         }
+        if (g_stable_pressed[button]) {
+            events.stable_pressed_mask |= (1U << button);
+        }
     }
 
     return events;

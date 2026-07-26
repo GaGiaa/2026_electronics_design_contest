@@ -119,7 +119,7 @@ RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_spee
 `g_motor_debug.wheel`，顺序为 `target_speed_mm_per_s`、`instant_feedback_speed_mm_per_s`、
 `feedback_speed_mm_per_s` 和 `output_duty_percent`；帧尾为 `00 00 80 7F`。
 
-启用 VOFA 模式后，UART0 输出由该模式独占，不会创建 UART 回显任务。速度环、灰度、巡线和
+启用 VOFA 模式后，UART0 输出由该模式独占，不会创建 UART 回显任务。按键、速度环、灰度、巡线和
 IMU yaw VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发送文本。帧仍然通过
 `board_uart_write()` 放入队列，并由专用 UART TX 任务发送，因此电机任务和编码器 ISR 不会
 阻塞在 UART 上。如果 `g_motor_debug.wheel` 无效，遥测任务会安全地发送前左轮状态。初次
@@ -241,13 +241,17 @@ SPI1 仍专用于 WS2812。BMI160 模块必须使用 3.3 V 并与 MCU 共地；�
 16 字节 JustFloat 帧。三个 `float32` 通道为 `yaw_deg`、`yaw_rate_dps` 和 `gyro_bias_z_dps`，
 之后是标准的 `00 00 80 7F` 帧尾。IMU 采样是否运行由 `APP_IMU_YAW_ENABLE` 单独决定。
 
-PA7、PB12、PA8 和 PA30 是四个外部上拉、低有效按键输入。独立的静态 `button_task` 每
-10 ms 扫描一次，并在连续两次采样一致后确认状态。稳定的按下和释放边沿按照引脚顺序，
-通过串行 UART 帧队列发送，例如 `key,pa7=down\r\n` 和 `key,pa7=up\r\n`。SysConfig 关闭
-内部电阻，也不为这些输入启用 GPIO 中断。按键任务使用 128 字的栈；TI Clang map 报告的
-栈大小为 512 字节，任务控制块为 76 字节，按键驱动状态为 12 字节。`config/app_config.h`
-提供编译期开关 `APP_BUTTON_FEATURE_ENABLE`，默认值为 `0U`。设为 `1U` 后启用按键初始化、
-状态扫描、UART 报告和按键任务的静态 RAM，同时保持 SysConfig 引脚定义不变。
+PA7、PB12、PA8 和 PA30 是四个外部上拉、低有效按键输入。独立的静态 `button_task` 始终
+运行，每 10 ms 扫描一次，并在连续两次采样一致后确认状态。按键任务只发布
+`app_button_snapshot_t`，其中包含稳定按下掩码、最近一次扫描周期的按下/释放边沿掩码和序列号，
+供未来按键控制任务或遥测任务读取；它不执行具体业务，也不访问 UART。SysConfig 关闭内部电阻，
+也不为这些输入启用 GPIO 中断。按键任务使用 128 字的栈。
+
+按键 JustFloat 遥测由独立的 `button_vofa_task` 提供，默认由
+`APP_BUTTON_VOFA_TELEMETRY_ENABLE=0U` 关闭，可通过
+`-ButtonVofaTelemetryEnable 1` 开启。任务默认每 10 ms 发送一个 20 字节小端 `float32` 帧，
+四个通道顺序为 `PA7、PB12、PA8、PA30`；按下发送 `1.0f`，释放发送 `0.0f`，帧尾为
+`00 00 80 7F`。按键遥测与其他 UART/VOFA 遥测模式互斥。
 
 ## 八路灰度传感器
 

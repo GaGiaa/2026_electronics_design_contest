@@ -8,10 +8,48 @@
 #include "algorithms/motor_control/motor_control.h"
 #include "app/app_state.h"
 #include "config/app_config.h"
+#include "drivers/buttons/board_buttons.h"
 #include "drivers/grayscale/board_grayscale.h"
 #include "drivers/uart/board_uart.h"
 #include "protocols/vofa/vofa_justfloat.h"
 #include "services/rtos_monitor/rtos_monitor.h"
+
+#if APP_BUTTON_VOFA_TELEMETRY_ENABLE
+static StaticTask_t g_button_vofa_task_buffer;
+static StackType_t g_button_vofa_task_stack[
+    APP_BUTTON_VOFA_TELEMETRY_TASK_STACK_DEPTH];
+
+static void button_vofa_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval =
+        pdMS_TO_TICKS(APP_BUTTON_VOFA_TELEMETRY_INTERVAL_MS);
+    app_button_snapshot_t snapshot;
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(BOARD_BUTTON_COUNT)];
+
+    (void)argument;
+    for (;;) {
+        app_state_buttons_snapshot_copy(&snapshot);
+        if (vofa_justfloat_encode4(
+                frame, sizeof(frame),
+                (snapshot.pressed_mask & (1U << BOARD_BUTTON_PA7)) != 0U
+                    ? 1.0f
+                    : 0.0f,
+                (snapshot.pressed_mask & (1U << BOARD_BUTTON_PB12)) != 0U
+                    ? 1.0f
+                    : 0.0f,
+                (snapshot.pressed_mask & (1U << BOARD_BUTTON_PA8)) != 0U
+                    ? 1.0f
+                    : 0.0f,
+                (snapshot.pressed_mask & (1U << BOARD_BUTTON_PA30)) != 0U
+                    ? 1.0f
+                    : 0.0f)) {
+            board_uart_write(frame, sizeof(frame));
+        }
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
 
 #if APP_IMU_TELEMETRY_ENABLE
 static StaticTask_t g_imu_vofa_task_buffer;
@@ -177,6 +215,13 @@ static StackType_t g_rtos_monitor_task_stack[APP_RTOS_MONITOR_TASK_STACK_DEPTH];
 
 void app_tasks_telemetry_start(void)
 {
+#if APP_BUTTON_VOFA_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(
+                     button_vofa_task, "button_vofa",
+                     APP_BUTTON_VOFA_TELEMETRY_TASK_STACK_DEPTH, NULL,
+                     APP_TELEMETRY_TASK_PRIORITY, g_button_vofa_task_stack,
+                     &g_button_vofa_task_buffer) != NULL);
+#endif
 #if APP_IMU_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(
                      imu_vofa_task, "imu_vofa",

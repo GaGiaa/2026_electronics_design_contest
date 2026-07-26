@@ -120,7 +120,7 @@ WS2812、蜂鸣器、按键和 OLED 的实物响应仍需单独验收。
 
 ### UART 遥测与 CRSF
 
-UART0 同一时间只能运行一种遥测模式。速度 VOFA、灰度 VOFA、巡线 VOFA 和 IMU Yaw 在编译期互斥，
+UART0 同一时间只能运行一种遥测模式。按键 VOFA、速度 VOFA、灰度 VOFA、巡线 VOFA 和 IMU Yaw 在编译期互斥，
 启用遥测时不创建 UART 回显任务。当前 CRSF 映射为 CH3（索引 2）控制前进和后退，
 CH1（索引 0）控制差速转向，SB/CH5 使用通道数组索引 6 控制低档空闲、中档手动和高档循迹；连续
 100 ms 没有有效帧时四轮目标清零。`CRSF_REMOTE_CONTROL_ENABLE` 默认值为 `1U`，
@@ -168,7 +168,8 @@ CH1（索引 0）控制差速转向，SB/CH5 使用通道数组索引 6 控制�
 停机处理。应用任务注册接口为 `app_startup()`、`app_tasks_motor_start()`、
 `app_tasks_sensor_start()`、`app_tasks_io_start()` 和 `app_tasks_telemetry_start()`。
 
-现有公开函数名、结构体名、PowerShell 构建参数、SWD 全局变量、UART 行为和 CRSF 超时行为保持不变；
+除按键输入从旧文本 UART 报告改为独立状态快照与可选 JustFloat 遥测外，现有公开函数名、结构体名、
+PowerShell 构建参数、SWD 全局变量、UART 行为和 CRSF 超时行为保持不变；
 应用源码级配置宏已统一为 `APP_` 前缀。当前 `APP_IMU_YAW_ENABLE` 和 `APP_RTOS_MONITOR_ENABLE` 默认开启，
 仍可分别通过 `-ImuYawEnable 0` 和 `-RtosMonitorEnable 0` 显式关闭。
 分层迁移不代表任何尚未完成的硬件验收已经完成。
@@ -181,6 +182,13 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 独立遥测周期和栈大小；`ImuYawEnable`、`ImuTelemetryEnable` 等既有 PowerShell 参数继续保留。
 由于该方案明确采用 yaw 开关控制 IMU 任务，关闭 `APP_IMU_YAW_ENABLE` 时不会初始化或读取 BMI160，
 同时 `app_profile_t.enable_imu` 为 `false`；当前默认值为 `1U`，因此默认构建会创建 IMU 任务。
+
+按键输入与遥测采用独立任务边界：`button_task` 始终运行，每 10 ms 调用
+`board_buttons_scan()`，通过 `app_state_buttons_publish()` 发布四键稳定按下掩码、最近扫描周期的
+按下/释放边沿掩码和序列号。未来按键控制任务与 `button_vofa_task` 均只读取该快照，不在输入任务中
+实现具体业务。`APP_BUTTON_VOFA_TELEMETRY_ENABLE` 默认关闭，开启后按 `PA7、PB12、PA8、PA30`
+顺序发送四通道 JustFloat，按下为 `1.0f`、释放为 `0.0f`；旧的按键功能开关、文本消息表和
+`key,...` UART 输出已移除。
 
 ## 已知验证与遗留风险
 
@@ -203,6 +211,19 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 - 已通过 `powershell -ExecutionPolicy Bypass -File tests\test_mspm0g3507_app.ps1`。
 - 已通过 `powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1`；构建过程只生成
   `Debug` 软件产物，未执行 Flash、烧录、GDB/SWD、电机调试或 WS2812 实物验收。
+
+### 本轮按键输入与遥测解耦
+
+- `button_task` 已改为始终编译、初始化和创建，仅扫描按键并通过 `app_state` 发布稳定按下掩码、
+  最近扫描周期的按下/释放边沿掩码和序列号；按键输入层不再访问 UART，也不包含具体业务动作。
+- 新增独立 `button_vofa_task` 和 `APP_BUTTON_VOFA_TELEMETRY_ENABLE`，默认关闭；开启后按
+  `PA7、PB12、PA8、PA30` 顺序发送四通道 JustFloat，按下为 `1.0f`、释放为 `0.0f`。
+- 已移除旧按键功能开关、文本消息表以及 `key,...` 文本 UART 输出；按键遥测加入 UART 回显抑制和
+  VOFA 编译期互斥校验，CCS/Keil 构建脚本均支持 `ButtonVofaTelemetryEnable` 临时覆盖。
+- 已通过全部 `tests\*.ps1` 回归脚本，包括按键 `app_state` 主机测试、四通道 JustFloat 测试、应用/Keil
+  静态集成、配置、文档、CCS 工作流和可移植性检查。
+- 已通过默认配置及 `-ButtonVofaTelemetryEnable 1` 的 CCS 和 Keil 软件构建；构建只生成软件产物，
+  未执行 Flash 擦除、烧录、探针枚举、GDB/SWD、电机调试或按键/VOFA 实物验收。
 
 此前已记录通过的验证包括电机控制、编码器模式 1/2、线跟踪、IMU Yaw、CRSF、VOFA
 JustFloat、G3507 应用静态集成、OLED、RTOS monitor、CCS/Keil 工程静态检查和可移植性

@@ -9,6 +9,8 @@ param(
     [ValidateSet(0, 1)]
     [int] $VofaSpeedPidTelemetryEnable,
     [ValidateSet(0, 1)]
+    [int] $ButtonVofaTelemetryEnable,
+    [ValidateSet(0, 1)]
     [int] $ImuTelemetryEnable,
     [ValidateRange(1, 60000)]
     [int] $ImuVofaTelemetryIntervalMs,
@@ -85,6 +87,9 @@ $projectFileBytes = $null
 $temporaryDefines = @()
 if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
     $temporaryDefines += "APP_VOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('ButtonVofaTelemetryEnable')) {
+    $temporaryDefines += "APP_BUTTON_VOFA_TELEMETRY_ENABLE=$ButtonVofaTelemetryEnable"
 }
 if ($PSBoundParameters.ContainsKey('ImuTelemetryEnable')) {
     $temporaryDefines += "APP_IMU_TELEMETRY_ENABLE=$ImuTelemetryEnable"

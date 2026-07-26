@@ -57,10 +57,35 @@ static void test_encode3_compatibility_remains(void)
     assert(frame[3U] == 0x3FU);
 }
 
+static void test_encode4_writes_button_states(void)
+{
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(4U)] = {0U};
+
+    assert(vofa_justfloat_encode4(frame, sizeof(frame), 0.0f, 1.0f,
+                                  1.0f, 0.0f));
+    assert(frame[0U] == 0x00U);
+    assert(frame[1U] == 0x00U);
+    assert(frame[2U] == 0x00U);
+    assert(frame[3U] == 0x00U);
+    assert(frame[4U] == 0x00U);
+    assert(frame[5U] == 0x00U);
+    assert(frame[6U] == 0x80U);
+    assert(frame[7U] == 0x3FU);
+    assert(frame[8U] == 0x00U);
+    assert(frame[9U] == 0x00U);
+    assert(frame[10U] == 0x80U);
+    assert(frame[11U] == 0x3FU);
+    assert(frame[sizeof(frame) - 4U] == 0x00U);
+    assert(frame[sizeof(frame) - 3U] == 0x00U);
+    assert(frame[sizeof(frame) - 2U] == 0x80U);
+    assert(frame[sizeof(frame) - 1U] == 0x7FU);
+}
+
 int main(void)
 {
     test_encode22_writes_little_endian_frame();
     test_encode_rejects_invalid_buffers();
     test_encode3_compatibility_remains();
+    test_encode4_writes_button_states();
     return 0;
 }
