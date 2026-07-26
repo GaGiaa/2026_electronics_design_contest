@@ -515,6 +515,16 @@
               <FilePath>..\..\mspm0g3507_app\drivers\uart\board_uart.c</FilePath>
             </File>
             <File>
+              <FileName>board_bluetooth_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\drivers\bluetooth_uart\board_bluetooth_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>host_link.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\protocols\host_link\host_link.c</FilePath>
+            </File>
+            <File>
               <FileName>board_crsf_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\drivers\crsf_uart\board_crsf_uart.c</FilePath>

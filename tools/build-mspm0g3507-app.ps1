@@ -30,6 +30,8 @@ param(
     [int] $OledTestTaskEnable,
     [ValidateSet(0, 1)]
     [int] $ServoFeatureEnable
+    ,[ValidateSet(0, 1)]
+    [int] $BluetoothUartEnable
 )
 
 Set-StrictMode -Version Latest
@@ -100,6 +102,9 @@ if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
 if ($PSBoundParameters.ContainsKey('ServoFeatureEnable')) {
     $commonCompilerArguments += "-DAPP_SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
 }
+if ($PSBoundParameters.ContainsKey('BluetoothUartEnable')) {
+    $commonCompilerArguments += "-DAPP_BLUETOOTH_UART_ENABLE=$BluetoothUartEnable"
+}
 $sources = @(
     @{ Source = (Join-Path $ProjectDir 'drivers\encoder\board_encoder.c'); Object = 'board_encoder.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\encoder\encoder_quadrature.c'); Object = 'encoder_quadrature.o' },
@@ -121,6 +126,8 @@ $sources = @(
     @{ Source = (Join-Path $ProjectDir 'drivers\oled\board_oled.c'); Object = 'board_oled.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\oled\board_oled_font.c'); Object = 'board_oled_font.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\uart\board_uart.c'); Object = 'board_uart.o' },
+    @{ Source = (Join-Path $ProjectDir 'drivers\bluetooth_uart\board_bluetooth_uart.c'); Object = 'board_bluetooth_uart.o' },
+    @{ Source = (Join-Path $ProjectDir 'protocols\host_link\host_link.c'); Object = 'host_link.o' },
     @{ Source = (Join-Path $ProjectDir 'services\rtos_monitor\rtos_monitor.c'); Object = 'rtos_monitor.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\crsf_uart\board_crsf_uart.c'); Object = 'board_crsf_uart.o' },
     @{ Source = (Join-Path $ProjectDir 'protocols\crsf\crsf_protocol.c'); Object = 'crsf_protocol.o' },
@@ -146,6 +153,6 @@ $sources = @(
 Push-Location $BuildDir
 try {
     foreach ($source in $sources) { Invoke-CheckedCommand -FilePath $Compiler -Arguments ($commonCompilerArguments + @('-o', $source.Object, $source.Source)) -Description "Compiling $($source.Object)" }
-    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\config", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'encoder_quadrature.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_servo.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'line_control.o', 'yaw_control.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_oled.o', 'board_oled_font.o', 'board_uart.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'app_profile.o', 'app_state.o', 'app_startup.o', 'app_tasks_motor.o', 'app_tasks_sensor.o', 'app_tasks_io.o', 'app_tasks_telemetry.o', 'g3507_interrupts.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
+    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\config", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'encoder_quadrature.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_servo.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'line_control.o', 'yaw_control.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_oled.o', 'board_oled_font.o', 'board_uart.o', 'board_bluetooth_uart.o', 'host_link.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'app_profile.o', 'app_state.o', 'app_startup.o', 'app_tasks_motor.o', 'app_tasks_sensor.o', 'app_tasks_io.o', 'app_tasks_telemetry.o', 'g3507_interrupts.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
 }
 finally { Pop-Location }

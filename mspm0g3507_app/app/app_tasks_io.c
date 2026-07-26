@@ -9,12 +9,16 @@
 
 #include "config/app_config.h"
 #include "drivers/buttons/board_buttons.h"
+#include "drivers/bluetooth_uart/board_bluetooth_uart.h"
 #include "drivers/buzzer/board_buzzer.h"
 #include "drivers/oled/board_oled.h"
 #include "drivers/servo/board_servo.h"
 #include "drivers/uart/board_uart.h"
 #include "drivers/ws2812/board_ws2812.h"
 #include "app/app_state.h"
+#if APP_BLUETOOTH_UART_ENABLE
+#include "protocols/host_link/host_link.h"
+#endif
 
 #if APP_WS2812_ANIMATION_ENABLE || APP_WS2812_STATUS_INDICATOR_ENABLE
 static StaticTask_t g_ws2812_task_buffer;
@@ -34,6 +38,15 @@ static StaticTask_t g_button_task_buffer;
 static StackType_t g_button_task_stack[APP_BUTTON_TASK_STACK_DEPTH];
 static StaticQueue_t g_uart_queue_buffer;
 static uint8_t g_uart_queue_storage[APP_UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
+#if APP_BLUETOOTH_UART_ENABLE
+static StaticTask_t g_bluetooth_task_buffer;
+static StackType_t g_bluetooth_task_stack[APP_BLUETOOTH_UART_TASK_STACK_DEPTH];
+static StaticTask_t g_bluetooth_tx_task_buffer;
+static StackType_t g_bluetooth_tx_task_stack[APP_BLUETOOTH_UART_TX_TASK_STACK_DEPTH];
+static StaticQueue_t g_bluetooth_queue_buffer;
+static uint8_t g_bluetooth_queue_storage[
+    APP_BLUETOOTH_UART_RX_QUEUE_LENGTH * sizeof(uint8_t)];
+#endif
 
 #if APP_WS2812_ANIMATION_ENABLE || APP_WS2812_STATUS_INDICATOR_ENABLE
 static void ws2812_task(void *argument)
@@ -179,6 +192,32 @@ static void uart_echo_task(void *argument)
 }
 #endif
 
+#if APP_BLUETOOTH_UART_ENABLE
+static void bluetooth_host_link_response(const uint8_t *data,
+                                         size_t length,
+                                         void *context)
+{
+    (void)context;
+    board_bluetooth_uart_write(data, length);
+}
+#endif
+
+#if APP_BLUETOOTH_UART_ENABLE
+static void bluetooth_host_link_task(void *argument)
+{
+    QueueHandle_t queue = (QueueHandle_t)argument;
+    host_link_t link;
+    uint8_t byte;
+
+    host_link_init(&link, bluetooth_host_link_response, NULL);
+    for (;;) {
+        if (xQueueReceive(queue, &byte, portMAX_DELAY) == pdPASS) {
+            host_link_receive_byte(&link, byte);
+        }
+    }
+}
+#endif
+
 #if APP_BUZZER_FEATURE_ENABLE
 static StaticTask_t g_buzzer_task_buffer;
 static StackType_t g_buzzer_task_stack[APP_BUZZER_TASK_STACK_DEPTH];
@@ -214,11 +253,24 @@ static void servo_task(void *argument)
 void app_tasks_io_start(void)
 {
     QueueHandle_t uart_queue;
+#if APP_BLUETOOTH_UART_ENABLE
+    QueueHandle_t bluetooth_queue;
+#endif
 
     uart_queue = xQueueCreateStatic(APP_UART_RX_QUEUE_LENGTH, sizeof(uint8_t),
                                      g_uart_queue_storage, &g_uart_queue_buffer);
     configASSERT(uart_queue != NULL);
     board_uart_enable_rx_interrupt(uart_queue);
+#if APP_BLUETOOTH_UART_ENABLE
+    bluetooth_queue = xQueueCreateStatic(APP_BLUETOOTH_UART_RX_QUEUE_LENGTH,
+                                         sizeof(uint8_t),
+                                         g_bluetooth_queue_storage,
+                                         &g_bluetooth_queue_buffer);
+    configASSERT(bluetooth_queue != NULL);
+    board_bluetooth_uart_enable_rx_interrupt(bluetooth_queue);
+#else
+    board_bluetooth_uart_disable();
+#endif
 
 #if APP_WS2812_ANIMATION_ENABLE || APP_WS2812_STATUS_INDICATOR_ENABLE
     configASSERT(xTaskCreateStatic(ws2812_task, "ws2812",
@@ -240,6 +292,17 @@ void app_tasks_io_start(void)
                                    APP_UART_TX_TASK_STACK_DEPTH, NULL,
                                    APP_TASK_PRIORITY, g_uart_tx_task_stack,
                                    &g_uart_tx_task_buffer) != NULL);
+#if APP_BLUETOOTH_UART_ENABLE
+    configASSERT(xTaskCreateStatic(board_bluetooth_uart_tx_task, "bt_tx",
+                                   APP_BLUETOOTH_UART_TX_TASK_STACK_DEPTH, NULL,
+                                   APP_TASK_PRIORITY, g_bluetooth_tx_task_stack,
+                                   &g_bluetooth_tx_task_buffer) != NULL);
+    configASSERT(xTaskCreateStatic(bluetooth_host_link_task, "bt_host",
+                                   APP_BLUETOOTH_UART_TASK_STACK_DEPTH,
+                                   bluetooth_queue, APP_TASK_PRIORITY,
+                                   g_bluetooth_task_stack,
+                                   &g_bluetooth_task_buffer) != NULL);
+#endif
 #if !APP_VOFA_SPEED_PID_TELEMETRY_ENABLE && !APP_GRAY_VOFA_TELEMETRY_ENABLE && !APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE && !APP_IMU_TELEMETRY_ENABLE && !APP_BUTTON_VOFA_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(uart_echo_task, "uart", APP_UART_TASK_STACK_DEPTH,
                                    uart_queue, APP_TASK_PRIORITY,

@@ -53,6 +53,7 @@ $expectedDirectories = @(
     'drivers\imu',
     'drivers\grayscale',
     'drivers\uart',
+    'drivers\bluetooth_uart',
     'drivers\crsf_uart',
     'drivers\oled',
     'drivers\buttons',
@@ -67,6 +68,7 @@ $expectedDirectories = @(
     'algorithms\motor_control',
     'protocols\crsf',
     'protocols\vofa',
+    'protocols\host_link',
     'services\rtos_monitor',
     'config',
     'platform'
@@ -96,6 +98,7 @@ $compatibilityFiles = @(
     'board_servo.h',
     'board_servo_math.h',
     'board_uart.h',
+    'board_bluetooth_uart.h',
     'board_ws2812.h',
     'crsf_config.h',
     'crsf_control.h',

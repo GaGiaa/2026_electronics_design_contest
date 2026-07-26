@@ -45,6 +45,17 @@ PB22，频率为 2.666667 MHz；PB9 是未使用的 SPI 时钟输出。WS2812 �
 使用 `tools/build-mspm0g3507-app.ps1` 构建，输出文件为
 `mspm0g3507_app/Debug/mspm0g3507_app.out`。
 
+蓝牙 UART2 测试功能由 `APP_BLUETOOTH_UART_ENABLE` 控制，默认值为 `0U`。普通固件构建会关闭
+蓝牙软件链路、FreeRTOS 蓝牙队列和任务，并在启动时关闭 UART2 RX 中断及 UART2 外设；SysConfig
+中的 UART2、PB15/PB16 配置仍然保留。需要构建 HC-05 测试固件时显式开启：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1 -BluetoothUartEnable 1
+```
+
+测试完成后恢复普通构建，不传入 `-BluetoothUartEnable`。开启蓝牙时第一版 Host Link 只接受
+`PING`、`INFO` 和 `STATUS`，不通过蓝牙实现电机控制。
+
 ## CCS 工程与可移植构建
 
 `.project`、`.cproject` 和 `.ccsproject` 用于 CCS 源码浏览、SysConfig 编辑以及目标和
@@ -343,6 +354,79 @@ PowerShell 构建脚本传入 `-RtosMonitorEnable 0` 临时关闭；传入 `-Rto
 计数器为 32 位，监控窗口使用无符号差值处理每个采样窗口的回绕。但是，随附的 FreeRTOS
 内核没有完整保护每个任务累计运行时间计数器的定时器回绕。在 10 MHz 时基下，计数器约
 429 秒回绕一次；长时间连续运行后，任务级数值可能不准确。
+
+## HC-05 主从通信测试
+
+当前测试拓扑是电脑串口终端通过 USB-TTL 连接 HC-05-A，HC-05-A 配置为 Bluetooth Master；
+HC-05-B 配置为 Slave 并连接到 G3507 的 UART2。Windows 本身不是 Bluetooth Master，电脑只负责
+通过 USB-TTL 收发串口字节：
+
+    电脑串口终端 -> USB-TTL -> HC-05-A (Master)
+                             )) SPP ((
+                      HC-05-B (Slave) -> G3507 UART2
+
+### HC-05 配置步骤
+
+两个模块分别接 USB-TTL，逐个进入 AT 模式。常见模块在 AT 模式使用 38400、8-N-1，终端行结束符
+选择 CRLF；透明数据模式使用下面工程配置的 115200、8-N-1。进入 AT 模式后先读取并记录：
+
+    AT
+    AT+VERSION?
+    AT+ADDR?
+    AT+NAME?
+    AT+ROLE?
+    AT+UART?
+
+先配置接 G3507 的 Slave，并记录返回的地址：
+
+    AT+ROLE=0
+    AT+CMODE=0
+    AT+NAME=G3507_SLAVE
+    AT+PSWD=1234
+    AT+UART=115200,0,0
+
+再配置接 USB-TTL 的 Master，并绑定上面记录的 Slave 地址。地址格式必须以模块固件返回结果为准；
+部分固件使用逗号，部分资料使用冒号：
+
+    AT+ROLE=1
+    AT+CMODE=0
+    AT+NAME=PC_MASTER
+    AT+PSWD=1234
+    AT+UART=115200,0,0
+    AT+BIND=<slave_address>
+
+如果当前固件不支持 AT+BIND，只尝试模块指令集明确支持且返回 OK 的 AT+PAIR=<address>,20
+或 AT+LINK=<address>，不要混用多个地址格式反复写入。配置完成后重新读取 AT+ROLE?、
+AT+CMODE?、AT+BIND? 和 AT+UART?，再退出 AT 模式并重新上电。
+
+### G3507 接线与安全测试
+
+    G3507 PB15 / UART2_TX -> HC-05-B RXD
+    G3507 PB16 / UART2_RX <- HC-05-B TXD
+    G3507 GND             -> HC-05-B GND
+
+TX/RX 必须交叉并共地。电源和 RXD 电平必须按实际 ZS-040 底板规格确认，不能默认核心模块的 RXD
+可以直接承受高于 3.3 V 的 TTL 电平。工程中的 UART2 独立使用静态 FreeRTOS RX 队列、TX 消息队列
+和 UART2_IRQHandler，不会复用 UART0，也不会改变 UART3 CRSF 接收链路。
+
+Master 继续接 USB-TTL，电脑端终端切换到 USB-TTL 对应的物理 COM 口和 115200、8-N-1，依次发送：
+
+    PING\r\n    -> PONG\r\n
+    INFO\r\n    -> G3507,BT_UART2,115200\r\n
+    STATUS\r\n  -> STATUS,READY\r\n
+    其他命令    -> ERR,UNKNOWN\r\n
+
+协议同时接受 LF 和 CRLF，空行忽略，超过 64 字节的命令行返回 ERR,LONG 并在下一行恢复解析。
+第一版仅测试安全的文本通信，不通过蓝牙实现任何电机控制。Windows 蓝牙虚拟 COM 口不属于本轮
+测试链路；它只适用于电脑直接连接 Slave 的另一种方案。
+
+### 两辆车的后续通信
+
+后续使用车辆 A 的 HC-05 Master 固定绑定车辆 B 的 HC-05 Slave。连接建立后 SPP 是双向字节流，
+两辆车都可以发送数据。车辆应用层应从文本回显升级为带版本、源地址、目标地址、消息类型、长度、
+载荷、序号和 CRC16 的帧，并定义 PING、ACK、VEHICLE_STATUS、CONTROL_COMMAND 和 HEARTBEAT。
+必须明确帧长限制、超时重发、心跳失联后的安全状态，以及控制命令失联时的电机处理。本阶段不实现
+这些车辆控制功能。
 
 ## CRSF 遥控输入
 

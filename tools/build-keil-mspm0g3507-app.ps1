@@ -32,6 +32,8 @@ param(
     [int] $OledTestTaskEnable,
     [ValidateSet(0, 1)]
     [int] $ServoFeatureEnable
+    ,[ValidateSet(0, 1)]
+    [int] $BluetoothUartEnable
 )
 
 Set-StrictMode -Version Latest
@@ -124,20 +126,39 @@ if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
 if ($PSBoundParameters.ContainsKey('ServoFeatureEnable')) {
     $temporaryDefines += "APP_SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
 }
-if ($temporaryDefines.Count -gt 0) {
-    $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)
-    $projectFileContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $projectFile
-    $projectFileWithDefines = $projectFileContent -replace '<Define>__MSPM0G3507__</Define>', "<Define>__MSPM0G3507__,$($temporaryDefines -join ',')</Define>"
-    if ($projectFileWithDefines -eq $projectFileContent) {
-        throw 'Keil project does not have the expected application define block.'
-    }
-    [System.IO.File]::WriteAllText(
-        $projectFile,
-        $projectFileWithDefines,
-        (New-Object System.Text.UTF8Encoding($false)))
+if ($PSBoundParameters.ContainsKey('BluetoothUartEnable')) {
+    $temporaryDefines += "APP_BLUETOOTH_UART_ENABLE=$BluetoothUartEnable"
 }
-
 try {
+    if ($temporaryDefines.Count -gt 0) {
+        $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)
+        $projectFileContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $projectFile
+        $defineMatch = [regex]::Match($projectFileContent, '<Define>(?<defines>[^<]*)</Define>')
+        if (-not $defineMatch.Success) {
+            throw 'Keil project does not have an application define block.'
+        }
+
+        $existingDefines = @($defineMatch.Groups['defines'].Value.Split(',') |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ -ne '' })
+        if ($existingDefines -notcontains '__MSPM0G3507__') {
+            throw 'Keil project does not have the expected MSPM0G3507 application define.'
+        }
+        $temporaryDefineNames = @($temporaryDefines |
+            ForEach-Object { ($_ -split '=', 2)[0] })
+        $mergedDefines = @($existingDefines |
+            Where-Object { $_ -notin $temporaryDefineNames })
+        $mergedDefines += $temporaryDefines
+        $replacement = "<Define>$($mergedDefines -join ',')</Define>"
+        $projectFileWithDefines = $projectFileContent.Remove(
+            $defineMatch.Index,
+            $defineMatch.Length).Insert($defineMatch.Index, $replacement)
+        [System.IO.File]::WriteAllText(
+            $projectFile,
+            $projectFileWithDefines,
+            (New-Object System.Text.UTF8Encoding($false)))
+    }
+
     & $generator -ProjectRoot $ProjectRoot -SdkRoot $SdkRoot -SysConfigRoot $SysConfigRoot
     if ($LASTEXITCODE -ne 0) {
         throw 'Keil SysConfig generation failed.'

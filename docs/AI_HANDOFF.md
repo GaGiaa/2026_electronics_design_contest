@@ -35,9 +35,8 @@
 
 ## 当前 Git 状态
 
-当前工作区分支为 `develop`，远端跟踪分支为 `origin/develop`。本次巡线默认参数修订基于
-提交 `12c4258`，实际提交状态、HEAD 和远端领先关系仍应以执行时的 `git status` 与
-`git log` 输出为准。
+当前工作区分支为 `develop_2`。本轮 HC-05 主从通信开发基于当前 HEAD `ce13522`（合并：解耦按键输入快照与 VOFA 遥测）；
+当前工作区未提交的新改动和实际 HEAD 仍应以执行时的 `git status` 与 `git log` 输出为准。
 
 此前的功能合并基线按以下顺序完成：
 
@@ -195,6 +194,19 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 `key,...` UART 输出已移除。
 
 ## 已知验证与遗留风险
+
+### 本轮 HC-05 主从通信与 UART2 接入
+
+- 当前方案为电脑串口终端 -> USB-TTL -> HC-05-A（Bluetooth Master）-> SPP -> HC-05-B（Slave）-> G3507 UART2；Windows 本身不作为 Bluetooth Master。
+- 在 `mspm0g3507_app/mspm0g3507_app.syscfg` 中新增 UART2：PB15 为 TX、PB16 为 RX、115200、8-N-1、RX 中断、FIFO 开启、DMA 关闭；UART0 PA10/PA11 和 UART3 PB2/PB3 420000 配置保留。
+- 蓝牙软件链路由 `APP_BLUETOOTH_UART_ENABLE` 控制，默认值为 `0U`；默认构建不创建蓝牙 RX/TX 队列和 FreeRTOS 任务，并在启动时禁用 UART2 RX 中断、NVIC 和 UART2 外设。SysConfig 的 UART2/PB15/PB16 仍保留，HC-05 测试构建使用 `tools/build-mspm0g3507-app.ps1 -BluetoothUartEnable 1`。
++- 新增 `drivers/bluetooth_uart/` 的独立 UART2 驱动、静态 RX/TX 队列和 `UART_2_INST_IRQHandler` 分发；新增 `protocols/host_link/` 的安全 ASCII 测试协议。CCS `.cproject` 没有逐文件源列表，而是递归包含 `${PROJECT_ROOT}/drivers` 和 `${PROJECT_ROOT}/protocols`，因此新源文件会由 CCS 项目目录发现；TI PowerShell 构建和 Keil XML 已显式加入新源文件。
+- 测试协议为 `PING` -> `PONG`、`INFO` -> `G3507,BT_UART2,115200`、`STATUS` -> `STATUS,READY`，未知命令返回 `ERR,UNKNOWN`；支持 LF/CRLF、空行忽略、超长行拒绝和恢复。第一版不接受电机控制命令。
+- HC-05 配置资料和操作顺序已写入 `mspm0g3507_app/README.md`：AT 模式常见 38400、CRLF；透明模式 115200；Slave 用 `AT+ROLE=0`，Master 用 `AT+ROLE=1`、`AT+CMODE=0` 和固定地址绑定。`AT+BIND`、`AT+PAIR`、`AT+LINK` 的地址格式必须以实际固件返回的 OK 和查询结果为准。
+- 本轮已通过 `tests/test_host_link.ps1`、`tests/test_bluetooth_uart.ps1`、`tests/test_mspm0g3507_app.ps1`、`tests/test_mspm0g3507_layers.ps1`、`tests/test_mspm0g3507_freertos.ps1`、`tests/test_keil_mspm0g3507_app.ps1`、`tests/test_crsf.ps1` 和 `tests/test_yaw_control.ps1`。
+- 本轮已通过默认关闭和 `-BluetoothUartEnable 1` 两种 `tools/build-mspm0g3507-app.ps1` 构建；SysConfig 生成结果确认 `UART_2_INST=UART2`、`UART2_IRQHandler`、PB16/PB15 和 115200，链接产物为 `mspm0g3507_app/Debug/mspm0g3507_app.out`。
+- 仅完成软件单元测试、静态集成检查、SysConfig 生成和本地构建；尚未配置或测量用户手上的两个 HC-05，尚未执行蓝牙空口通信、USB-TTL 物理串口、G3507 接线、电平、电源、Flash、烧录、探针枚举、GDB/SWD 或电机实物验收。
+- 后续两车通信仍需定义应用层二进制帧、CRC16、序号、超时重发、心跳失联安全状态和控制命令失联后的电机处理；当前 Host Link 文本协议不得直接扩展为电机控制接口。
 
 ### 本轮 VS Code IntelliSense 修复
 
