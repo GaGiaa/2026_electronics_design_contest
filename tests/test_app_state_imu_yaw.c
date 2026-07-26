@@ -51,11 +51,16 @@ int main(void)
     drive.mode = CRSF_DRIVE_MODE_LINE_TRACKING;
     drive.link_active = true;
     drive.sb_raw = 1500U;
+    drive.sc_raw = 992U;
     drive.line_error = -250;
     drive.line_strength = 2048U;
     drive.line_valid = true;
     drive.base_speed_mm_per_s = 300.0f;
     drive.turn_speed_mm_per_s = 20.0f;
+    drive.yaw_valid = true;
+    drive.yaw_target_deg = -90.0f;
+    drive.yaw_feedback_deg = -85.0f;
+    drive.yaw_error_deg = -5.0f;
     drive.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_LEFT] = 320.0f;
     drive.wheel_feedback_mm_per_s[BOARD_MOTOR_FRONT_LEFT] = 315.0f;
     drive.line_sequence = 7U;
@@ -66,12 +71,17 @@ int main(void)
     assert(copied_drive.mode == CRSF_DRIVE_MODE_LINE_TRACKING);
     assert(copied_drive.link_active);
     assert(copied_drive.sb_raw == 1500U);
+    assert(copied_drive.sc_raw == 992U);
     assert(copied_drive.line_error == -250);
     assert_float_equal(copied_drive.base_speed_mm_per_s, 300.0f);
     assert_float_equal(copied_drive.wheel_targets_mm_per_s[
                            BOARD_MOTOR_FRONT_LEFT], 320.0f);
     assert_float_equal(copied_drive.wheel_feedback_mm_per_s[
                            BOARD_MOTOR_FRONT_LEFT], 315.0f);
+    assert(copied_drive.yaw_valid);
+    assert_float_equal(copied_drive.yaw_target_deg, -90.0f);
+    assert_float_equal(copied_drive.yaw_feedback_deg, -85.0f);
+    assert_float_equal(copied_drive.yaw_error_deg, -5.0f);
     assert(copied_drive.line_sequence == 7U);
     assert(copied_drive.control_sequence == 11U);
 

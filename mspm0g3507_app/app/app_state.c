@@ -185,6 +185,7 @@ void app_state_drive_control_publish(
     g_drive_control_snapshot.mode = snapshot->mode;
     g_drive_control_snapshot.link_active = snapshot->link_active;
     g_drive_control_snapshot.sb_raw = snapshot->sb_raw;
+    g_drive_control_snapshot.sc_raw = snapshot->sc_raw;
     g_drive_control_snapshot.line_error = snapshot->line_error;
     g_drive_control_snapshot.line_strength = snapshot->line_strength;
     g_drive_control_snapshot.adc_timeout_mask = snapshot->adc_timeout_mask;
@@ -196,6 +197,10 @@ void app_state_drive_control_publish(
     g_drive_control_snapshot.pid_i_out = snapshot->pid_i_out;
     g_drive_control_snapshot.pid_d_out = snapshot->pid_d_out;
     g_drive_control_snapshot.pid_output = snapshot->pid_output;
+    g_drive_control_snapshot.yaw_valid = snapshot->yaw_valid;
+    g_drive_control_snapshot.yaw_target_deg = snapshot->yaw_target_deg;
+    g_drive_control_snapshot.yaw_feedback_deg = snapshot->yaw_feedback_deg;
+    g_drive_control_snapshot.yaw_error_deg = snapshot->yaw_error_deg;
     for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
         g_drive_control_snapshot.wheel_targets_mm_per_s[wheel] =
             snapshot->wheel_targets_mm_per_s[wheel];
@@ -223,6 +228,7 @@ void app_state_drive_control_snapshot_copy(
             snapshot->mode = g_drive_control_snapshot.mode;
             snapshot->link_active = g_drive_control_snapshot.link_active;
             snapshot->sb_raw = g_drive_control_snapshot.sb_raw;
+            snapshot->sc_raw = g_drive_control_snapshot.sc_raw;
             snapshot->line_error = g_drive_control_snapshot.line_error;
             snapshot->line_strength = g_drive_control_snapshot.line_strength;
             snapshot->adc_timeout_mask = g_drive_control_snapshot.adc_timeout_mask;
@@ -236,6 +242,10 @@ void app_state_drive_control_snapshot_copy(
             snapshot->pid_i_out = g_drive_control_snapshot.pid_i_out;
             snapshot->pid_d_out = g_drive_control_snapshot.pid_d_out;
             snapshot->pid_output = g_drive_control_snapshot.pid_output;
+            snapshot->yaw_valid = g_drive_control_snapshot.yaw_valid;
+            snapshot->yaw_target_deg = g_drive_control_snapshot.yaw_target_deg;
+            snapshot->yaw_feedback_deg = g_drive_control_snapshot.yaw_feedback_deg;
+            snapshot->yaw_error_deg = g_drive_control_snapshot.yaw_error_deg;
             for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
                 snapshot->wheel_targets_mm_per_s[wheel] =
                     g_drive_control_snapshot.wheel_targets_mm_per_s[wheel];
