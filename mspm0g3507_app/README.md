@@ -78,11 +78,13 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 
 应用 CPU 由板载 40 MHz HFXT 和 SYSPLL 运行在 80 MHz。四路 10 kHz、双输入 PWM 硬件通道
 使用 PA12/PA13、PA28/PA31、PA29/PB27 和 PB4/PB5。逻辑轮位映射为：前左 PA29/PB27、
-前右 PB4/PB5、后左 PA28/PA31、后右 PA12/PA13。后左电机的极性相反，因此逻辑轮位的
-PWM 输入顺序被反向处理。`BOARD_MOTOR_DIRECTION_FORWARD` 对所有逻辑轮位都表示车辆前进。
-`board_motor_set_signed_duty()` 将带符号的占空比转换为现有的正转/反转双 PWM 映射；正值
-表示车辆前进，负值表示倒车。电机电源、电机驱动器和 MCU 必须共地。硬件验收应从单个轮子
-的低占空比开始；任何 Flash 写入操作都必须事先获得明确授权。
+前右 PB4/PB5、后左 PA28/PA31、后右 PA12/PA13。`BOARD_MOTOR_DIRECTION_FORWARD` 对
+所有逻辑轮位都表示车辆前进。`board_motor_set_signed_duty()` 将带符号的占空比转换为正转/
+反转双 PWM 映射；正值表示逻辑前进，负值表示逻辑倒车。四个轮位的实际电机极性配置在
+`config/motor_config.h`：当前实测前左、前右和后左需要反向，默认符号依次为 `-1`、`-1`、
+`-1`、`1`。如果某个轮子的正 PWM 仍与逻辑前进相反，只翻转对应的
+`BOARD_MOTOR_*_DIRECTION_SIGN`，不要修改编码器方向配置。电机电源、电机驱动器和 MCU
+必须共地。硬件验收应从单个轮子的低占空比开始；任何 Flash 写入操作都必须事先获得明确授权。
 
 每个轮位还有一个 AB 增量编码器。硬件校准发现，实际物理输入与原始 SysConfig 名称不一致。
 当前 `mspm0g3507_app.syscfg` 中的逻辑映射为：前左 PA15/PB24、前右 PA17/PA22（方向反向）、
@@ -94,7 +96,18 @@ B 相用于判断方向。`board_encoder` 明确声明电机机械参数：电�
 得到 520 counts。将编译期 `BOARD_ENCODER_DECODE_MODE` 设置为
 `BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4` 后，会通过正交状态解码器统计 AB 两相
 的双沿，此时每个输出轴转一圈得到 1040 counts。修改模式后需要重新构建和烧录，并在使用
-速度环之前低速手动转动输出轴一圈进行确认。轮径为 48 mm。
+速度环之前低速手动转动输出轴一圈进行确认。轮径为 48 mm。四个轮位的编码器方向符号由
+`config/encoder_config.h` 中的 `BOARD_ENCODER_*_DIRECTION_SIGN` 控制，默认值对应当前
+已验证接线：前左 `-1`、前右 `1`、后左 `1`、后右 `-1`。如果更换硬件后前左和前右在
+“车辆前进方向”下的计数符号都反了，只需将这两个宏改为：
+
+```c
+#define BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN -1
+#define BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN 1
+```
+
+不要为修正编码器反馈而修改 `board_motor_set_signed_duty()` 或 PWM 引脚顺序。修改后必须
+重新构建，并在速度环前手动确认四个轮位的计数符号、单圈计数和轮位隔离。
 
 电机任务每次 10 ms 的迭代依次采样带符号编码器增量、累积计数和计算得到的 mm/s 速度，
 然后更新 PWM。每个轮位使用一个增量式 PID 速度控制器。`algorithms/pid/` 是从外部
@@ -102,7 +115,14 @@ MotorLib 中受控复制的、仅包含平台无关 PID 核心的目录；CAN �
 RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_speed_targets_mm_s[4]`
 提供普通的四轮 mm/s 目标值，初始时所有目标均为 0。
 
-当 `CRSF_REMOTE_CONTROL_ENABLE=0U` 时，`volatile g_motor_debug` 提供单轮 SWD 调试覆盖。设置 `enable`，选择 `wheel`，再选择
+当 `CRSF_REMOTE_CONTROL_ENABLE=0U` 时，`volatile g_motor_debug` 提供单轮 SWD 调试覆盖。使用
+下面的构建命令生成无 CRSF 的单电机调试版本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1 -CrsfRemoteControlEnable 0
+```
+
+烧录并启动后，通过 SWD 写入 `g_motor_debug`：设置 `enable`，选择 `wheel`，再选择
 `MOTOR_CONTROL_DEBUG_MODE_STOP`、`MOTOR_CONTROL_DEBUG_MODE_PWM` 或
 `MOTOR_CONTROL_DEBUG_MODE_SPEED`。PWM 模式使用带符号的 `target_duty_percent`；速度模式
 使用 `target_speed_mm_per_s` 和可写的 `speed_pid_params`（`kp`、`ki`、`kd`、
@@ -111,6 +131,14 @@ RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_spee
 明确使用 `speed_pid_params` 中的参数。输出被限制在带符号的 100% 范围内。调试启用后，
 所有未选中的轮位都会停止。启用调试或修改轮位、模式时，控制器状态会复位，并在输出恢复
 前让所有轮位保持一个 10 ms 控制周期的 0 输出。电机运动时不要设置断点。
+
+测试开环电机旋转方向时使用 `MOTOR_CONTROL_DEBUG_MODE_PWM`，不要使用速度模式：先将
+`target_duty_percent` 设为 `0.0f`，选择一个轮位并写入 `enable=true`，再从 `+5.0f` 或
+`-5.0f` 的低占空比开始。观察实际轮子旋转方向和 `g_encoder_samples[wheel]` 的
+`delta_counts`/`instant_speed_mm_per_s` 符号；停止时先写回 `target_duty_percent=0.0f`，
+最后写 `enable=false`。先分别测试四个轮位，车轮悬空或断开电机电源，电机运动期间不要
+设置断点。若仅电机机械方向错误，调整的是 PWM 方向映射；若电机方向正确但编码器符号
+错误，调整的是上述 `BOARD_ENCODER_*_DIRECTION_SIGN`。
 
 为便于观察，10 ms 电机任务会写入 `volatile g_encoder_samples[BOARD_MOTOR_COUNT]` 快照，
 可通过 SWD 观察，不需要增加断点。调试速度环时，将 `config/app_config.h` 中的编译期开关

@@ -39,11 +39,14 @@ $profile = Join-Path $projectDir 'app\app_profile.h'
 $appConfig = Join-Path $projectDir 'config\app_config.h'
 $encoderConfig = Join-Path $projectDir 'config\encoder_config.h'
 $encoderHeader = Join-Path $projectDir 'drivers\encoder\board_encoder.h'
+$motorConfig = Join-Path $projectDir 'config\motor_config.h'
+$motorHeader = Join-Path $projectDir 'drivers\motor\board_motor.h'
 $monitorConfig = Join-Path $projectDir 'config\rtos_monitor_config.h'
 $monitorHeader = Join-Path $projectDir 'services\rtos_monitor\rtos_monitor.h'
 $freertosConfig = Join-Path $projectDir 'config\FreeRTOSConfig.h'
 
 foreach ($path in @($profile, $appConfig, $encoderConfig, $encoderHeader,
+                    $motorConfig, $motorHeader,
                     $monitorConfig, $monitorHeader, $freertosConfig)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Required configuration file is missing: $path"
@@ -61,10 +64,45 @@ Assert-NotContains -Path $profile -Pattern '^\s*#\s*define\s+APP_(?!PROFILE_H\b)
 
 Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION\s+13U' `
     -Description 'Encoder mechanics must live in encoder configuration'
+Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN\s+-1' `
+    -Description 'Front-left encoder direction must be configurable'
+Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN\s+1' `
+    -Description 'Front-right encoder direction must be configurable'
+Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_REAR_LEFT_DIRECTION_SIGN\s+1' `
+    -Description 'Rear-left encoder direction must be configurable'
+Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_REAR_RIGHT_DIRECTION_SIGN\s+-1' `
+    -Description 'Rear-right encoder direction must be configurable'
 Assert-Contains -Path $encoderHeader -Pattern '#include "config/encoder_config\.h"' `
     -Description 'Encoder interface must include encoder configuration'
 Assert-NotContains -Path $encoderHeader -Pattern '^\s*#\s*define\s+BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION' `
     -Description 'Encoder interface must not define encoder mechanics'
+
+Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_FRONT_LEFT_DIRECTION_SIGN\s+-1' `
+    -Description 'Motor polarity must live in motor configuration'
+Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_FRONT_RIGHT_DIRECTION_SIGN\s+-1' `
+    -Description 'Motor polarity must configure front-right independently'
+Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_REAR_LEFT_DIRECTION_SIGN\s+-1' `
+    -Description 'Motor polarity must preserve the rear-left inversion'
+Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_REAR_RIGHT_DIRECTION_SIGN\s+1' `
+    -Description 'Motor polarity must configure rear-right independently'
+Assert-Contains -Path $motorHeader -Pattern '#include "config/motor_config\.h"' `
+    -Description 'Motor interface must include motor configuration'
+Assert-Contains -Path (Join-Path $projectDir 'drivers\motor\board_motor.c') `
+    -Pattern 'BOARD_MOTOR_FRONT_LEFT_DIRECTION_SIGN' `
+    -Description 'Motor driver must use the configured front-left polarity'
+Assert-Contains -Path (Join-Path $projectDir 'drivers\motor\board_motor.c') `
+    -Pattern 'BOARD_MOTOR_FRONT_RIGHT_DIRECTION_SIGN' `
+    -Description 'Motor driver must use the configured front-right polarity'
+
+$encoder = Join-Path $projectDir 'drivers\encoder\board_encoder.c'
+Assert-Contains -Path $encoder -Pattern 'BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN' `
+    -Description 'Encoder driver must use the configured front-left direction'
+Assert-Contains -Path $encoder -Pattern 'BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN' `
+    -Description 'Encoder driver must use the configured front-right direction'
+Assert-Contains -Path $encoder -Pattern 'BOARD_ENCODER_REAR_LEFT_DIRECTION_SIGN' `
+    -Description 'Encoder driver must use the configured rear-left direction'
+Assert-Contains -Path $encoder -Pattern 'BOARD_ENCODER_REAR_RIGHT_DIRECTION_SIGN' `
+    -Description 'Encoder driver must use the configured rear-right direction'
 
 Assert-Contains -Path $monitorConfig -Pattern '#define RTOS_MONITOR_TASK_NAME_LENGTH\s+16U' `
     -Description 'Monitor configuration must own task name length'

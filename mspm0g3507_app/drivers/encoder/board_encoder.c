@@ -69,28 +69,32 @@ static void record_front_left_quadrature_edge(void)
 {
     record_quadrature_edge(BOARD_MOTOR_FRONT_LEFT, ENCODER_FRONT_LEFT_A_PORT,
                            ENCODER_FRONT_LEFT_A_PIN, ENCODER_FRONT_LEFT_B_PORT,
-                           ENCODER_FRONT_LEFT_B_PIN, 1);
+                           ENCODER_FRONT_LEFT_B_PIN,
+                           BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN);
 }
 
 static void record_front_right_quadrature_edge(void)
 {
     record_quadrature_edge(BOARD_MOTOR_FRONT_RIGHT, ENCODER_FRONT_RIGHT_A_PORT,
                            ENCODER_FRONT_RIGHT_A_PIN, ENCODER_FRONT_RIGHT_B_PORT,
-                           ENCODER_FRONT_RIGHT_B_PIN, -1);
+                           ENCODER_FRONT_RIGHT_B_PIN,
+                           BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN);
 }
 
 static void record_rear_left_quadrature_edge(void)
 {
     record_quadrature_edge(BOARD_MOTOR_REAR_LEFT, ENCODER_REAR_LEFT_A_PORT,
                            ENCODER_REAR_LEFT_A_PIN, ENCODER_REAR_LEFT_B_PORT,
-                           ENCODER_REAR_LEFT_B_PIN, 1);
+                           ENCODER_REAR_LEFT_B_PIN,
+                           BOARD_ENCODER_REAR_LEFT_DIRECTION_SIGN);
 }
 
 static void record_rear_right_quadrature_edge(void)
 {
     record_quadrature_edge(BOARD_MOTOR_REAR_RIGHT, ENCODER_REAR_RIGHT_A_PORT,
                            ENCODER_REAR_RIGHT_A_PIN, ENCODER_REAR_RIGHT_B_PORT,
-                           ENCODER_REAR_RIGHT_B_PIN, -1);
+                           ENCODER_REAR_RIGHT_B_PIN,
+                           BOARD_ENCODER_REAR_RIGHT_DIRECTION_SIGN);
 }
 
 void board_encoder_init(void)
@@ -144,22 +148,26 @@ void board_encoder_gpioa_irq_handler(void)
     case ENCODER_FRONT_LEFT_A_IIDX:
         record_a_phase_edge(BOARD_MOTOR_FRONT_LEFT, ENCODER_FRONT_LEFT_A_PORT,
                             ENCODER_FRONT_LEFT_A_PIN, ENCODER_FRONT_LEFT_B_PORT,
-                            ENCODER_FRONT_LEFT_B_PIN, 1);
+                            ENCODER_FRONT_LEFT_B_PIN,
+                            BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN);
         break;
     case ENCODER_FRONT_RIGHT_A_IIDX:
         record_a_phase_edge(BOARD_MOTOR_FRONT_RIGHT, ENCODER_FRONT_RIGHT_A_PORT,
                             ENCODER_FRONT_RIGHT_A_PIN, ENCODER_FRONT_RIGHT_B_PORT,
-                            ENCODER_FRONT_RIGHT_B_PIN, -1);
+                            ENCODER_FRONT_RIGHT_B_PIN,
+                            BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN);
         break;
     case ENCODER_REAR_LEFT_A_IIDX:
         record_a_phase_edge(BOARD_MOTOR_REAR_LEFT, ENCODER_REAR_LEFT_A_PORT,
                             ENCODER_REAR_LEFT_A_PIN, ENCODER_REAR_LEFT_B_PORT,
-                            ENCODER_REAR_LEFT_B_PIN, 1);
+                            ENCODER_REAR_LEFT_B_PIN,
+                            BOARD_ENCODER_REAR_LEFT_DIRECTION_SIGN);
         break;
     case ENCODER_REAR_RIGHT_A_IIDX:
         record_a_phase_edge(BOARD_MOTOR_REAR_RIGHT, ENCODER_REAR_RIGHT_A_PORT,
                             ENCODER_REAR_RIGHT_A_PIN, ENCODER_REAR_RIGHT_B_PORT,
-                            ENCODER_REAR_RIGHT_B_PIN, -1);
+                            ENCODER_REAR_RIGHT_B_PIN,
+                            BOARD_ENCODER_REAR_RIGHT_DIRECTION_SIGN);
         break;
     default:
         break;

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "config/motor_config.h"
+
 typedef enum {
     BOARD_MOTOR_FRONT_LEFT = 0U,
     BOARD_MOTOR_FRONT_RIGHT,

@@ -1,6 +1,6 @@
 # MSPM0 核心板工程交接索引
 
-最后更新：2026-07-26
+最后更新：2026-07-28
 
 ## 使用规则
 
@@ -195,6 +195,31 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 `key,...` UART 输出已移除。
 
 ## 已知验证与遗留风险
+
+### 本轮编码器方向配置与单电机开环说明
+
+- 将四个轮位的编码器方向符号从 `drivers/encoder/board_encoder.c` 中的硬编码值移至
+  `config/encoder_config.h` 的 `BOARD_ENCODER_*_DIRECTION_SIGN`；A 相双沿和 AB X4 两条
+  解码路径共用这些配置，且编译期限制为 `+1` 或 `-1`。
+- 当前工作区已按新硬件确认的编码器符号配置为：前左 `-1`、前右 `1`、后左 `1`、后右
+  `-1`。编码器符号只修正反馈方向，不改变 PWM 电机方向映射。
+- 单电机开环调试入口为构建参数 `-CrsfRemoteControlEnable 0`、变量 `g_motor_debug`、
+  模式 `MOTOR_CONTROL_DEBUG_MODE_PWM` 和带符号变量 `target_duty_percent`。默认 CRSF
+  构建不启用该 SWD 调试覆盖。
+- 已通过 `tests\test_config_ownership.ps1`、`tests\test_motor_control.ps1 -EncoderDecodeMode 1`
+  和 `tests\test_motor_control.ps1 -EncoderDecodeMode 2`。仅执行主机测试，未执行 Flash、
+  烧录、探针枚举、GDB/SWD、电机调试或实物验收。
+
+### 本轮电机 PWM 极性配置
+
+- 新增 `config/motor_config.h`，将四轮电机正反转极性从 `board_motor.c` 的后左硬编码分支
+  提取为 `BOARD_MOTOR_*_DIRECTION_SIGN`；`+1` 保持逻辑方向，`-1` 交换正反 PWM 输出。
+- 根据本次开环低占空比实测，当前配置为前左 `-1`、前右 `-1`、后左 `-1`、后右 `1`。
+  这只影响 PWM 电机方向，不影响编码器计数符号；两者需要分别配置。
+- 当前工作区的 `config/crsf_config.h` 已被设为 `CRSF_REMOTE_CONTROL_ENABLE=0U`，用于无
+  CRSF 的单电机 SWD 调试；原有静态集成测试仍按基线默认值 `1U` 检查，因此在该本地配置下
+  会单独报告默认值不匹配。
+- 未执行 Flash、烧录、探针连接或电机实物复验；需要重新构建并烧录后逐轮使用低占空比确认。
 
 ### 本轮 VS Code IntelliSense 修复
 

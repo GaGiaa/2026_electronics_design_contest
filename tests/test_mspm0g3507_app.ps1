@@ -106,6 +106,7 @@ $crsfProtocolHeader = Join-Path $projectDir 'protocols\crsf\crsf_protocol.h'
 $crsfControl = Join-Path $projectDir 'protocols\crsf\crsf_control.c'
 $crsfControlHeader = Join-Path $projectDir 'protocols\crsf\crsf_control.h'
 $crsfConfig = Join-Path $projectDir 'config\crsf_config.h'
+$motorConfig = Join-Path $projectDir 'config\motor_config.h'
 $motor = Join-Path $projectDir 'drivers\motor\board_motor.c'
 $motorHeader = Join-Path $projectDir 'drivers\motor\board_motor.h'
 $encoder = Join-Path $projectDir 'drivers\encoder\board_encoder.c'
@@ -127,7 +128,7 @@ $gitIgnore = Join-Path $ProjectRoot '.gitignore'
 $keilProject = Join-Path $ProjectRoot 'keil\mspm0g3507_app\mspm0g3507_app.uvprojx'
 
 foreach ($path in @($projectDir, $main, $ws2812, $ws2812Header, $buzzer, $buzzerHeader, $servo, $servoHeader, $servoMath, $appConfig, $encoderConfig, $monitorConfig, $bmi160, $bmi160Header, $imuYaw, $imuYawHeader, $buttons, $buttonsHeader, $grayscale, $grayscaleHeader, $lineTracking, $lineTrackingHeader, $lineControl, $lineControlHeader, $yawControl, $yawControlHeader, $grayscaleUnitTest, $grayscaleUnitTestScript, $grayscaleUnitTestSupport, $uart, $crsfUart, $crsfProtocol, $crsfProtocolHeader, $crsfControl, $crsfControlHeader, $crsfConfig, $motor, $motorHeader, $encoder, $encoderHeader, $motorControl, $motorControlHeader, $motorPid, $motorPidHeader, $vofaJustFloat, $vofaJustFloatHeader, $syscfg, $rtosConfig, $ccsBuildConfig,
-                        $buildScript, $flashScript, $tasks, $launch, $gitIgnore)) {
+                         $motorConfig, $buildScript, $flashScript, $tasks, $launch, $gitIgnore)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "MSPM0G3507 app project is incomplete: $path is missing."
     }
@@ -463,9 +464,10 @@ Assert-Contains -Path $motor -Pattern 'DL_Timer_setCaptureCompareValue' -Descrip
 Assert-Contains -Path $motor -Pattern 'BOARD_MOTOR_DIRECTION_FORWARD' -Description 'Motor driver must drive IN1 for forward motion'
 Assert-Contains -Path $motor -Pattern 'BOARD_MOTOR_DIRECTION_REVERSE' -Description 'Motor driver must drive IN2 for reverse motion'
 Assert-Contains -Path $motor -Pattern 'board_motor_set_signed_duty' -Description 'Motor driver must map signed duty to direction and PWM'
+Assert-Contains -Path $motor -Pattern 'get_direction_sign' -Description 'Motor driver must apply per-wheel polarity configuration'
 Assert-OrderedPatterns -Path $motor -Patterns @('case BOARD_MOTOR_FRONT_LEFT:', 'MOTOR_FRONT_LEFT_INST') -Description 'Logical front-left wheel must use its matching PWM instance'
 Assert-OrderedPatterns -Path $motor -Patterns @('case BOARD_MOTOR_FRONT_RIGHT:', 'MOTOR_FRONT_RIGHT_INST') -Description 'Logical front-right wheel must use its matching PWM instance'
-Assert-OrderedPatterns -Path $motor -Patterns @('case BOARD_MOTOR_REAR_LEFT:', 'BOARD_MOTOR_DIRECTION_REVERSE', 'MOTOR_REAR_LEFT_INST') -Description 'Logical rear-left wheel must invert direction through its matching PWM instance'
+Assert-OrderedPatterns -Path $motor -Patterns @('case BOARD_MOTOR_REAR_LEFT:', 'MOTOR_REAR_LEFT_INST') -Description 'Logical rear-left wheel must use its matching PWM instance'
 Assert-OrderedPatterns -Path $motor -Patterns @('case BOARD_MOTOR_REAR_RIGHT:', 'MOTOR_REAR_RIGHT_INST') -Description 'Logical rear-right wheel must use its matching PWM instance'
 Assert-Contains -Path $uart -Pattern 'xQueueSendFromISR' -Description 'UART ISR must queue received bytes'
 Assert-Contains -Path $uart -Pattern 'DL_UART_Main_isRXFIFOEmpty' -Description 'UART ISR must drain the receive FIFO'
@@ -486,7 +488,12 @@ Assert-Contains -Path $encoderConfig -Pattern 'BOARD_ENCODER_DECODE_MODE_A_PHASE
 Assert-Contains -Path $encoderConfig -Pattern 'BOARD_ENCODER_DECODE_MODE_AB_PHASE_QUADRATURE_X4' -Description 'Encoder configuration must define AB quadrature X4 mode'
 Assert-Contains -Path $encoderConfig -Pattern 'BOARD_ENCODER_COUNTS_PER_REVOLUTION' -Description 'Encoder configuration must derive counts per revolution'
 Assert-Contains -Path $encoderConfig -Pattern 'BOARD_ENCODER_WHEEL_DIAMETER_MM\s+48' -Description 'Encoder configuration must define the reference wheel diameter'
+Assert-Contains -Path $motorConfig -Pattern 'BOARD_MOTOR_FRONT_LEFT_DIRECTION_SIGN\s+-1' -Description 'Motor configuration must invert the measured front-left polarity'
+Assert-Contains -Path $motorConfig -Pattern 'BOARD_MOTOR_FRONT_RIGHT_DIRECTION_SIGN\s+-1' -Description 'Motor configuration must invert the measured front-right polarity'
+Assert-Contains -Path $motorConfig -Pattern 'BOARD_MOTOR_REAR_LEFT_DIRECTION_SIGN\s+-1' -Description 'Motor configuration must preserve the rear-left polarity inversion'
+Assert-Contains -Path $motorConfig -Pattern 'BOARD_MOTOR_REAR_RIGHT_DIRECTION_SIGN\s+1' -Description 'Motor configuration must preserve the rear-right polarity'
 Assert-Contains -Path $encoderHeader -Pattern '#include "config/encoder_config\.h"' -Description 'Encoder interface must include encoder configuration'
+Assert-Contains -Path $motorHeader -Pattern '#include "config/motor_config\.h"' -Description 'Motor interface must include motor configuration'
 Assert-Contains -Path $motorControlHeader -Pattern 'g_motor_speed_targets_mm_s' -Description 'Motor control must expose SWD four-wheel speed targets'
 Assert-Contains -Path $motorControlHeader -Pattern 'g_motor_debug' -Description 'Motor control must expose the SWD debug state'
 Assert-Contains -Path $motorControlHeader -Pattern 'MOTOR_CONTROL_DEBUG_MODE_PWM' -Description 'Motor control must expose PWM debug mode'
@@ -512,19 +519,11 @@ Assert-Contains -Path $encoder -Pattern 'ENCODER_FRONT_RIGHT_A_IIDX' -Descriptio
 Assert-Contains -Path $encoder -Pattern 'ENCODER_REAR_LEFT_A_IIDX' -Description 'Encoder driver must use generated rear-left A interrupt definitions'
 Assert-Contains -Path $encoder -Pattern 'ENCODER_REAR_RIGHT_A_IIDX' -Description 'Encoder driver must use generated rear-right A interrupt definitions'
 Assert-OrderedPatterns -Path $encoder -Patterns @(
-    'case ENCODER_FRONT_LEFT_A_IIDX:',
-    'BOARD_MOTOR_FRONT_LEFT',
-    '\s*,\s*1\);',
-    'case ENCODER_FRONT_RIGHT_A_IIDX:',
-    'BOARD_MOTOR_FRONT_RIGHT',
-    '\s*,\s*-1\);',
-    'case ENCODER_REAR_LEFT_A_IIDX:',
-    'BOARD_MOTOR_REAR_LEFT',
-    '\s*,\s*1\);',
-    'case ENCODER_REAR_RIGHT_A_IIDX:',
-    'BOARD_MOTOR_REAR_RIGHT',
-    '\s*,\s*-1\);'
-) -Description 'Encoder GPIO channels must match the measured physical wheel mapping and direction signs'
+    'BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN',
+    'BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN',
+    'BOARD_ENCODER_REAR_LEFT_DIRECTION_SIGN',
+    'BOARD_ENCODER_REAR_RIGHT_DIRECTION_SIGN'
+) -Description 'Encoder GPIO channels must use configurable direction signs'
 Assert-Contains -Path $syscfg -Pattern 'PB22' -Description 'WS2812 data output must use PB22'
 Assert-Contains -Path $syscfg -Pattern 'HSCLKMUX.*SYSPLL0' -Description 'Application CPU clock must use SYSPLL0'
 Assert-Contains -Path $syscfg -Pattern 'HFXT' -Description 'Application SYSPLL reference must use the HFXT'
