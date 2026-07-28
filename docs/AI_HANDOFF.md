@@ -271,7 +271,7 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 - 将四个轮位的编码器方向符号从 `drivers/encoder/board_encoder.c` 中的硬编码值移至
   `config/encoder_config.h` 的 `BOARD_ENCODER_*_DIRECTION_SIGN`；A 相双沿和 AB X4 两条
   解码路径共用这些配置，且编译期限制为 `+1` 或 `-1`。
-- 当前工作区已按新硬件确认的编码器符号配置为：前左 `-1`、前右 `1`、后左 `1`、后右
+- 当前工作区已按新硬件确认的编码器符号配置为：前左 `1`、前右 `-1`、后左 `1`、后右
   `-1`。编码器符号只修正反馈方向，不改变 PWM 电机方向映射。
 - 单电机开环调试入口为构建参数 `-CrsfRemoteControlEnable 0`、变量 `g_motor_debug`、
   模式 `MOTOR_CONTROL_DEBUG_MODE_PWM` 和带符号变量 `target_duty_percent`。默认 CRSF
@@ -284,7 +284,7 @@ BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENAB
 
 - 新增 `config/motor_config.h`，将四轮电机正反转极性从 `board_motor.c` 的后左硬编码分支
   提取为 `BOARD_MOTOR_*_DIRECTION_SIGN`；`+1` 保持逻辑方向，`-1` 交换正反 PWM 输出。
-- 根据本次开环低占空比实测，当前配置为前左 `-1`、前右 `-1`、后左 `-1`、后右 `1`。
+- 根据本次开环低占空比实测，当前配置为前左 `1`、前右 `1`、后左 `-1`、后右 `1`。
   这只影响 PWM 电机方向，不影响编码器计数符号；两者需要分别配置。
 - 当前工作区的 `config/crsf_config.h` 已被设为 `CRSF_REMOTE_CONTROL_ENABLE=0U`，用于无
   CRSF 的单电机 SWD 调试；原有静态集成测试仍按基线默认值 `1U` 检查，因此在该本地配置下

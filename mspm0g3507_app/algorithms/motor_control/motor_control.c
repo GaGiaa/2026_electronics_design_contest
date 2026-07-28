@@ -34,8 +34,8 @@ static const PID_Incremental_Param_Config g_default_speed_pid_params[BOARD_MOTOR
         .output_delta_limit = 0.0f,
     },
     [BOARD_MOTOR_REAR_LEFT] = {
-        .kp = 0.1f,
-        .ki = 1.5f,
+        .kp = 0.05f,
+        .ki = 1.0f,
         .kd = 0.0f,
         .output_limit = MOTOR_CONTROL_MAX_DUTY_PERCENT,
         .deadband = 0.0f,
