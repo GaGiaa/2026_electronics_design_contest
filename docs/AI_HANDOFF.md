@@ -125,6 +125,11 @@ BMI160 软复位后需要重新执行 SPI 接口选择事务，再进行配置�
 灰度结果通过 `g_grayscale_snapshot` 提供 SWD 和 VOFA 观察，并由高档循迹模式读取其
 `line_error`、`line_strength`、`sequence` 和 `adc_timeout_mask`。WS2812 使用 SPI1 输出到
 PB22；四针 SSD1306 OLED 使用 I2C0：`SDA=PA0`、`SCL=PA1`，默认地址为 `0x3C`。
+当前 `app/app_startup.c` 使用的八路逐通道标定默认值为 `white={1239,2393,803,709,2596,2254,3040,829}`、
+`black={72,64,67,81,97,76,410,76}`；数组下标按 `74HC4051` 地址顺序对应通道 0..7。标定值已同步到
+工程 README 和应用静态集成测试，但白黑基准、归一化、黑线位图和循迹抗干扰能力仍需结合灰度 VOFA 与实物验证。
+当前 `test_board_grayscale.ps1` 的 GPIO mock 未记录 `AD0/AD1/AD2` 输出，尚不能自动验证 `000..111`
+地址序列及左右物理位置映射；这属于测试覆盖缺口，后续应通过扩展 mock 或灰度 VOFA 实物观察补充确认。
 WS2812、蜂鸣器、按键和 OLED 的实物响应仍需单独验收。
 
 ### HC-SR04 超声波测距
