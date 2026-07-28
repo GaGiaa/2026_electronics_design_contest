@@ -102,8 +102,8 @@ B 相用于判断方向。`board_encoder` 明确声明电机机械参数：电�
 “车辆前进方向”下的计数符号都反了，只需将这两个宏改为：
 
 ```c
-#define BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN -1
-#define BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN 1
+#define BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN 1
+#define BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN -1
 ```
 
 不要为修正编码器反馈而修改 `board_motor_set_signed_duty()` 或 PWM 引脚顺序。修改后必须

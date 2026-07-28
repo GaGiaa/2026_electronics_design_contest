@@ -64,9 +64,9 @@ Assert-NotContains -Path $profile -Pattern '^\s*#\s*define\s+APP_(?!PROFILE_H\b)
 
 Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION\s+13U' `
     -Description 'Encoder mechanics must live in encoder configuration'
-Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN\s+-1' `
+Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_FRONT_LEFT_DIRECTION_SIGN\s+1' `
     -Description 'Front-left encoder direction must be configurable'
-Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN\s+1' `
+Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_FRONT_RIGHT_DIRECTION_SIGN\s+-1' `
     -Description 'Front-right encoder direction must be configurable'
 Assert-Contains -Path $encoderConfig -Pattern '#define BOARD_ENCODER_REAR_LEFT_DIRECTION_SIGN\s+1' `
     -Description 'Rear-left encoder direction must be configurable'
@@ -77,9 +77,9 @@ Assert-Contains -Path $encoderHeader -Pattern '#include "config/encoder_config\.
 Assert-NotContains -Path $encoderHeader -Pattern '^\s*#\s*define\s+BOARD_ENCODER_MOTOR_LINES_PER_REVOLUTION' `
     -Description 'Encoder interface must not define encoder mechanics'
 
-Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_FRONT_LEFT_DIRECTION_SIGN\s+-1' `
+Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_FRONT_LEFT_DIRECTION_SIGN\s+1' `
     -Description 'Motor polarity must live in motor configuration'
-Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_FRONT_RIGHT_DIRECTION_SIGN\s+-1' `
+Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_FRONT_RIGHT_DIRECTION_SIGN\s+1' `
     -Description 'Motor polarity must configure front-right independently'
 Assert-Contains -Path $motorConfig -Pattern '#define BOARD_MOTOR_REAR_LEFT_DIRECTION_SIGN\s+-1' `
     -Description 'Motor polarity must preserve the rear-left inversion'
