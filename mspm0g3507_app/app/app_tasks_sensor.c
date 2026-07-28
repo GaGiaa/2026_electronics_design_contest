@@ -6,6 +6,7 @@
 #include <task.h>
 
 #include "config/app_config.h"
+#include "config/rtos_monitor_config.h"
 
 #if APP_IMU_YAW_ENABLE
 #include "algorithms/imu_yaw/board_imu_yaw.h"
@@ -17,6 +18,8 @@
 #include "config/crsf_config.h"
 #include "drivers/crsf_uart/board_crsf_uart.h"
 #include "drivers/grayscale/board_grayscale.h"
+#include "drivers/hcsr04/board_hcsr04.h"
+#include "algorithms/ultrasonic/ultrasonic_measurement.h"
 #include "protocols/crsf/crsf_protocol.h"
 
 #if APP_IMU_YAW_ENABLE
@@ -28,6 +31,10 @@ static StackType_t g_gray_task_stack[APP_GRAY_TASK_STACK_DEPTH];
 #if CRSF_REMOTE_CONTROL_ENABLE
 static StaticTask_t g_crsf_task_buffer;
 static StackType_t g_crsf_task_stack[APP_CRSF_TASK_STACK_DEPTH];
+#endif
+#if APP_HCSR04_ENABLE
+static StaticTask_t g_hcsr04_task_buffer;
+static StackType_t g_hcsr04_task_stack[APP_HCSR04_TASK_STACK_DEPTH];
 #endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
@@ -75,7 +82,6 @@ static void imu_task(void *argument)
     board_imu_yaw_state_t yaw_state;
     board_encoder_sample_t encoder_samples[BOARD_MOTOR_COUNT];
 #endif
-
     (void)argument;
     board_imu_yaw_init(&yaw_state, APP_IMU_YAW_TRACK_WIDTH_MM);
     for (;;) {
@@ -132,6 +138,40 @@ static void gray_task(void *argument)
     }
 }
 
+#if APP_HCSR04_ENABLE
+static void hcsr04_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval = pdMS_TO_TICKS(APP_HCSR04_SAMPLE_INTERVAL_MS);
+    board_hcsr04_result_t result;
+    app_hcsr04_snapshot_t snapshot = {0};
+    TaskHandle_t task_handle = xTaskGetCurrentTaskHandle();
+
+    (void)argument;
+    board_hcsr04_set_task_handle(task_handle);
+    for (;;) {
+        (void)ulTaskNotifyTake(pdTRUE, 0U);
+        board_hcsr04_trigger();
+        if (ulTaskNotifyTake(pdTRUE,
+                             pdMS_TO_TICKS(APP_HCSR04_ECHO_TIMEOUT_MS)) == 0U) {
+            board_hcsr04_abort();
+            snapshot.valid = false;
+            snapshot.distance_mm = 0U;
+            snapshot.echo_time_us = 0U;
+            ++snapshot.timeout_count;
+        } else {
+            board_hcsr04_read_result(&result);
+            snapshot.valid = result.valid && ultrasonic_measurement_calculate(
+                result.echo_ticks, RTOS_MONITOR_TIMER_HZ, 100U, 30000U,
+                &snapshot.echo_time_us, &snapshot.distance_mm);
+        }
+        ++snapshot.sequence;
+        app_state_hcsr04_publish(&snapshot);
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
+
 void app_tasks_sensor_start(void)
 {
 #if CRSF_REMOTE_CONTROL_ENABLE
@@ -147,4 +187,10 @@ void app_tasks_sensor_start(void)
     configASSERT(xTaskCreateStatic(gray_task, "gray", APP_GRAY_TASK_STACK_DEPTH,
                                    NULL, APP_TELEMETRY_TASK_PRIORITY,
                                    g_gray_task_stack, &g_gray_task_buffer) != NULL);
+#if APP_HCSR04_ENABLE
+    board_hcsr04_init();
+    configASSERT(xTaskCreateStatic(hcsr04_task, "hcsr04", APP_HCSR04_TASK_STACK_DEPTH,
+                                   NULL, APP_TASK_PRIORITY, g_hcsr04_task_stack,
+                                   &g_hcsr04_task_buffer) != NULL);
+#endif
 }

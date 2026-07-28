@@ -2,6 +2,8 @@
 
 #include "drivers/crsf_uart/board_crsf_uart.h"
 #include "drivers/encoder/board_encoder.h"
+#include "drivers/hcsr04/board_hcsr04.h"
+#include "config/app_config.h"
 #include "drivers/uart/board_uart.h"
 #include "ti_msp_dl_config.h"
 
@@ -21,7 +23,10 @@ void GROUP1_IRQHandler(void)
     case ENCODER_GPIOA_INT_IIDX:
         board_encoder_gpioa_irq_handler();
         break;
-    case ENCODER_GPIOB_INT_IIDX:
+    case GPIO_MULTIPLE_GPIOB_INT_IIDX:
+#if APP_HCSR04_ENABLE
+        board_hcsr04_gpio_irq_handler();
+#endif
         board_encoder_gpiob_irq_handler();
         break;
     default:

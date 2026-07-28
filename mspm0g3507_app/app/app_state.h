@@ -50,6 +50,14 @@ typedef struct {
     uint32_t sequence;
 } app_button_snapshot_t;
 
+typedef struct {
+    bool valid;
+    uint32_t distance_mm;
+    uint32_t echo_time_us;
+    uint32_t timeout_count;
+    uint32_t sequence;
+} app_hcsr04_snapshot_t;
+
 /* SWD-observable app-state sequence guards. Treat these as read-only. */
 extern volatile uint32_t g_encoder_sample_sequence;
 extern volatile uint32_t g_grayscale_publish_sequence;
@@ -60,6 +68,8 @@ extern volatile board_grayscale_snapshot_t g_grayscale_snapshot;
 extern volatile app_drive_control_snapshot_t g_drive_control_snapshot;
 extern volatile app_button_snapshot_t g_button_snapshot;
 extern volatile uint32_t g_button_publish_sequence;
+extern volatile app_hcsr04_snapshot_t g_hcsr04_snapshot;
+extern volatile uint32_t g_hcsr04_publish_sequence;
 extern line_tracking_state_t g_line_tracking_state;
 
 #if APP_IMU_YAW_ENABLE
@@ -113,6 +123,8 @@ void app_state_buttons_publish(uint32_t pressed_mask,
                                uint32_t pressed_edge_mask,
                                uint32_t released_edge_mask);
 void app_state_buttons_snapshot_copy(app_button_snapshot_t *snapshot);
+void app_state_hcsr04_publish(const app_hcsr04_snapshot_t *snapshot);
+void app_state_hcsr04_snapshot_copy(app_hcsr04_snapshot_t *snapshot);
 
 #if APP_IMU_YAW_ENABLE
 void app_state_imu_yaw_publish(float yaw_deg, float yaw_rate_dps,

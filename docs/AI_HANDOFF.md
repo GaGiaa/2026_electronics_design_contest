@@ -118,6 +118,25 @@ BMI160 使用 SPI0：`SCK=PB18`、`MOSI=PB17`、`MISO=PB19`、`CS=PB0`，配置�
 PB22；四针 SSD1306 OLED 使用 I2C0：`SDA=PA0`、`SCL=PA1`，默认地址为 `0x3C`。
 WS2812、蜂鸣器、按键和 OLED 的实物响应仍需单独验收。
 
+### HC-SR04 超声波测距
+
+当前采用方案 A：`TRIG=PB10`，`ECHO=PB11`，`VCC=5 V`，`GND=MCU GND`。HC-SR04 的
+`ECHO` 通常为 5 V，必须经过分压或电平转换后再进入 `PB11`；推荐
+`ECHO -> 10 kOhm -> PB11 -> 18 kOhm -> GND`，不能直连。PB10/PB11 原本未占用，且不会
+改变 `PB8` 舵机 PWM、`PB9` WS2812 SPI 时钟、TIMG0/TIMG6/TIMG8 的既有功能。
+
+方案 A 使用 PB11 GPIO 双边沿中断记录 Echo 高电平宽度，复用 `TIMG12` 的 10 MHz 运行时
+计时器，不新增定时器。驱动在每次触发前清理 pending 状态，成功或超时后关闭 Echo 中断，
+避免迟到边沿污染下一次测量。10 MHz 计时器的 0.1 us 量化只对应约 0.017 mm；ISR 两个
+边沿的公共进入延时通常抵消，但 1 us 的边沿延时差对应约 0.17 mm，5 us 对应约 0.86 mm。
+由于当前没有示波器实测数据，不能把上述换算当作最终误差保证；中断屏蔽、临界区和高优先级
+中断造成的实际边沿差仍需硬件验收。
+
+功能默认由 `APP_HCSR04_ENABLE=0U` 关闭，HC-SR04 JustFloat 遥测由
+`APP_HCSR04_TELEMETRY_ENABLE=0U` 关闭。启用后，`g_hcsr04_snapshot` 发布
+`distance_mm`、`echo_time_us`、`valid`、`timeout_count` 和 `sequence`；3 通道 UART0
+JustFloat 顺序为距离、Echo 时间和有效标志，并与其他 UART0 VOFA 遥测互斥。
+
 ### UART 遥测与 CRSF
 
 UART0 同一时间只能运行一种遥测模式。按键 VOFA、速度 VOFA、灰度 VOFA、巡线 VOFA 和 IMU Yaw 在编译期互斥，
@@ -265,6 +284,20 @@ host test、CRSF、电机控制、舵机、IMU yaw、线跟踪和 VOFA 单元测
 本轮未执行 Flash 擦除、烧录、探针枚举、电机调试或任何实物验收操作。巡线 VOFA 帧的实际
 VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
+### 本轮 HC-SR04 方案 A
+
+- 新增 `drivers/hcsr04/` 板级驱动和 `algorithms/ultrasonic/` 纯算法模块；SysConfig 将
+  `PB10` 配置为 `TRIG` 输出、`PB11` 配置为 `ECHO` 双边沿中断输入。
+- 复用 `TIMG12` 10 MHz 运行时计时器测量 Echo 高电平，增加 `g_hcsr04_snapshot` 和可选
+  3 通道 JustFloat 遥测；`APP_HCSR04_ENABLE` 与 `APP_HCSR04_TELEMETRY_ENABLE` 默认均为 0。
+- 增加超时后的 Echo 中断 disarm、pending 清理和下一次触发前重新 arm，避免迟到边沿污染
+  下一次测量。
+- 已通过 `tests/test_ultrasonic_measurement.ps1`、`tests/test_hcsr04_static.ps1`、
+  `tests/test_mspm0g3507_app.ps1` 和 `tests/test_rtos_monitor_static.ps1`。
+- 已通过 TI Clang 和 Keil 的 `-Hcsr04Enable 1 -Hcsr04TelemetryEnable 1` 软件构建。
+- 本轮仍未执行 Flash 擦除、烧录、探针连接、GDB/SWD、电机调试、示波器/逻辑分析仪测量、
+  HC-SR04 接线或距离精度验收；5 V `ECHO` 分压/电平转换必须在实物测试前确认。
+
 尚未完成或需要持续复核的硬件项目包括：
 
 - BMI160 长期零偏、静止漂移、左右转 yaw 符号和急转弯响应；
@@ -274,6 +307,8 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
   的进入阈值允许较弱或较窄黑线进入有效状态，实际抗干扰能力仍需硬件验证；
 - 黑线循迹位置式 PID 的 `turn_sign`、基础速度、四轮速度环联调和模式切换实车响应；
 - yaw 锁定位置式 PID 的 `turn_sign`、目标角标定、IMU 漂移、低速响应和 SB/SC 模式切换冲击；
+- HC-SR04 5 V `ECHO` 分压、电源共地、PB10/PB11 电平、近距离盲区、反射面变化和测距超时；
+- HC-SR04 GPIO ISR 的进入延时差、临界区/高优先级中断影响、TIMG12 回绕和实际距离误差；
 - VOFA+ 曲线数量、通道顺序、帧尾和 UART 实际接收；
 - WS2812、蜂鸣器、按键和 OLED 实物响应。
 

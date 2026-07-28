@@ -344,6 +344,49 @@ PowerShell 构建脚本传入 `-RtosMonitorEnable 0` 临时关闭；传入 `-Rto
 内核没有完整保护每个任务累计运行时间计数器的定时器回绕。在 10 MHz 时基下，计数器约
 429 秒回绕一次；长时间连续运行后，任务级数值可能不准确。
 
+## HC-SR04 超声波测距（方案 A）
+
+HC-SR04 使用常见四针接口，但 `ECHO` 通常输出 5 V，不能直接连接 MSPM0G3507 的 GPIO。
+当前方案尽量使用图片所示的相邻空闲引脚：
+
+| HC-SR04 | MSPM0G3507 | 说明 |
+| --- | --- | --- |
+| `VCC` | `5 V` | 使用稳定的 5 V 供电 |
+| `GND` | `MCU GND` | 传感器和 MCU 必须共地 |
+| `TRIG` | `PB10` | 3.3 V GPIO 输出，至少保持高电平 10 us |
+| `ECHO` | `PB11` | 必须先经过分压或电平转换 |
+
+推荐使用电阻分压：`ECHO -> 10 kOhm -> PB11 -> 18 kOhm -> GND`，节点电压约为 3.2 V；
+也可以使用明确支持 5 V 输入、3.3 V 输出的电平转换器。不要把 `ECHO` 直接接到 `PB11`，
+也不要把 HC-SR04 的 5 V `VCC` 接到 MCU 的 3.3 V 电源。分压电阻的实际值和板卡输入
+耐压仍需在上电前确认。
+
+方案 A 使用 PB11 的 GPIO 双边沿中断测量 Echo 高电平宽度，并复用 `TIMG12` 的 10 MHz
+自由运行计时器；不新增定时器，也不占用 `PB8` 舵机 PWM、`PB9` WS2812 SPI 时钟或已有
+电机/蜂鸣器定时器。每次触发前清除旧中断状态，测量成功或超时后暂时关闭 Echo 中断，
+用于避免迟到边沿污染下一次测量。
+
+计时器分辨率为 0.1 us，理论量化距离分辨率约为 0.017 mm。GPIO ISR 的进入延时会分别
+影响上升沿和下降沿，但两次边沿经过相同的 ISR 路径时大部分公共延时会抵消。以 80 MHz
+CPU 计算，1 us 的边沿延时差对应约 0.17 mm 距离误差，5 us 对应约 0.86 mm；这些是
+误差换算，不是本板已实测的保证值。临界区、较高优先级中断和 WS2812 发送期间的中断屏蔽
+可能增大边沿延时差，最终数值需要用示波器或逻辑分析仪实测。
+
+HC-SR04 功能默认关闭。只构建软件测试版本时执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1 `
+    -Hcsr04Enable 1 -Hcsr04TelemetryEnable 1
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 `
+    -Hcsr04Enable 1 -Hcsr04TelemetryEnable 1
+```
+
+应用通过 `g_hcsr04_snapshot` 提供序列保护快照：`distance_mm`、`echo_time_us`、`valid`、
+`timeout_count` 和 `sequence`。启用 HC-SR04 JustFloat 遥测后，UART0 每个周期发送 3 个
+通道，顺序为 `distance_mm`、`echo_time_us`、`valid`，帧尾仍为 `00 00 80 7F`；它与其他
+UART0 VOFA 遥测互斥。构建成功只表示软件链路通过，不代表已完成供电、电平、距离精度或
+UART 实物验收。
+
 ## CRSF 遥控输入
 
 CRSF 遥控链路使用 UART3，速率 420000 baud、8-N-1，PB3 为 RX，PB2 为 TX。将接收机
