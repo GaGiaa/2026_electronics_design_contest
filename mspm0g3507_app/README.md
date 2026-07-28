@@ -215,6 +215,38 @@ PID、yaw 诊断、四轮目标和反馈速度的序列保护快照，供 SWD �
 `APP_IMU_YAW_ENABLE=0U` 时，yaw 模式清零四轮目标并复位 PID；SWD 写入非法目标角、PID 或限速参数时也会安全停车。跨越 ±180° 时会清除 PID 微分历史，避免角度环绕产生尖峰。yaw 模式不使用 CH1 右摇杆，
 只使用 CH3 左摇杆控制基础前进速度。
 
+### 赛道巡线
+
+`algorithms/course_following/` 是独立于通用 `line_control` 的赛道控制器。赛道模式进入后先清零
+四轮目标并调用 `board_imu_yaw_request_recalibration()`；控制器必须观察到 IMU 快照先失效、再在
+新标定完成后有效，才允许输出非零轮速。`APP_IMU_YAW_ENABLE=0U` 或 IMU 无效时保持停车。
+
+无线区必须连续 5 个灰度样本无有效线才进入航向保持，短暂丢线不会切换航向状态。直线航向依次为
+`0 deg`、`175 deg`，之后每两个直线段递减 `5 deg`。全黑立即停车。两侧边缘双黑触发直角转弯，
+默认直行速度为 `150 mm/s`，转弯外轮/内轮分别为 `+300/-200 mm/s`；转弯至少保持 500 ms，中心线
+连续 3 个样本退出，2000 ms 超时保护，退出后 100 ms 内不允许再次触发。这些参数是保守默认值，
+赛道线宽、IMU 漂移、转弯方向和速度响应仍需实车验证。
+
+赛道控制器、通用巡线和 yaw 控制的状态均保存在 `motor_task` 的局部对象中。因此
+`APP_MOTOR_TASK_STACK_DEPTH` 的默认值为 `512U`（2 KiB），不能恢复为旧的 `256U`（1 KiB）。后者会使
+向下增长的任务栈覆盖相邻的静态任务控制块，并可能在 FreeRTOS PendSV 上下文切换期间进入 HardFault。
+运行时应通过 RTOS monitor 的栈高水位快照观察实际余量；软件构建本身不等同于硬件确认。
+
+### 赛道 VOFA 遥测
+
+`APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE=0U` 默认关闭，通过
+`-CourseFollowingVofaTelemetryEnable 1` 开启；`-CourseFollowingVofaTelemetryIntervalMs` 默认值为
+10 ms。该模式要求 `APP_IMU_YAW_ENABLE=1U`，与所有其它 UART0 VOFA 遥测和 UART 回显互斥。
+任务只读取 IMU、`g_drive_control_snapshot` 和四轮电机状态快照，发送 14 通道、60 字节小端
+JustFloat 帧，帧尾为 `00 00 80 7F`：
+
+| 通道 | 内容 |
+| --- | --- |
+| 0..2 | yaw、yaw rate、gyro bias |
+| 3..5 | 赛道航向目标、无线区/航向保持标志、巡线误差 |
+| 6..9 | 前左、前右、后左、后右目标速度 |
+| 10..13 | 前左、前右、后左、后右反馈速度 |
+
 ### 巡线 VOFA 遥测
 
 巡线遥测默认由 `APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE=0U` 关闭，通过
@@ -340,8 +372,8 @@ VOFA 速度遥测和 IMU yaw 遥测不能同时启用。
 `app/app_startup.c` 使用实测的逐通道标定值：
 
 ```text
-white = {2834, 3064, 2150, 1924, 3099, 3032, 3182, 2467}
-black = { 353, 1075,  139,  189, 1027,  593, 2033,  110}
+white = {2750, 3000, 1980, 1900, 3000, 3000, 3100, 2400}
+black = {1500, 2600,  600,  550, 2400, 2900, 3000, 1700}
 ```
 
 `line_error` 根据归一化模拟值计算黑度 `4095-normalized[i]`，使用权重
@@ -427,10 +459,9 @@ SWD 调试版本。CH3（通道索引 2）控制前进和后退，CH1（通道�
 （通道数组索引 6）和 SC（通道数组索引 7）共同控制底盘模式。标准 CRSF 范围 172..1811 以 992 为中心映射，并使用 20%
 死区。默认最大轮速目标为 800 mm/s，可通过 `CRSF_MAX_SPEED_MM_PER_S` 修改。
 
-SB 低档（小于 700）使底盘空闲。SB 中档（700 到 1299）且 SC 低档（小于 700）使用
-CH1/CH3 手动差速，SC 中档（700 到 1299）进入 yaw 锁定，SC 高档（不小于 1300）安全停车。
-SB 高档（不小于 1300）使用 CH3 作为基础速度并进入黑线循迹，忽略 SC。模式切换时先输出一个 10 ms 的四轮零目标，
-连续 100 ms 没有收到有效的打包 RC 帧时也会清零。方向符号可以通过 `CRSF_FORWARD_SIGN`
+SB 或 SC 任一低档（小于 700）均使底盘空闲。其余组合固定为：SB/SC 中/中为 CH1/CH3 手动差速，
+中/高为 yaw 锁定，高/中为通用黑线循迹，高/高为赛道巡线。高档循迹和赛道模式均由 CH3 提供基础速度。
+模式切换时先输出一个 10 ms 的四轮零目标，连续 100 ms 没有收到有效的打包 RC 帧时也会清零。方向符号可以通过 `CRSF_FORWARD_SIGN`
 和 `CRSF_TURN_SIGN` 调整。`CRSF_REMOTE_CONTROL_ENABLE=0U` 时保留 `g_motor_debug` 单轮
 SWD 调试覆盖路径；UART0 仍可用于现有调试和 VOFA 输出。
 

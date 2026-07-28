@@ -139,10 +139,10 @@ JustFloat 顺序为距离、Echo 时间和有效标志，并与其他 UART0 VOFA
 
 ### UART 遥测与 CRSF
 
-UART0 同一时间只能运行一种遥测模式。按键 VOFA、速度 VOFA、灰度 VOFA、巡线 VOFA 和 IMU Yaw 在编译期互斥，
+UART0 同一时间只能运行一种遥测模式。按键 VOFA、速度 VOFA、灰度 VOFA、通用巡线 VOFA、赛道巡线 VOFA 和 IMU Yaw 在编译期互斥，
 启用遥测时不创建 UART 回显任务。当前 CRSF 映射为 CH3（索引 2）控制前进和后退，
 CH1（索引 0）控制手动模式差速转向，SB/CH5 使用通道数组索引 6，SC 使用通道数组索引 7；
-SB 低档为空闲，SB 中档且 SC 低档为手动、SC 中档为 yaw 锁定、SC 高档为空闲，SB 高档为循迹；连续
+SB 或 SC 任一低档为空闲，SB/SC 中/中为手动、中/高为 yaw 锁定、高/中为通用巡线、高/高为赛道巡线；连续
 100 ms 没有有效帧时四轮目标清零。`CRSF_REMOTE_CONTROL_ENABLE` 默认值为 `1U`，
 仍可通过构建参数设为 `0` 以保留无 CRSF 的 SWD 单轮电机调试路径。
 
@@ -172,6 +172,43 @@ SB 低档为空闲，SB 中档且 SC 低档为手动、SC 中档为 yaw 锁定�
 黑度、有效标志、丢线时间、ADC 超时掩码、基础速度、转向输出、左右目标速度、左右平均反馈速度、
 左右平均 PWM 以及位置 PID 的 P/I/D 输出。任务只读取 `g_drive_control_snapshot` 和电机状态快照，
 通过现有 UART TX 队列发送，不直接访问巡线控制器内部状态。
+
+### 本轮赛道巡线、IMU 漂移修正与遥测回迁
+
+- 新增 `CRSF_DRIVE_MODE_COURSE_FOLLOWING`，SB/SC 真值表已固定为任一低档空闲、中/中手动、
+  中/高 yaw 锁定、高/中通用巡线、高/高赛道巡线；低档优先于其它组合。
+- 新增 `algorithms/course_following/`。赛道无线区需连续 5 个样本确认，航向保持目标为
+  `0 deg`、`175 deg`，后续每半圈 `-5 deg`；全黑、IMU 无效与 `APP_IMU_YAW_ENABLE=0U` 均安全停车。
+  短暂丢线不切换航向保持。边缘双黑直角转弯的保守默认值为直行 `150 mm/s`、外/内轮
+  `+300/-200 mm/s`，最短 500 ms、中心线连续 3 样本退出、2000 ms 超时、100 ms 重触发抑制。
+- 进入赛道模式时电机任务清零目标并请求 IMU yaw 重新标定；必须看到 yaw 快照失效后重新有效才允许赛道
+  控制器输出。`app_drive_control_snapshot_t` 增加赛道航向目标和无线区/航向保持快照字段。
+- `board_imu_yaw` 完整采用 20 样本静止确认、陀螺静止阈值、启动校准离群样本拒绝与
+  `0.30 dps` 去偏置死区；所有阈值保留为具名宏。BMI160 长期漂移、静止判定、左右转向符号和急转弯响应
+  仍须实车验证。
+- 新增默认关闭的 `APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE`。默认 10 ms 发送 14 通道
+  JustFloat：yaw、yaw rate、gyro bias、赛道航向目标、无线区标志、循迹误差、四轮目标速度、四轮反馈速度。
+  它要求 `APP_IMU_YAW_ENABLE=1U`，与其它全部 UART0 VOFA 遥测及 UART 回显互斥；CCS/Keil 构建参数为
+  `CourseFollowingVofaTelemetryEnable` 与 `CourseFollowingVofaTelemetryIntervalMs`。
+- 已新增赛道算法、14 通道编码、CRSF 真值表、IMU 漂移和配置互斥主机测试，并更新 CCS/Keil 源文件清单。
+- 已执行全部 `tests\*.ps1`，并通过 `tools\build-mspm0g3507-app.ps1`、
+  `tools\build-mspm0g3507-app.ps1 -CourseFollowingVofaTelemetryEnable 1`、
+  `tools\build-keil-mspm0g3507-app.ps1` 与
+  `tools\build-keil-mspm0g3507-app.ps1 -CourseFollowingVofaTelemetryEnable 1`。
+  后续仍需在安全的实车条件下验证 IMU 漂移、直角转弯和赛道循迹响应；本轮未执行 Flash、烧录、探针、GDB/SWD
+  或任何实车操作。
+
+### 电机任务 HardFault 诊断与栈修复
+
+- Keil 硬故障现场的异常堆栈表明，首次异常发生在 PendSV 的 `vTaskSwitchContext()`，而非
+  `HardFault_Handler` 或外设中断。故障指令读取当前任务 TCB 的 `pxStack` 字段时，字段已经被改写为
+  无效地址；现场 TCB 地址和栈指针均对应电机任务。
+- `motor_task()` 因赛道巡线新增的控制状态在编译器栈帧中已占用 864 B，旧的
+  `APP_MOTOR_TASK_STACK_DEPTH=256U` 仅提供 1 KiB，栈向下增长会覆盖相邻的静态 TCB。
+  默认值已改为 `512U`（2 KiB），作为唯一的根因修复；没有变更控制逻辑、调度或硬件访问。
+- 已先添加静态回归检查并确认它在旧值下失败，随后通过配置、应用集成和 Keil 集成检查。后续在获得单独授权的
+  烧录/运行条件后，应通过 RTOS monitor 观察电机任务栈高水位；本轮未执行 Flash、烧录、探针、GDB/SWD
+  或实车操作。
 
 ## 分层迁移事实
 

@@ -95,6 +95,11 @@ $lineControl = Join-Path $projectDir 'algorithms\line_control\line_control.c'
 $lineControlHeader = Join-Path $projectDir 'algorithms\line_control\line_control.h'
 $yawControl = Join-Path $projectDir 'algorithms\yaw_control\yaw_control.c'
 $yawControlHeader = Join-Path $projectDir 'algorithms\yaw_control\yaw_control.h'
+$courseFollowing = Join-Path $projectDir 'algorithms\course_following\course_following.c'
+$courseFollowingHeader = Join-Path $projectDir 'algorithms\course_following\course_following.h'
+$courseFollowingConfig = Join-Path $projectDir 'config\course_following_config.h'
+$courseFollowingTelemetry = Join-Path $projectDir 'protocols\vofa\course_following_telemetry.c'
+$courseFollowingTelemetryHeader = Join-Path $projectDir 'protocols\vofa\course_following_telemetry.h'
 $grayscaleUnitTest = Join-Path $ProjectRoot 'tests\test_board_grayscale.c'
 $grayscaleUnitTestScript = Join-Path $ProjectRoot 'tests\test_board_grayscale.ps1'
 $grayscaleUnitTestSupport = Join-Path $ProjectRoot 'tests\test_support\ti_msp_dl_config.h'
@@ -128,7 +133,7 @@ $gitIgnore = Join-Path $ProjectRoot '.gitignore'
 $keilProject = Join-Path $ProjectRoot 'keil\mspm0g3507_app\mspm0g3507_app.uvprojx'
 
 foreach ($path in @($projectDir, $main, $ws2812, $ws2812Header, $buzzer, $buzzerHeader, $servo, $servoHeader, $servoMath, $appConfig, $encoderConfig, $monitorConfig, $bmi160, $bmi160Header, $imuYaw, $imuYawHeader, $buttons, $buttonsHeader, $grayscale, $grayscaleHeader, $lineTracking, $lineTrackingHeader, $lineControl, $lineControlHeader, $yawControl, $yawControlHeader, $grayscaleUnitTest, $grayscaleUnitTestScript, $grayscaleUnitTestSupport, $uart, $crsfUart, $crsfProtocol, $crsfProtocolHeader, $crsfControl, $crsfControlHeader, $crsfConfig, $motor, $motorHeader, $encoder, $encoderHeader, $motorControl, $motorControlHeader, $motorPid, $motorPidHeader, $vofaJustFloat, $vofaJustFloatHeader, $syscfg, $rtosConfig, $ccsBuildConfig,
-                         $motorConfig, $buildScript, $flashScript, $tasks, $launch, $gitIgnore)) {
+                         $motorConfig, $courseFollowing, $courseFollowingHeader, $courseFollowingConfig, $courseFollowingTelemetry, $courseFollowingTelemetryHeader, $buildScript, $flashScript, $tasks, $launch, $gitIgnore)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "MSPM0G3507 app project is incomplete: $path is missing."
     }
@@ -158,6 +163,7 @@ Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(ws2812_task' -Descripti
 Assert-Contains -Path $main -Pattern 'APP_WS2812_ANIMATION_ENABLE\s*\|\|\s*APP_WS2812_STATUS_INDICATOR_ENABLE' -Description 'WS2812 task creation must depend on an enabled mode'
 Assert-Contains -Path $main -Pattern 'pdMS_TO_TICKS\(10U\)' -Description 'Motor task must refresh commands every 10 ms'
 Assert-Contains -Path $main -Pattern 'xTaskCreateStatic\(motor_task' -Description 'Motor task must use static allocation'
+Assert-Contains -Path $appConfig -Pattern 'APP_MOTOR_TASK_STACK_DEPTH\s+512U' -Description 'Motor task stack must reserve 2 KiB for control-state locals'
 Assert-Contains -Path $main -Pattern 'board_encoder_init' -Description 'Application must initialize the encoder driver'
 Assert-Contains -Path $main -Pattern 'motor_control_init' -Description 'Application must initialize the motor control layer'
 Assert-Contains -Path $main -Pattern 'motor_control_step' -Description 'Motor task must run the motor control layer'
@@ -405,6 +411,8 @@ Assert-Contains -Path $grayscaleHeader -Pattern 'board_grayscale_snapshot_t' -De
 Assert-Contains -Path $grayscaleHeader -Pattern 'board_grayscale_init' -Description 'Grayscale driver must expose initialization'
 Assert-Contains -Path $grayscaleHeader -Pattern 'board_grayscale_sample' -Description 'Grayscale driver must expose sampling'
 Assert-Contains -Path $grayscaleHeader -Pattern 'BOARD_GRAYSCALE_CHANNEL_COUNT\s+8U' -Description 'Grayscale driver must define eight channels'
+Assert-Contains -Path $main -Pattern 'grayscale_white.*2750U.*3000U.*1980U.*1900U.*3000U.*3000U.*3100U.*2400U' -Description 'Startup must use the migrated grayscale white calibration'
+Assert-Contains -Path $main -Pattern 'grayscale_black.*1500U.*2600U.*600U.*550U.*2400U.*2900U.*3000U.*1700U' -Description 'Startup must use the migrated grayscale black calibration'
 Assert-Contains -Path $grayscale -Pattern 'DL_ADC12_startConversion' -Description 'Grayscale driver must start ADC conversions'
 Assert-Contains -Path $grayscale -Pattern 'DL_ADC12_initSingleSample' -Description 'Grayscale driver must initialize ADC single-sample mode'
 Assert-Contains -Path $grayscale -Pattern 'DL_ADC12_REPEAT_MODE_DISABLED' -Description 'Grayscale ADC must use a bounded single conversion'
@@ -455,6 +463,8 @@ Assert-Contains -Path $lineTracking -Pattern 'BOARD_GRAYSCALE_ADC_MAX\s*-\s*norm
 Assert-Contains -Path $lineTracking -Pattern '-3500.*-2500.*-1500.*-500' -Description 'Line tracking must define signed channel weights'
 Assert-Contains -Path $buildScript -Pattern 'line_tracking\.c' -Description 'CCS build must compile line tracking'
 Assert-Contains -Path $buildScript -Pattern 'line_control\.c' -Description 'CCS build must compile line control'
+Assert-Contains -Path $buildScript -Pattern 'course_following\.c' -Description 'CCS build must compile course following'
+Assert-Contains -Path $buildScript -Pattern 'course_following_telemetry\.c' -Description 'CCS build must compile course following telemetry'
 Assert-Contains -Path $motorHeader -Pattern 'BOARD_MOTOR_DIRECTION_STOP' -Description 'Motor driver must expose a stop direction'
 Assert-Contains -Path $motorHeader -Pattern 'BOARD_MOTOR_DIRECTION_FORWARD' -Description 'Motor driver must expose a forward direction'
 Assert-Contains -Path $motorHeader -Pattern 'BOARD_MOTOR_DIRECTION_REVERSE' -Description 'Motor driver must expose a reverse direction'
@@ -673,5 +683,14 @@ Assert-Contains -Path $keilProject -Pattern 'crsf_protocol\.c' -Description 'Kei
 Assert-Contains -Path $keilProject -Pattern 'crsf_control\.c' -Description 'Keil project must include the CRSF mixer'
 Assert-Contains -Path $keilProject -Pattern 'line_control\.c' -Description 'Keil project must include line control'
 Assert-Contains -Path $keilProject -Pattern 'yaw_control\.c' -Description 'Keil project must include yaw control'
+Assert-Contains -Path $keilProject -Pattern 'course_following\.c' -Description 'Keil project must include course following'
+Assert-Contains -Path $keilProject -Pattern 'course_following_telemetry\.c' -Description 'Keil project must include course following telemetry'
+Assert-Contains -Path $appConfig -Pattern 'APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE\s+0U' -Description 'Course following telemetry must default to disabled'
+Assert-Contains -Path $appConfig -Pattern 'APP_COURSE_FOLLOWING_VOFA_TELEMETRY_INTERVAL_MS\s+10U' -Description 'Course following telemetry must run at 100 Hz'
+Assert-Contains -Path $telemetry -Pattern 'course_following_vofa_task' -Description 'Application must provide a course following VOFA task'
+Assert-Contains -Path $main -Pattern 'board_imu_yaw_request_recalibration' -Description 'Course mode must request yaw recalibration'
+Assert-Contains -Path $main -Pattern 'course_imu_invalid_seen' -Description 'Course mode must await a fresh yaw snapshot'
+Assert-Contains -Path $buildScript -Pattern 'CourseFollowingVofaTelemetryEnable' -Description 'CCS build must support course following telemetry'
+Assert-Contains -Path $buildScript -Pattern 'CourseFollowingVofaTelemetryIntervalMs' -Description 'CCS build must support course following telemetry interval'
 
 Write-Host 'PASS: MSPM0G3507 app static integration checks passed.'

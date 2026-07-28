@@ -77,6 +77,8 @@ int main(void)
     drive.yaw_target_deg = -90.0f;
     drive.yaw_feedback_deg = -85.0f;
     drive.yaw_error_deg = -5.0f;
+    drive.course_heading_hold = true;
+    drive.course_heading_target_deg = 175.0f;
     drive.wheel_targets_mm_per_s[BOARD_MOTOR_FRONT_LEFT] = 320.0f;
     drive.wheel_feedback_mm_per_s[BOARD_MOTOR_FRONT_LEFT] = 315.0f;
     drive.line_sequence = 7U;
@@ -98,6 +100,8 @@ int main(void)
     assert_float_equal(copied_drive.yaw_target_deg, -90.0f);
     assert_float_equal(copied_drive.yaw_feedback_deg, -85.0f);
     assert_float_equal(copied_drive.yaw_error_deg, -5.0f);
+    assert(copied_drive.course_heading_hold);
+    assert_float_equal(copied_drive.course_heading_target_deg, 175.0f);
     assert(copied_drive.line_sequence == 7U);
     assert(copied_drive.control_sequence == 11U);
 

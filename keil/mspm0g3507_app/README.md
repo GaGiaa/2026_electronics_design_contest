@@ -74,6 +74,17 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 `
 模式不能同时启用。灰度 `line_error` 仅用于观察，不会驱动电机目标或 PWM。
 构建成功不代表传感器已经完成实物验收。
 
+赛道巡线遥测默认关闭，可使用以下参数临时开启；它要求保持 `APP_IMU_YAW_ENABLE=1U`，并与
+其它 UART0 VOFA 模式互斥：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1 `
+  -CourseFollowingVofaTelemetryEnable 1 -CourseFollowingVofaTelemetryIntervalMs 10
+```
+
+该模式发送 14 通道 JustFloat 帧：yaw、yaw rate、gyro bias、赛道航向目标、无线区标志、
+巡线误差、四轮目标速度和四轮反馈速度。赛道控制行为、SB/SC 映射与保守转弯参数见共享应用 README。
+
 ## 从 VS Code 打开
 
 运行 VS Code 任务 `MSPM0G3507 App: Open Keil Project`，生成并打开本地 Keil 工程：

@@ -209,6 +209,9 @@ void app_state_drive_control_publish(
     g_drive_control_snapshot.yaw_target_deg = snapshot->yaw_target_deg;
     g_drive_control_snapshot.yaw_feedback_deg = snapshot->yaw_feedback_deg;
     g_drive_control_snapshot.yaw_error_deg = snapshot->yaw_error_deg;
+    g_drive_control_snapshot.course_heading_hold = snapshot->course_heading_hold;
+    g_drive_control_snapshot.course_heading_target_deg =
+        snapshot->course_heading_target_deg;
     for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
         g_drive_control_snapshot.wheel_targets_mm_per_s[wheel] =
             snapshot->wheel_targets_mm_per_s[wheel];
@@ -254,6 +257,10 @@ void app_state_drive_control_snapshot_copy(
             snapshot->yaw_target_deg = g_drive_control_snapshot.yaw_target_deg;
             snapshot->yaw_feedback_deg = g_drive_control_snapshot.yaw_feedback_deg;
             snapshot->yaw_error_deg = g_drive_control_snapshot.yaw_error_deg;
+            snapshot->course_heading_hold =
+                g_drive_control_snapshot.course_heading_hold;
+            snapshot->course_heading_target_deg =
+                g_drive_control_snapshot.course_heading_target_deg;
             for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
                 snapshot->wheel_targets_mm_per_s[wheel] =
                     g_drive_control_snapshot.wheel_targets_mm_per_s[wheel];

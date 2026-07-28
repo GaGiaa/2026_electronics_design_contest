@@ -490,6 +490,11 @@
               <FilePath>..\..\mspm0g3507_app\algorithms\yaw_control\yaw_control.c</FilePath>
             </File>
             <File>
+              <FileName>course_following.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\algorithms\course_following\course_following.c</FilePath>
+            </File>
+            <File>
               <FileName>board_bmi160.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\drivers\imu\board_bmi160.c</FilePath>
@@ -513,6 +518,11 @@
               <FileName>vofa_justfloat.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\protocols\vofa\vofa_justfloat.c</FilePath>
+            </File>
+            <File>
+              <FileName>course_following_telemetry.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\protocols\vofa\course_following_telemetry.c</FilePath>
             </File>
             <File>
               <FileName>pid.c</FileName>

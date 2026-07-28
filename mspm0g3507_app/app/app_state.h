@@ -37,6 +37,9 @@ typedef struct {
     float yaw_target_deg;
     float yaw_feedback_deg;
     float yaw_error_deg;
+    /* 赛道巡线控制器发布的无线区航向保持状态。 */
+    bool course_heading_hold;
+    float course_heading_target_deg;
     float wheel_targets_mm_per_s[BOARD_MOTOR_COUNT];
     float wheel_feedback_mm_per_s[BOARD_MOTOR_COUNT];
     uint32_t line_sequence;

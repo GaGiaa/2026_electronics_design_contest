@@ -67,24 +67,25 @@ crsf_drive_mode_t crsf_control_get_drive_mode(
     if ((mode_value < CRSF_CHANNEL_MIN) || (mode_value > CRSF_CHANNEL_MAX)) {
         return CRSF_DRIVE_MODE_IDLE;
     }
-    if (mode_value <= CRSF_MODE_LOW_MAX) {
-        return CRSF_DRIVE_MODE_IDLE;
-    }
-    if (mode_value >= CRSF_MODE_HIGH_MIN) {
-        return CRSF_DRIVE_MODE_LINE_TRACKING;
-    }
-
     sc_value = input->channels[CRSF_SC_CHANNEL_INDEX];
     if ((sc_value < CRSF_CHANNEL_MIN) || (sc_value > CRSF_CHANNEL_MAX)) {
         return CRSF_DRIVE_MODE_IDLE;
     }
-    if (sc_value <= CRSF_MODE_LOW_MAX) {
-        return CRSF_DRIVE_MODE_MANUAL;
-    }
-    if (sc_value >= CRSF_MODE_HIGH_MIN) {
+    if ((mode_value <= CRSF_MODE_LOW_MAX) ||
+        (sc_value <= CRSF_MODE_LOW_MAX)) {
         return CRSF_DRIVE_MODE_IDLE;
     }
-    return CRSF_DRIVE_MODE_YAW_HOLD;
+
+    if (mode_value < CRSF_MODE_HIGH_MIN) {
+        if (sc_value < CRSF_MODE_HIGH_MIN) {
+            return CRSF_DRIVE_MODE_MANUAL;
+        }
+        return CRSF_DRIVE_MODE_YAW_HOLD;
+    }
+    if (sc_value < CRSF_MODE_HIGH_MIN) {
+        return CRSF_DRIVE_MODE_LINE_TRACKING;
+    }
+    return CRSF_DRIVE_MODE_COURSE_FOLLOWING;
 }
 
 bool crsf_control_get_forward_speed(const crsf_control_input_t *input,

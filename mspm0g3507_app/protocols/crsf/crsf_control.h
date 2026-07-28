@@ -19,14 +19,15 @@ typedef enum {
     CRSF_DRIVE_MODE_MANUAL,
     CRSF_DRIVE_MODE_YAW_HOLD,
     CRSF_DRIVE_MODE_LINE_TRACKING,
+    CRSF_DRIVE_MODE_COURSE_FOLLOWING,
 } crsf_drive_mode_t;
 
 /**
  * @brief 根据链路状态和 SB/SC 三档值选择底盘模式。
  *
- * SB 低档为空闲；SB 中档时，SC 低档为手动、SC 中档为 yaw 锁定、
- * SC 高档为空闲；SB 高档为黑线循迹。无效、超时或超出标准 CRSF
- * 范围的必需开关值返回空闲模式。
+ * 任一开关低档均为空闲；SB/SC 中档为手动，SB 中档/SC 高档为 yaw
+ * 锁定，SB 高档/SC 中档为通用黑线循迹，SB/SC 高档为赛道循迹。无效、
+ * 超时或超出标准 CRSF 范围的必需开关值返回空闲模式。
  */
 crsf_drive_mode_t crsf_control_get_drive_mode(
     const crsf_control_input_t *input, uint32_t now_ms);

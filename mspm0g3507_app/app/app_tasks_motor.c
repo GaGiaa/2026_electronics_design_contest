@@ -5,11 +5,16 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
+#include "config/app_config.h"
+#include "algorithms/course_following/course_following.h"
+#if APP_IMU_YAW_ENABLE
+#include "algorithms/imu_yaw/board_imu_yaw.h"
+#endif
 #include "algorithms/line_control/line_control.h"
 #include "algorithms/motor_control/motor_control.h"
 #include "algorithms/yaw_control/yaw_control.h"
 #include "app/app_state.h"
-#include "config/app_config.h"
+#include "config/course_following_config.h"
 #include "config/crsf_config.h"
 #include "drivers/encoder/board_encoder.h"
 #include "drivers/motor/board_motor.h"
@@ -32,8 +37,11 @@ static void motor_task(void *argument)
     line_control_output_t line_output;
     yaw_control_state_t yaw_control_state;
     yaw_control_output_t yaw_output;
+    course_following_state_t course_following_state;
+    course_following_output_t course_output;
 #if APP_IMU_YAW_ENABLE
     app_imu_yaw_snapshot_t imu_yaw_snapshot;
+    bool course_imu_invalid_seen;
 #endif
     app_drive_control_snapshot_t drive_snapshot;
     float crsf_targets[BOARD_MOTOR_COUNT];
@@ -46,6 +54,10 @@ static void motor_task(void *argument)
 #if CRSF_REMOTE_CONTROL_ENABLE
     line_control_init(&line_control_state);
     yaw_control_init(&yaw_control_state);
+    course_following_init(&course_following_state);
+#if APP_IMU_YAW_ENABLE
+    course_imu_invalid_seen = false;
+#endif
 #endif
     for (;;) {
         app_state_encoder_cycle_begin();
@@ -83,6 +95,13 @@ static void motor_task(void *argument)
         if (mode_changed) {
             line_control_reset(&line_control_state);
             yaw_control_reset(&yaw_control_state);
+            course_following_reset(&course_following_state);
+#if APP_IMU_YAW_ENABLE
+            if (mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
+                board_imu_yaw_request_recalibration();
+                course_imu_invalid_seen = false;
+            }
+#endif
             last_mode = mode;
         }
         for (uint32_t wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
@@ -90,6 +109,7 @@ static void motor_task(void *argument)
         }
         line_output = (line_control_output_t){0};
         yaw_output = (yaw_control_output_t){0};
+        course_output = (course_following_output_t){0};
         if (!mode_changed && mode == CRSF_DRIVE_MODE_MANUAL) {
             (void)crsf_control_mix(&crsf_input, now_ms, crsf_targets);
         } else if (!mode_changed && mode == CRSF_DRIVE_MODE_YAW_HOLD) {
@@ -124,6 +144,26 @@ static void motor_task(void *argument)
                 crsf_targets[wheel] =
                     line_output.wheel_targets_mm_per_s[wheel];
             }
+        } else if (!mode_changed && mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
+#if APP_IMU_YAW_ENABLE
+            if (!course_imu_invalid_seen) {
+                course_imu_invalid_seen = !imu_yaw_snapshot.valid;
+            } else if (imu_yaw_snapshot.valid) {
+                course_following_input_t course_input = {
+                    .grayscale = &grayscale,
+                    .yaw_valid = true,
+                    .yaw_deg = imu_yaw_snapshot.yaw_deg,
+                    .now_ms = now_ms,
+                };
+
+                course_following_step(&course_following_state, &course_input,
+                                      &course_output);
+                for (uint32_t wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
+                    crsf_targets[wheel] =
+                        course_output.wheel_targets_mm_per_s[wheel];
+                }
+            }
+#endif
         }
         app_state_crsf_set_link_active(link_active);
         g_motor_speed_targets_mm_s[BOARD_MOTOR_FRONT_LEFT] =
@@ -146,9 +186,14 @@ static void motor_task(void *argument)
         drive_snapshot.line_error = grayscale.line_error;
         drive_snapshot.line_strength = grayscale.line_strength;
         drive_snapshot.adc_timeout_mask = grayscale.adc_timeout_mask;
-        drive_snapshot.line_valid = line_output.line_valid;
+        drive_snapshot.line_valid =
+            mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING ?
+                (!course_output.line_lost && !course_output.all_black_stop) :
+                line_output.line_valid;
         drive_snapshot.lost_line_ms = line_output.lost_ms;
-        drive_snapshot.base_speed_mm_per_s = base_speed_mm_per_s;
+        drive_snapshot.base_speed_mm_per_s =
+            mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING ?
+                COURSE_FOLLOWING_BASE_SPEED_MM_PER_S : base_speed_mm_per_s;
         if (mode == CRSF_DRIVE_MODE_YAW_HOLD) {
             drive_snapshot.turn_speed_mm_per_s =
                 yaw_output.turn_speed_mm_per_s;
@@ -156,6 +201,11 @@ static void motor_task(void *argument)
             drive_snapshot.pid_i_out = yaw_output.pid_i_out;
             drive_snapshot.pid_d_out = yaw_output.pid_d_out;
             drive_snapshot.pid_output = yaw_output.pid_output;
+        } else if (mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
+            drive_snapshot.turn_speed_mm_per_s =
+                course_output.heading_hold ? course_output.heading_pid_output :
+                                             course_output.line_pid_output;
+            drive_snapshot.pid_output = drive_snapshot.turn_speed_mm_per_s;
         } else {
             drive_snapshot.turn_speed_mm_per_s =
                 line_output.turn_speed_mm_per_s;
@@ -168,8 +218,19 @@ static void motor_task(void *argument)
         drive_snapshot.yaw_target_deg = g_yaw_control_debug.target_yaw_deg;
 #if APP_IMU_YAW_ENABLE
         drive_snapshot.yaw_feedback_deg = imu_yaw_snapshot.yaw_deg;
+        if (mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
+            drive_snapshot.yaw_valid = imu_yaw_snapshot.valid &&
+                                      course_imu_invalid_seen;
+        }
 #endif
         drive_snapshot.yaw_error_deg = yaw_output.yaw_error_deg;
+        drive_snapshot.course_heading_hold = course_output.heading_hold;
+        drive_snapshot.course_heading_target_deg =
+            course_output.heading_target_deg;
+        if (mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
+            drive_snapshot.yaw_target_deg = course_output.heading_target_deg;
+            drive_snapshot.yaw_error_deg = course_output.heading_error_deg;
+        }
         drive_snapshot.line_sequence = grayscale.sequence;
         drive_snapshot.control_sequence = ++control_sequence;
         for (uint32_t wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
