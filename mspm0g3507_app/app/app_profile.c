@@ -12,6 +12,7 @@ static const app_profile_t g_app_profile = {
     .enable_telemetry = (APP_VOFA_SPEED_PID_TELEMETRY_ENABLE != 0U) ||
                         (APP_GRAY_VOFA_TELEMETRY_ENABLE != 0U) ||
                         (APP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE != 0U) ||
+                        (APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE != 0U) ||
                         (APP_BUTTON_VOFA_TELEMETRY_ENABLE != 0U) ||
                         (APP_IMU_TELEMETRY_ENABLE != 0U),
 };

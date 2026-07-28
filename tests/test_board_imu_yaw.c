@@ -60,7 +60,7 @@ static void test_stationary_after_rotation_holds_yaw(void)
 {
     board_imu_yaw_state_t state;
     board_bmi160_sample_t rotating_sample = stationary_sample(90.0f);
-    board_bmi160_sample_t stopped_sample = stationary_sample(5.0f);
+    board_bmi160_sample_t stopped_sample = stationary_sample(0.2f);
     board_encoder_sample_t rotating_encoders[BOARD_MOTOR_COUNT];
     board_encoder_sample_t stopped_encoders[BOARD_MOTOR_COUNT] = {0};
     float yaw_after_stationary_confirmation;
@@ -147,6 +147,93 @@ static void test_yaw_wraps_to_signed_range(void)
     assert(fabsf(state.yaw_deg + 7.2f) < 0.8f);
 }
 
+static void test_corrected_gyro_deadband_rejects_residual_drift(void)
+{
+    board_imu_yaw_state_t state;
+    board_bmi160_sample_t sample = stationary_sample(0.2f);
+    board_encoder_sample_t encoders[BOARD_MOTOR_COUNT];
+    uint32_t index;
+
+    board_imu_yaw_init(&state, TEST_TRACK_WIDTH_MM);
+    complete_startup_calibration(&state, 0.0f);
+    for (index = 0U; index < BOARD_MOTOR_COUNT; ++index) {
+        encoders[index] = encoder_sample(100.0f);
+    }
+    for (index = 0U; index < 100U; ++index) {
+        board_imu_yaw_update(&state, &sample, encoders, TEST_DT_S);
+    }
+    assert(fabsf(state.yaw_deg) < 0.01f);
+}
+
+static void test_gyro_rotation_is_not_treated_as_stationary(void)
+{
+    board_imu_yaw_state_t state;
+    board_bmi160_sample_t sample = stationary_sample(1.0f);
+    board_encoder_sample_t encoders[BOARD_MOTOR_COUNT] = {0};
+    uint32_t index;
+
+    board_imu_yaw_init(&state, TEST_TRACK_WIDTH_MM);
+    complete_startup_calibration(&state, 0.0f);
+    for (index = 0U; index < 100U; ++index) {
+        board_imu_yaw_update(&state, &sample, encoders, TEST_DT_S);
+    }
+    assert(state.yaw_deg > 0.5f);
+}
+
+static void test_stationary_confirmation_requires_twenty_samples(void)
+{
+    board_imu_yaw_state_t state;
+    board_bmi160_sample_t rotating = stationary_sample(1.0f);
+    board_bmi160_sample_t stopped = stationary_sample(0.0f);
+    board_encoder_sample_t moving[BOARD_MOTOR_COUNT];
+    board_encoder_sample_t stopped_encoders[BOARD_MOTOR_COUNT] = {0};
+    uint32_t index;
+
+    board_imu_yaw_init(&state, TEST_TRACK_WIDTH_MM);
+    complete_startup_calibration(&state, 0.0f);
+    for (index = 0U; index < BOARD_MOTOR_COUNT; ++index) {
+        moving[index] = encoder_sample(100.0f);
+    }
+    board_imu_yaw_update(&state, &rotating, moving, TEST_DT_S);
+    for (index = 0U; index < BOARD_IMU_YAW_STATIONARY_CONFIRM_SAMPLES - 1U;
+         ++index) {
+        board_imu_yaw_update(&state, &stopped, stopped_encoders, TEST_DT_S);
+    }
+    assert(!state.stationary_confirmed);
+    board_imu_yaw_update(&state, &stopped, stopped_encoders, TEST_DT_S);
+    assert(state.stationary_confirmed);
+}
+
+static void test_calibration_rejects_outlier_and_recalibrates(void)
+{
+    board_imu_yaw_state_t state;
+    board_bmi160_sample_t stable = stationary_sample(0.0f);
+    board_bmi160_sample_t outlier = stationary_sample(2.4f);
+    board_encoder_sample_t encoders[BOARD_MOTOR_COUNT] = {0};
+    uint32_t index;
+
+    board_imu_yaw_init(&state, TEST_TRACK_WIDTH_MM);
+    for (index = 0U; index < BOARD_IMU_YAW_CALIBRATION_INITIAL_SAMPLES;
+         ++index) {
+        board_imu_yaw_update(&state, &stable, encoders, TEST_DT_S);
+    }
+    board_imu_yaw_update(&state, &outlier, encoders, TEST_DT_S);
+    assert(state.calibration_samples == BOARD_IMU_YAW_CALIBRATION_INITIAL_SAMPLES);
+    for (index = 0U;
+         index < BOARD_IMU_YAW_STARTUP_CALIBRATION_SAMPLES -
+                     BOARD_IMU_YAW_CALIBRATION_INITIAL_SAMPLES;
+         ++index) {
+        board_imu_yaw_update(&state, &stable, encoders, TEST_DT_S);
+    }
+    assert(state.calibrated);
+    assert(fabsf(state.gyro_bias_z_dps) < 0.01f);
+
+    board_imu_yaw_request_recalibration();
+    board_imu_yaw_update(&state, &stable, encoders, TEST_DT_S);
+    assert(!state.calibrated);
+    assert(state.calibration_samples == 1U);
+}
+
 int main(void)
 {
     test_stationary_bias_does_not_drift();
@@ -154,6 +241,10 @@ int main(void)
     test_gyro_integrates_yaw();
     test_encoder_turn_direction();
     test_yaw_wraps_to_signed_range();
+    test_corrected_gyro_deadband_rejects_residual_drift();
+    test_gyro_rotation_is_not_treated_as_stationary();
+    test_stationary_confirmation_requires_twenty_samples();
+    test_calibration_rejects_outlier_and_recalibrates();
     puts("board_imu_yaw tests passed");
     return 0;
 }

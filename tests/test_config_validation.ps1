@@ -75,6 +75,17 @@ Assert-ConfigCompileFails -Header 'config/app_config.h' `
     -Defines @('-DAPP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE=1U',
                '-DAPP_GRAY_VOFA_TELEMETRY_ENABLE=1U') `
     -Description 'line control and grayscale telemetry modes conflict'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE=1U',
+               '-DAPP_IMU_YAW_ENABLE=0U') `
+    -Description 'course following telemetry is enabled without yaw'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE=1U',
+               '-DAPP_LINE_CONTROL_VOFA_TELEMETRY_ENABLE=1U') `
+    -Description 'course following and line control telemetry modes conflict'
+Assert-ConfigCompileFails -Header 'config/app_config.h' `
+    -Defines @('-DAPP_COURSE_FOLLOWING_VOFA_TELEMETRY_INTERVAL_MS=0U') `
+    -Description 'course following VOFA telemetry period is zero'
 Assert-ConfigCompileFails -Header 'config/encoder_config.h' `
     -Defines @('-DBOARD_ENCODER_DECODE_MODE=99U') `
     -Description 'unsupported encoder decode mode'

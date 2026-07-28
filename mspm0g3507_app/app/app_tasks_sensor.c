@@ -106,9 +106,13 @@ static void imu_task(void *argument)
                     app_state_encoder_samples_snapshot_copy(encoder_samples);
                     board_imu_yaw_update(&yaw_state, &sample, encoder_samples,
                                          (float)APP_IMU_SAMPLE_INTERVAL_MS / 1000.0f);
-                    app_state_imu_yaw_publish(yaw_state.yaw_deg,
-                                              yaw_state.yaw_rate_dps,
-                                              yaw_state.gyro_bias_z_dps);
+                    if (yaw_state.calibrated) {
+                        app_state_imu_yaw_publish(yaw_state.yaw_deg,
+                                                  yaw_state.yaw_rate_dps,
+                                                  yaw_state.gyro_bias_z_dps);
+                    } else {
+                        app_state_imu_yaw_invalidate();
+                    }
                 }
                 vTaskDelayUntil(&last_wake_time, interval);
             }

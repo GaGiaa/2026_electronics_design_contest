@@ -12,6 +12,7 @@
 #include "drivers/grayscale/board_grayscale.h"
 #include "drivers/hcsr04/board_hcsr04.h"
 #include "drivers/uart/board_uart.h"
+#include "protocols/vofa/course_following_telemetry.h"
 #include "protocols/vofa/vofa_justfloat.h"
 #include "services/rtos_monitor/rtos_monitor.h"
 
@@ -45,6 +46,49 @@ static void button_vofa_task(void *argument)
                 (snapshot.pressed_mask & (1U << BOARD_BUTTON_PA30)) != 0U
                     ? 1.0f
                     : 0.0f)) {
+            board_uart_write(frame, sizeof(frame));
+        }
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
+
+#if APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE
+static StaticTask_t g_course_following_vofa_task_buffer;
+static StackType_t g_course_following_vofa_task_stack[
+    APP_COURSE_FOLLOWING_VOFA_TELEMETRY_TASK_STACK_DEPTH];
+
+static void course_following_vofa_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval =
+        pdMS_TO_TICKS(APP_COURSE_FOLLOWING_VOFA_TELEMETRY_INTERVAL_MS);
+    app_drive_control_snapshot_t drive;
+    app_imu_yaw_snapshot_t imu;
+    motor_control_wheel_status_t control[BOARD_MOTOR_COUNT];
+    course_following_telemetry_values_t values;
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(
+        COURSE_FOLLOWING_TELEMETRY_CHANNEL_COUNT)];
+    uint32_t wheel;
+
+    (void)argument;
+    for (;;) {
+        app_state_drive_control_snapshot_copy(&drive);
+        app_state_imu_yaw_snapshot_copy(&imu);
+        app_state_motor_control_snapshot_copy(control);
+        values.yaw_deg = imu.yaw_deg;
+        values.yaw_rate_dps = imu.yaw_rate_dps;
+        values.gyro_bias_z_dps = imu.gyro_bias_z_dps;
+        values.heading_target_deg = drive.course_heading_target_deg;
+        values.heading_hold = drive.course_heading_hold;
+        values.line_error = drive.line_error;
+        for (wheel = 0U; wheel < BOARD_MOTOR_COUNT; ++wheel) {
+            values.target_speed_mm_per_s[wheel] =
+                drive.wheel_targets_mm_per_s[wheel];
+            values.feedback_speed_mm_per_s[wheel] =
+                control[wheel].feedback_speed_mm_per_s;
+        }
+        if (course_following_telemetry_encode(frame, sizeof(frame), &values)) {
             board_uart_write(frame, sizeof(frame));
         }
         vTaskDelayUntil(&last_wake_time, interval);
@@ -241,6 +285,14 @@ static StackType_t g_rtos_monitor_task_stack[APP_RTOS_MONITOR_TASK_STACK_DEPTH];
 
 void app_tasks_telemetry_start(void)
 {
+#if APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(
+                     course_following_vofa_task, "course_following_vofa",
+                     APP_COURSE_FOLLOWING_VOFA_TELEMETRY_TASK_STACK_DEPTH, NULL,
+                     APP_TELEMETRY_TASK_PRIORITY,
+                     g_course_following_vofa_task_stack,
+                     &g_course_following_vofa_task_buffer) != NULL);
+#endif
 #if APP_BUTTON_VOFA_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(
                      button_vofa_task, "button_vofa",

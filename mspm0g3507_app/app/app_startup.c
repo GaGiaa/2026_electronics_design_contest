@@ -53,9 +53,9 @@ void vApplicationStackOverflowHook(TaskHandle_t task, char *task_name)
 void app_startup(void)
 {
     static const uint16_t grayscale_white[BOARD_GRAYSCALE_CHANNEL_COUNT] =
-        {1843U, 2809U, 852U, 663U, 2720U, 2483U, 3054U, 993U};
+        {2750U, 3000U, 1980U, 1900U, 3000U, 3000U, 3100U, 2400U};
     static const uint16_t grayscale_black[BOARD_GRAYSCALE_CHANNEL_COUNT] =
-        {965U, 1489U, 121U, 98U, 1264U, 923U, 2709U, 484U};
+        {1500U, 2600U, 600U, 550U, 2400U, 2900U, 3000U, 1700U};
 
     (void)app_profile_get();
     app_state_init();

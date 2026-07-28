@@ -247,10 +247,11 @@ static void test_control_classifies_three_position_sb_mode(void)
     input.channels[4U] = 1811U;
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 992U;
     input.channels[CRSF_SC_CHANNEL_INDEX] = 500U;
-    assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_MANUAL);
+    assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_IDLE);
 
     input.channels[4U] = 500U;
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 1500U;
+    input.channels[CRSF_SC_CHANNEL_INDEX] = 992U;
     assert(crsf_control_get_drive_mode(&input, 1050U) == CRSF_DRIVE_MODE_LINE_TRACKING);
 
     assert(crsf_control_get_drive_mode(&input, 1101U) == CRSF_DRIVE_MODE_IDLE);
@@ -267,15 +268,15 @@ static void test_control_classifies_sb_sc_drive_modes(void)
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 992U;
     input.channels[CRSF_SC_CHANNEL_INDEX] = 500U;
     assert(crsf_control_get_drive_mode(&input, 1050U) ==
-           CRSF_DRIVE_MODE_MANUAL);
+           CRSF_DRIVE_MODE_IDLE);
 
     input.channels[CRSF_SC_CHANNEL_INDEX] = 992U;
     assert(crsf_control_get_drive_mode(&input, 1050U) ==
-           CRSF_DRIVE_MODE_YAW_HOLD);
+           CRSF_DRIVE_MODE_MANUAL);
 
     input.channels[CRSF_SC_CHANNEL_INDEX] = 1500U;
     assert(crsf_control_get_drive_mode(&input, 1050U) ==
-           CRSF_DRIVE_MODE_IDLE);
+           CRSF_DRIVE_MODE_YAW_HOLD);
 
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 500U;
     input.channels[CRSF_SC_CHANNEL_INDEX] = 992U;
@@ -285,7 +286,17 @@ static void test_control_classifies_sb_sc_drive_modes(void)
     input.channels[CRSF_MODE_CHANNEL_INDEX] = 1500U;
     input.channels[CRSF_SC_CHANNEL_INDEX] = 500U;
     assert(crsf_control_get_drive_mode(&input, 1050U) ==
+           CRSF_DRIVE_MODE_IDLE);
+
+    input.channels[CRSF_MODE_CHANNEL_INDEX] = 1500U;
+    input.channels[CRSF_SC_CHANNEL_INDEX] = 992U;
+    assert(crsf_control_get_drive_mode(&input, 1050U) ==
            CRSF_DRIVE_MODE_LINE_TRACKING);
+
+    input.channels[CRSF_MODE_CHANNEL_INDEX] = 1500U;
+    input.channels[CRSF_SC_CHANNEL_INDEX] = 1500U;
+    assert(crsf_control_get_drive_mode(&input, 1050U) ==
+           CRSF_DRIVE_MODE_COURSE_FOLLOWING);
 }
 
 int main(void)

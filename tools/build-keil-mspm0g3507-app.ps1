@@ -22,6 +22,10 @@ param(
     [int] $LineControlVofaTelemetryEnable,
     [ValidateRange(1, 60000)]
     [int] $LineControlVofaTelemetryIntervalMs,
+    [ValidateSet(0, 1)]
+    [int] $CourseFollowingVofaTelemetryEnable,
+    [ValidateRange(1, 60000)]
+    [int] $CourseFollowingVofaTelemetryIntervalMs,
     [ValidateSet(1, 2)]
     [int] $EncoderDecodeMode,
     [ValidateSet(0, 1)]
@@ -113,6 +117,12 @@ if ($PSBoundParameters.ContainsKey('LineControlVofaTelemetryEnable')) {
 }
 if ($PSBoundParameters.ContainsKey('LineControlVofaTelemetryIntervalMs')) {
     $temporaryDefines += "APP_LINE_CONTROL_VOFA_TELEMETRY_INTERVAL_MS=$LineControlVofaTelemetryIntervalMs"
+}
+if ($PSBoundParameters.ContainsKey('CourseFollowingVofaTelemetryEnable')) {
+    $temporaryDefines += "APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE=$CourseFollowingVofaTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('CourseFollowingVofaTelemetryIntervalMs')) {
+    $temporaryDefines += "APP_COURSE_FOLLOWING_VOFA_TELEMETRY_INTERVAL_MS=$CourseFollowingVofaTelemetryIntervalMs"
 }
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $temporaryDefines += "BOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"

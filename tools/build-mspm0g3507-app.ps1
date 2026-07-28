@@ -20,6 +20,10 @@ param(
     [int] $LineControlVofaTelemetryEnable,
     [ValidateRange(1, 60000)]
     [int] $LineControlVofaTelemetryIntervalMs,
+    [ValidateSet(0, 1)]
+    [int] $CourseFollowingVofaTelemetryEnable,
+    [ValidateRange(1, 60000)]
+    [int] $CourseFollowingVofaTelemetryIntervalMs,
     [ValidateSet(1, 2)]
     [int] $EncoderDecodeMode,
     [ValidateSet(0, 1)]
@@ -90,6 +94,12 @@ if ($PSBoundParameters.ContainsKey('LineControlVofaTelemetryEnable')) {
 if ($PSBoundParameters.ContainsKey('LineControlVofaTelemetryIntervalMs')) {
     $commonCompilerArguments += "-DAPP_LINE_CONTROL_VOFA_TELEMETRY_INTERVAL_MS=$LineControlVofaTelemetryIntervalMs"
 }
+if ($PSBoundParameters.ContainsKey('CourseFollowingVofaTelemetryEnable')) {
+    $commonCompilerArguments += "-DAPP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE=$CourseFollowingVofaTelemetryEnable"
+}
+if ($PSBoundParameters.ContainsKey('CourseFollowingVofaTelemetryIntervalMs')) {
+    $commonCompilerArguments += "-DAPP_COURSE_FOLLOWING_VOFA_TELEMETRY_INTERVAL_MS=$CourseFollowingVofaTelemetryIntervalMs"
+}
 if ($PSBoundParameters.ContainsKey('EncoderDecodeMode')) {
     $commonCompilerArguments += "-DBOARD_ENCODER_DECODE_MODE=$EncoderDecodeMode"
 }
@@ -126,9 +136,11 @@ $sources = @(
     @{ Source = (Join-Path $ProjectDir 'algorithms\line_tracking\line_tracking.c'); Object = 'line_tracking.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\line_control\line_control.c'); Object = 'line_control.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\yaw_control\yaw_control.c'); Object = 'yaw_control.o' },
+    @{ Source = (Join-Path $ProjectDir 'algorithms\course_following\course_following.c'); Object = 'course_following.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\pid\pid.c'); Object = 'motor_pid.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\motor_control\motor_control.c'); Object = 'motor_control.o' },
     @{ Source = (Join-Path $ProjectDir 'protocols\vofa\vofa_justfloat.c'); Object = 'vofa_justfloat.o' },
+    @{ Source = (Join-Path $ProjectDir 'protocols\vofa\course_following_telemetry.c'); Object = 'course_following_telemetry.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\motor\board_motor.c'); Object = 'board_motor.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\ws2812\board_ws2812.c'); Object = 'board_ws2812.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\oled\board_oled.c'); Object = 'board_oled.o' },
@@ -159,6 +171,6 @@ $sources = @(
 Push-Location $BuildDir
 try {
     foreach ($source in $sources) { Invoke-CheckedCommand -FilePath $Compiler -Arguments ($commonCompilerArguments + @('-o', $source.Object, $source.Source)) -Description "Compiling $($source.Object)" }
-    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\config", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'board_hcsr04.o', 'encoder_quadrature.o', 'ultrasonic_measurement.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_servo.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'line_control.o', 'yaw_control.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_oled.o', 'board_oled_font.o', 'board_uart.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'app_profile.o', 'app_state.o', 'app_startup.o', 'app_tasks_motor.o', 'app_tasks_sensor.o', 'app_tasks_io.o', 'app_tasks_telemetry.o', 'g3507_interrupts.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
+    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\config", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'board_hcsr04.o', 'encoder_quadrature.o', 'ultrasonic_measurement.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_servo.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'line_control.o', 'yaw_control.o', 'course_following.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'course_following_telemetry.o', 'board_motor.o', 'board_ws2812.o', 'board_oled.o', 'board_oled_font.o', 'board_uart.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'app_profile.o', 'app_state.o', 'app_startup.o', 'app_tasks_motor.o', 'app_tasks_sensor.o', 'app_tasks_io.o', 'app_tasks_telemetry.o', 'g3507_interrupts.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
 }
 finally { Pop-Location }
