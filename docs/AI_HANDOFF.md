@@ -116,8 +116,9 @@ BMI160 使用 SPI0：`SCK=PB18`、`MOSI=PB17`、`MISO=PB19`、`CS=PB0`，配置�
 200 Hz、±4g、±500 dps。驱动已确认 `CHIP_ID=0xD1`，静止时 Z 轴加速度约为 1g，
 BMI160 软复位后需要重新执行 SPI 接口选择事务，再进行配置寄存器写入和回读；
 静止陀螺仪输出接近 0。纯六轴 IMU 融合使用三轴陀螺仪和三轴加速度计，不读取编码器辅助 yaw，
-只能提供相对于启动方向的航向；长期零偏、漂移、方向符号、倾斜补偿和急转弯响应仍属于待完成
-硬件验收。
+只能提供相对于启动方向的航向。加速度只有模长位于 `0.75~1.25 g` 且相对预测重力的方向误差
+不超过 `35 deg` 时才参与重力校正；连续方向失配 `3 s` 后进入恢复。长期零偏、漂移、方向符号、
+阈值/恢复时间的实车适配、倾斜补偿和急转弯响应仍属于待完成硬件验收。
 
 ### 灰度、WS2812、按键和 OLED
 
@@ -404,6 +405,18 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
   `tools\build-mspm0g3507-app.ps1` 和 `tools\build-keil-mspm0g3507-app.ps1` 软件构建。
 - 构建期间仅生成/更新被忽略的 `Debug`、`Generated` 和 Keil `Objects` 产物；本轮未执行 Flash、烧录、
   探针连接、GDB/SWD、电机调试或任何实车验收。SysConfig 仅输出既有信息提示，无构建错误。
+
+### 本轮 Fusion 风格加速度方向拒绝
+
+- 保留 BMI160 纯六轴 Mahony 融合、启动静止标定、静止 gyro bias 跟踪和既有 VOFA 帧；新增预测重力与
+  测量加速度的方向误差门控。加速度模长合法但方向误差超过 `35 deg` 时不参与姿态校正，连续失配
+  `3 s` 后进入恢复，防止持续拒绝导致永久失去 roll/pitch 校正。
+- `acceleration_valid` 的语义更新为“当前样本实际参与重力校正”；它为假时，静止判定不会更新 gyro bias。
+  未增加 VOFA 通道，`acceleration_recovery_active` 和拒绝计时仅保存在融合器状态中。
+- 新增 `test_direction_error_rejects_linear_acceleration()` 与
+  `test_sustained_direction_error_enters_recovery()` 主机回归用例。前者使用仍处于 `1.25 g` 模长上限内的
+  `0.75 g` 横向线性加速度，验证不会错误拉偏 pitch，并验证重力方向恢复后立即重新启用校正；后者验证
+  连续失配达到 `3 s` 会进入恢复。尚未执行 Flash、烧录、探针连接、GDB/SWD 或实车验收。
 
 ### 本轮 HardFault 现场捕获与 Keil 系统栈修复
 

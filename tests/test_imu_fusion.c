@@ -170,6 +170,38 @@ static void test_invalid_acceleration_falls_back_to_gyro(void)
     assert(fabsf(state.yaw_deg - 45.0f) < 1.5f);
 }
 
+static void test_direction_error_rejects_linear_acceleration(void)
+{
+    imu_fusion_state_t state;
+    board_bmi160_sample_t accelerated = sample_from(0.75f, 0.0f, 1.0f,
+                                                     0.8f, -0.6f, 1.2f);
+    board_bmi160_sample_t gravity = sample_from(0.0f, 0.0f, 1.0f,
+                                                 0.8f, -0.6f, 1.2f);
+
+    imu_fusion_init(&state);
+    complete_calibration(&state);
+    update_many(&state, &accelerated, 200U, TEST_DT_S);
+    assert(!state.acceleration_valid);
+    assert(fabsf(state.pitch_deg) < 3.0f);
+
+    update_many(&state, &gravity, 20U, TEST_DT_S);
+    assert(state.acceleration_valid);
+    assert(fabsf(state.pitch_deg) < 3.0f);
+}
+
+static void test_sustained_direction_error_enters_recovery(void)
+{
+    imu_fusion_state_t state;
+    board_bmi160_sample_t accelerated = sample_from(0.75f, 0.0f, 1.0f,
+                                                     0.8f, -0.6f, 1.2f);
+
+    imu_fusion_init(&state);
+    complete_calibration(&state);
+    update_many(&state, &accelerated, 600U, TEST_DT_S);
+    assert(state.acceleration_recovery_active);
+    assert(state.acceleration_valid);
+}
+
 static void test_actual_dt_controls_yaw_rate(void)
 {
     imu_fusion_state_t state;
@@ -234,6 +266,8 @@ int main(void)
     test_static_tilt_does_not_create_yaw();
     test_tilted_world_vertical_rotation_tracks_yaw();
     test_invalid_acceleration_falls_back_to_gyro();
+    test_direction_error_rejects_linear_acceleration();
+    test_sustained_direction_error_enters_recovery();
     test_actual_dt_controls_yaw_rate();
     test_invalid_dt_and_nonfinite_sample_are_ignored();
     test_invalid_quaternion_restarts_calibration();

@@ -326,7 +326,7 @@ SPI 控制器使用 Motorola mode 3，
 | 2 | `roll_deg` |
 | 3 | `pitch_deg` |
 | 4 | `accel_norm_g` |
-| 5 | `acceleration_valid`，有效为 `1.0` |
+| 5 | `acceleration_valid`，本周期实际参与重力校正为 `1.0` |
 | 6 | `gyro_bias_x_dps` |
 | 7 | `gyro_bias_y_dps` |
 | 8 | `gyro_bias_z_dps` |
@@ -377,9 +377,10 @@ MCU 地线，传感器使用稳定的独立 5 V 电源供电。
 
 纯六轴姿态融合实现在 `algorithms/imu_fusion/imu_fusion.c/.h` 中。只有
 `APP_IMU_YAW_ENABLE=1U` 时才会创建 5 ms 的 `imu_task`；该任务负责 BMI160 初始化、采样、
-失败重试和 yaw 更新。融合器使用三轴陀螺仪积分四元数，并在加速度模长接近 1g 时用重力方向
-校正 roll/pitch；加速度受到颠簸或线性加速度污染时回退为纯陀螺仪积分。启动或请求重标定时，
-需要车辆静止约 1 秒以估计三轴陀螺仪零偏。该算法完全不读取编码器，也不需要轮距参数。
+失败重试和 yaw 更新。融合器使用三轴陀螺仪积分四元数；只有加速度模长在 `0.75~1.25 g` 且
+相对预测重力的方向误差不超过 `35 deg` 时，才用其校正 roll/pitch。方向失配时回退为纯陀螺仪
+积分；失配持续 `3 s` 后进入恢复以避免永久丢失姿态校正。启动或请求重标定时，需要车辆静止约
+1 秒以估计三轴陀螺仪零偏。该算法完全不读取编码器，也不需要轮距参数。
 `APP_IMU_YAW_ENABLE` 默认值为 `1U`，关闭时不创建 IMU 采样任务；如需使用不带 IMU 硬件的
 SWD 或电机调试构建，可通过 `-ImuYawEnable 0` 显式关闭。
 

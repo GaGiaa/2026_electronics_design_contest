@@ -115,6 +115,55 @@ static bool acceleration_is_valid(const float acceleration_g[3])
            (norm <= IMU_FUSION_ACCEL_NORM_MAX_G);
 }
 
+static float calculate_acceleration_error_deg(const float quaternion[4],
+                                             const float acceleration_g[3])
+{
+    float acceleration_norm = vector_norm(acceleration_g);
+    float ax = acceleration_g[0] / acceleration_norm;
+    float ay = acceleration_g[1] / acceleration_norm;
+    float az = acceleration_g[2] / acceleration_norm;
+    float estimated_x = 2.0f * (quaternion[1] * quaternion[3] -
+                                quaternion[0] * quaternion[2]);
+    float estimated_y = 2.0f * (quaternion[0] * quaternion[1] +
+                                quaternion[2] * quaternion[3]);
+    float estimated_z = (quaternion[0] * quaternion[0]) -
+                        (quaternion[1] * quaternion[1]) -
+                        (quaternion[2] * quaternion[2]) +
+                        (quaternion[3] * quaternion[3]);
+    float cross_x = (ay * estimated_z) - (az * estimated_y);
+    float cross_y = (az * estimated_x) - (ax * estimated_z);
+    float cross_z = (ax * estimated_y) - (ay * estimated_x);
+    float cross_norm = sqrtf((cross_x * cross_x) + (cross_y * cross_y) +
+                             (cross_z * cross_z));
+    float dot = (ax * estimated_x) + (ay * estimated_y) +
+                (az * estimated_z);
+
+    return atan2f(cross_norm, dot) * IMU_FUSION_RAD_TO_DEG;
+}
+
+static bool acceleration_is_accepted(imu_fusion_state_t *state,
+                                     const float acceleration_g[3],
+                                     float dt_s)
+{
+    float error_deg = calculate_acceleration_error_deg(state->quaternion,
+                                                        acceleration_g);
+
+    if (error_deg <= IMU_FUSION_ACCELERATION_REJECTION_ANGLE_DEG) {
+        state->acceleration_rejection_elapsed_s = 0.0f;
+        state->acceleration_recovery_active = false;
+        return true;
+    }
+
+    if (!state->acceleration_recovery_active) {
+        state->acceleration_rejection_elapsed_s += dt_s;
+        if (state->acceleration_rejection_elapsed_s >=
+            IMU_FUSION_ACCELERATION_REJECTION_TIMEOUT_S) {
+            state->acceleration_recovery_active = true;
+        }
+    }
+    return state->acceleration_recovery_active;
+}
+
 static bool gyro_is_below(const float gyro_dps[3], float limit_dps)
 {
     return vector_norm(gyro_dps) <= limit_dps;
@@ -164,11 +213,13 @@ static void reset_state(imu_fusion_state_t *state)
     state->gyro_bias_z_dps = 0.0f;
     state->calibration_elapsed_s = 0.0f;
     state->stationary_elapsed_s = 0.0f;
+    state->acceleration_rejection_elapsed_s = 0.0f;
     state->previous_yaw_deg = 0.0f;
     state->dt_s = 0.0f;
     state->calibration_samples = 0U;
     state->calibrated = false;
     state->stationary_confirmed = false;
+    state->acceleration_recovery_active = false;
     state->acceleration_valid = false;
     for (index = 0U; index < 3U; ++index) {
         state->calibration_m2_dps2[index] = 0.0f;
@@ -378,6 +429,14 @@ void imu_fusion_update(imu_fusion_state_t *state,
             corrected_gyro_dps[index] = 0.0f;
         }
         gyro_rad_s[index] = corrected_gyro_dps[index] * IMU_FUSION_DEG_TO_RAD;
+    }
+
+    if (state->acceleration_valid) {
+        state->acceleration_valid = acceleration_is_accepted(
+            state, acceleration_g, dt_s);
+    } else {
+        state->acceleration_rejection_elapsed_s = 0.0f;
+        state->acceleration_recovery_active = false;
     }
 
     stationary = state->acceleration_valid &&

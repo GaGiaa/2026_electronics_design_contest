@@ -15,6 +15,8 @@
 #define IMU_FUSION_CALIBRATION_OUTLIER_MARGIN_DPS 0.50f
 #define IMU_FUSION_ACCEL_NORM_MIN_G 0.75f
 #define IMU_FUSION_ACCEL_NORM_MAX_G 1.25f
+#define IMU_FUSION_ACCELERATION_REJECTION_ANGLE_DEG 35.0f
+#define IMU_FUSION_ACCELERATION_REJECTION_TIMEOUT_S 3.0f
 #define IMU_FUSION_BIAS_TIME_CONSTANT_S 5.0f
 #define IMU_FUSION_MAHONY_KP 2.0f
 #define IMU_FUSION_MAHONY_KI 0.05f
@@ -33,11 +35,13 @@ typedef struct {
     float calibration_m2_dps2[3];
     float calibration_elapsed_s;
     float stationary_elapsed_s;
+    float acceleration_rejection_elapsed_s;
     float gyro_integral[3];
     float previous_yaw_deg;
     uint32_t calibration_samples;
     bool calibrated;
     bool stationary_confirmed;
+    bool acceleration_recovery_active;
     bool acceleration_valid;
 } imu_fusion_state_t;
 
@@ -65,6 +69,8 @@ void imu_fusion_request_recalibration(void);
  *
  * 加速度模长接近 1 g 时用于 roll/pitch 重力校正，不能提供绝对 yaw；当
  * 加速度受到冲击或线性加速度污染时，暂时回退到陀螺仪积分。
+ * 仅当加速度模长和相对预测重力的方向误差都满足限制时，输出
+ * acceleration_valid 才为 true；持续方向失配达到恢复超时后会重新启用校正。
  *
  * @param[in,out] state
  *     已初始化的融合状态对象。
