@@ -14,7 +14,7 @@ static void assert_float_equal(float actual, float expected)
 int main(void)
 {
     app_button_snapshot_t buttons;
-    app_imu_yaw_snapshot_t snapshot;
+    app_imu_fusion_snapshot_t snapshot;
     app_drive_control_snapshot_t drive = {0};
     app_drive_control_snapshot_t copied_drive = {0};
 
@@ -23,8 +23,17 @@ int main(void)
     assert(g_grayscale_publish_sequence == 0U);
     assert(g_drive_control_publish_sequence == 0U);
     assert(g_button_publish_sequence == 0U);
-    assert(g_imu_yaw_publish_sequence == 0U);
-    assert(!g_imu_yaw_snapshot.valid);
+    assert(g_imu_fusion_publish_sequence == 0U);
+    assert(!g_imu_fusion_snapshot.valid);
+    assert(g_imu_debug.chip_id == 0U);
+    assert(!g_imu_debug.initialized);
+    assert(g_imu_debug.init_status == BOARD_BMI160_STATUS_OK);
+    assert(g_imu_debug.last_read_status == BOARD_BMI160_STATUS_OK);
+    assert(g_imu_debug.init_attempts == 0U);
+    assert(g_imu_debug.sample_attempts == 0U);
+    assert(g_imu_debug.sample_successes == 0U);
+    assert(g_imu_debug.last_sample.accel_z == 0);
+    assert(g_imu_debug.sequence == 0U);
 
     app_state_buttons_snapshot_copy(&buttons);
     assert(buttons.pressed_mask == 0U);
@@ -45,19 +54,43 @@ int main(void)
     app_state_encoder_cycle_end();
     assert(g_encoder_sample_sequence == 2U);
 
-    app_state_imu_yaw_snapshot_copy(&snapshot);
+    app_state_imu_fusion_snapshot_copy(&snapshot);
     assert(!snapshot.valid);
     assert(snapshot.sequence == 0U);
 
-    app_state_imu_yaw_publish(12.5f, -3.25f, 0.75f);
-    app_state_imu_yaw_snapshot_copy(&snapshot);
+    snapshot = (app_imu_fusion_snapshot_t){
+        .yaw_deg = 12.5f,
+        .yaw_rate_dps = -3.25f,
+        .roll_deg = 4.5f,
+        .pitch_deg = -2.25f,
+        .accel_norm_g = 1.08f,
+        .gyro_bias_x_dps = 0.10f,
+        .gyro_bias_y_dps = -0.20f,
+        .gyro_bias_z_dps = 0.75f,
+        .dt_s = 0.005f,
+        .acceleration_valid = true,
+        .stationary_confirmed = true,
+        .calibrated = true,
+        .valid = true,
+    };
+    app_state_imu_fusion_publish(&snapshot);
+    app_state_imu_fusion_snapshot_copy(&snapshot);
     assert(snapshot.valid);
     assert(snapshot.sequence == 1U);
     assert_float_equal(snapshot.yaw_deg, 12.5f);
     assert_float_equal(snapshot.yaw_rate_dps, -3.25f);
+    assert_float_equal(snapshot.roll_deg, 4.5f);
+    assert_float_equal(snapshot.pitch_deg, -2.25f);
+    assert_float_equal(snapshot.accel_norm_g, 1.08f);
+    assert(snapshot.acceleration_valid);
+    assert_float_equal(snapshot.gyro_bias_x_dps, 0.10f);
+    assert_float_equal(snapshot.gyro_bias_y_dps, -0.20f);
     assert_float_equal(snapshot.gyro_bias_z_dps, 0.75f);
-    assert(g_imu_yaw_publish_sequence == 2U);
-    assert(g_imu_yaw_snapshot.valid);
+    assert(snapshot.stationary_confirmed);
+    assert(snapshot.calibrated);
+    assert_float_equal(snapshot.dt_s, 0.005f);
+    assert(g_imu_fusion_publish_sequence == 2U);
+    assert(g_imu_fusion_snapshot.valid);
 
     board_grayscale_snapshot_t grayscale = {0};
     grayscale.sequence = 9U;
@@ -105,8 +138,8 @@ int main(void)
     assert(copied_drive.line_sequence == 7U);
     assert(copied_drive.control_sequence == 11U);
 
-    app_state_imu_yaw_invalidate();
-    app_state_imu_yaw_snapshot_copy(&snapshot);
+    app_state_imu_fusion_invalidate();
+    app_state_imu_fusion_snapshot_copy(&snapshot);
     assert(!snapshot.valid);
     assert(snapshot.sequence == 2U);
 

@@ -170,8 +170,9 @@ IMU yaw VOFA 遥测在编译期互斥。启用 VOFA 模式时不要向 UART0 发
 | 21 | `sequence` |
 
 `app_state.h` 公开了以下用于 SWD 观察的 `volatile` 全局变量：`g_encoder_sample_sequence`、`g_grayscale_publish_sequence`、
-`g_drive_control_publish_sequence`，以及在 `APP_IMU_YAW_ENABLE=1U` 时存在的 `g_imu_yaw_snapshot` 和
-`g_imu_yaw_publish_sequence`。这些序列变量用于快照一致性保护，只应观察，不应通过调试器写入。灰度驱动另提供
+`g_drive_control_publish_sequence`，以及在 `APP_IMU_YAW_ENABLE=1U` 时存在的 `g_imu_fusion_snapshot` 和
+`g_imu_fusion_publish_sequence`。融合快照包含 yaw、roll/pitch、加速度可信度、三轴 gyro bias、校准状态、实际
+`dt_s` 和 `valid`；这些序列变量用于快照一致性保护，只应观察，不应通过调试器写入。灰度驱动另提供
 `volatile g_grayscale_debug` 镜像，用于观察每个通道的 `white`、`black`、`gray_white`、`gray_black` 标定值，
 以及 `digital` 和 `sequence`。该镜像不会反向修改驱动内部的私有标定数组。
 
@@ -218,7 +219,7 @@ PID、yaw 诊断、四轮目标和反馈速度的序列保护快照，供 SWD �
 ### 赛道巡线
 
 `algorithms/course_following/` 是独立于通用 `line_control` 的赛道控制器。赛道模式进入后先清零
-四轮目标并调用 `board_imu_yaw_request_recalibration()`；控制器必须观察到 IMU 快照先失效、再在
+四轮目标并调用 `imu_fusion_request_recalibration()`；控制器必须观察到 IMU 快照先失效、再在
 新标定完成后有效，才允许输出非零轮速。`APP_IMU_YAW_ENABLE=0U` 或 IMU 无效时保持停车。
 
 无线区必须连续 5 个灰度样本无有效线才进入航向保持，短暂丢线不会切换航向状态。直线航向依次为
@@ -299,10 +300,13 @@ SPI1 仍专用于 WS2812。BMI160 模块必须使用 3.3 V 并与 MCU 共地；�
 
 启动时，驱动会按照 Bosch 参考流程产生一次 CS 低到高的空 SPI 事务，以便上电后切换到 SPI
 模式。随后 `board_bmi160.c/.h` 校验 `CHIP_ID`（`0xD1`），执行软复位，启动加速度计和
-陀螺仪，并将采样配置为 100 Hz、±4g 和 ±500dps。驱动执行官方复位后的 SPI 通信测试，
+软复位后会再次产生一次空 SPI 事务，重新确认 BMI160 仍处于 SPI 接口模式；
+陀螺仪，并将采样配置为 200 Hz、±4g 和 ±500dps。驱动执行官方复位后的 SPI 通信测试，
 每次寄存器写入后等待 1 ms，并在报告成功前检查错误、电源模式、ODR、带宽和量程寄存器。
-静态 FreeRTOS 任务每 10 ms 读取 12 字节的加速度加陀螺仪寄存器块（`0x0C` 到 `0x17`，
-陀螺仪在前）。SPI 控制器使用 Motorola mode 3，以匹配 Bosch 参考示例。启用 IMU yaw 遥测
+静态 FreeRTOS 任务每 5 ms 读取 12 字节的加速度加陀螺仪寄存器块（`0x0C` 到 `0x17`，
+陀螺仪在前），在每次读取开始前记录 tick，并使用相邻成功样本的实际 tick 差作为解算 `dt`。
+SPI 控制器使用 Motorola mode 3，
+以匹配 Bosch 参考示例。启用 IMU yaw 遥测
 时，使用现有的静态 UART 帧队列发送 JustFloat 帧。SPI 事务有有限超时；初始化失败后每秒
 重试一次，连续三次读取失败会触发重新初始化。
 
@@ -310,10 +314,42 @@ SPI1 仍专用于 WS2812。BMI160 模块必须使用 3.3 V 并与 MCU 共地；�
 轴加速度约为 1g，以及静止陀螺仪输出接近 0。构建和测试命令不会执行 Flash 写入；这些
 软件结果不替代尚未完成的完整硬件验收。
 
-`config/app_config.h` 提供编译期开关 `APP_IMU_TELEMETRY_ENABLE`，默认值为 `0U`。当它与
+`config/app_config.h` 提供编译期开关 `APP_IMU_TELEMETRY_ENABLE`，默认值为 `0U`。需要通过 VOFA 观察 IMU
+融合调试数据时，使用 `-ImuTelemetryEnable 1` 显式开启。当它与
 `APP_IMU_YAW_ENABLE` 同时启用时，独立遥测任务按配置周期通过现有 UART 帧队列发送一个
-16 字节 JustFloat 帧。三个 `float32` 通道为 `yaw_deg`、`yaw_rate_dps` 和 `gyro_bias_z_dps`，
-之后是标准的 `00 00 80 7F` 帧尾。IMU 采样是否运行由 `APP_IMU_YAW_ENABLE` 单独决定。
+56 字节 JustFloat 帧。13 个 `float32` 通道及索引如下，之后是标准的 `00 00 80 7F` 帧尾：
+
+| 通道 | 内容 |
+| --- | --- |
+| 0 | `yaw_deg` |
+| 1 | `yaw_rate_dps` |
+| 2 | `roll_deg` |
+| 3 | `pitch_deg` |
+| 4 | `accel_norm_g` |
+| 5 | `acceleration_valid`，有效为 `1.0` |
+| 6 | `gyro_bias_x_dps` |
+| 7 | `gyro_bias_y_dps` |
+| 8 | `gyro_bias_z_dps` |
+| 9 | `stationary_confirmed`，确认静止为 `1.0` |
+| 10 | `calibrated`，完成零偏校准为 `1.0` |
+| 11 | `valid`，当前 yaw 可用于控制为 `1.0` |
+| 12 | `dt_s` |
+
+The IMU telemetry frame has the 12 fusion channels above plus `dt_s`. Hardware diagnostics remain
+available through SWD: inspect `g_imu_debug` for the BMI160 chip ID, status counters, last raw
+sample, and `g_bmi160_diagnostics` for the driver-level register snapshot. These globals are
+read-only observation points.
+
+IMU 采样是否运行由 `APP_IMU_YAW_ENABLE` 单独决定。即使正在启动校准或当前采样无效，遥测任务仍发送诊断帧，
+应通过通道 10/11 判断是否能使用 yaw，不应把旧数据误认为有效输出。
+
+### HardFault 现场
+
+`app/app_startup.h` 公开了 `volatile g_hardfault_snapshot`。发生 HardFault 后，
+`active` 会置为 `1`，`stacked_pc`、`stacked_lr`、`stacked_sp` 和 `exception_return` 是异常入口保存的现场，
+`cfsr`、`hfsr`、`dfsr`、`mmfar`、`bfar` 和 `icsr` 是 SCB 状态寄存器镜像。该快照只应通过 SWD 读取，
+HardFault 处理器会停在死循环中。Keil 启动文件的 MSP 系统栈已配置为 0x400 字节，以覆盖嵌套中断和
+FreeRTOS 异常路径；这不等同于任务栈，任务栈仍由 `APP_*_TASK_STACK_DEPTH` 配置。
 
 PA7、PB12、PA8 和 PA30 是四个外部上拉、低有效按键输入。独立的静态 `button_task` 始终
 运行，每 10 ms 扫描一次，并在连续两次采样一致后确认状态。按键任务只发布
@@ -339,22 +375,23 @@ MCU 地线，传感器使用稳定的独立 5 V 电源供电。
 `black_mask`，其中第 N 位对应通道 N，1 表示黑色，同时生成 `black_count`、`line_strength`
 和带符号整数 `line_error`。
 
-可选的一维车辆 yaw 估计器实现在 `board_imu_yaw.c/.h` 中。只有
-`APP_IMU_YAW_ENABLE=1U` 时才会创建 10 ms 的 `imu_task`；该任务负责 BMI160 初始化、采样、
-失败重试和 yaw 更新。它使用配置的 `+/-500 dps` 量程转换 BMI160 Z 轴陀螺仪数据，在启动时
-通过 100 个静止样本估计陀螺仪零偏，并以 98% 陀螺仪和 2% 编码器的权重融合左右差速编码器
-角速度。初始轮距由 `config/app_config.h` 中的 `APP_IMU_YAW_TRACK_WIDTH_MM` 配置；测得的
-左右轮中心距离为 130 mm。`APP_IMU_YAW_ENABLE` 默认值为 `1U`，关闭时不创建 IMU 采样任务；如需使用不带 IMU
-硬件的 SWD 或电机调试构建，可通过 `-ImuYawEnable 0` 显式关闭。
+纯六轴姿态融合实现在 `algorithms/imu_fusion/imu_fusion.c/.h` 中。只有
+`APP_IMU_YAW_ENABLE=1U` 时才会创建 5 ms 的 `imu_task`；该任务负责 BMI160 初始化、采样、
+失败重试和 yaw 更新。融合器使用三轴陀螺仪积分四元数，并在加速度模长接近 1g 时用重力方向
+校正 roll/pitch；加速度受到颠簸或线性加速度污染时回退为纯陀螺仪积分。启动或请求重标定时，
+需要车辆静止约 1 秒以估计三轴陀螺仪零偏。该算法完全不读取编码器，也不需要轮距参数。
+`APP_IMU_YAW_ENABLE` 默认值为 `1U`，关闭时不创建 IMU 采样任务；如需使用不带 IMU 硬件的
+SWD 或电机调试构建，可通过 `-ImuYawEnable 0` 显式关闭。
 
 估计器假设车辆坐标系为 `+X` 向前、`+Y` 向左、`+Z` 向上，Z 轴正角速度表示左转。如果
-安装的传感器 Z 轴方向相反，将 `BOARD_IMU_YAW_GYRO_Z_SIGN` 改为 `-1.0f`。
+安装的传感器 Z 轴方向相反，将 `IMU_FUSION_GYRO_Z_SIGN` 改为 `-1.0f`。六轴 IMU 没有
+磁力计或其他外部航向来源，只能提供相对于启动方向的 yaw，不能提供绝对航向。
 
 当 `APP_IMU_YAW_ENABLE` 和 `APP_IMU_TELEMETRY_ENABLE` 都为 `1U` 时，独立的
-`imu_vofa_task` 按 `APP_IMU_VOFA_TELEMETRY_INTERVAL_MS` 周期读取 yaw 快照，并发送前文所述的
-三通道 JustFloat yaw 帧。默认周期为 10 ms，独立任务使用
+`imu_vofa_task` 按 `APP_IMU_VOFA_TELEMETRY_INTERVAL_MS` 周期读取融合快照，并发送前文所述的
+13 通道 JustFloat 调试帧。默认周期为 10 ms，独立任务使用
 `APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH` 栈配置。yaw 任务通过 `app_state` 发布带有效标志的
-快照；BMI160 初始化或采样无效时，VOFA 任务跳过发送，不发送过期帧。yaw 相对于启动时的朝向，
+快照；BMI160 初始化或采样无效时仍发送状态字段，不发送新的有效 yaw。yaw 相对于启动时的朝向，
 并归一化到 `[-180, 180)`；六轴 IMU 没有磁力计或其他外部航向来源时，无法提供绝对 yaw 参考。
 
 `APP_VOFA_SPEED_PID_TELEMETRY_ENABLE` 默认值为 `0U`。进行 yaw UART 测试时，使用以下参数构建：

@@ -500,9 +500,9 @@
               <FilePath>..\..\mspm0g3507_app\drivers\imu\board_bmi160.c</FilePath>
             </File>
             <File>
-              <FileName>board_imu_yaw.c</FileName>
+              <FileName>imu_fusion.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\algorithms\imu_yaw\board_imu_yaw.c</FilePath>
+              <FilePath>..\..\mspm0g3507_app\algorithms\imu_fusion\imu_fusion.c</FilePath>
             </File>
             <File>
               <FileName>board_motor.c</FileName>

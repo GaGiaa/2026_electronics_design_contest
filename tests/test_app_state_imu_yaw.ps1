@@ -31,7 +31,8 @@ try {
     }
 
     & $gcc '-std=c11' '-Wall' '-Wextra' '-Werror' `
-        '-DAPP_IMU_YAW_ENABLE=0U' '-DCRSF_REMOTE_CONTROL_ENABLE=0U' `
+        '-DAPP_IMU_YAW_ENABLE=0U' '-DAPP_IMU_TELEMETRY_ENABLE=0U' `
+        '-DCRSF_REMOTE_CONTROL_ENABLE=0U' `
         "-I$includeRoot" $noImuTestSource $stateSource '-lm' '-o' $noImuTestOutput
     if ($LASTEXITCODE -ne 0) {
         throw "GCC no-IMU app-state test build failed (exit code $LASTEXITCODE)."

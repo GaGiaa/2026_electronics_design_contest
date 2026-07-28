@@ -64,7 +64,7 @@ static void course_following_vofa_task(void *argument)
     const TickType_t interval =
         pdMS_TO_TICKS(APP_COURSE_FOLLOWING_VOFA_TELEMETRY_INTERVAL_MS);
     app_drive_control_snapshot_t drive;
-    app_imu_yaw_snapshot_t imu;
+    app_imu_fusion_snapshot_t imu;
     motor_control_wheel_status_t control[BOARD_MOTOR_COUNT];
     course_following_telemetry_values_t values;
     uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(
@@ -74,7 +74,7 @@ static void course_following_vofa_task(void *argument)
     (void)argument;
     for (;;) {
         app_state_drive_control_snapshot_copy(&drive);
-        app_state_imu_yaw_snapshot_copy(&imu);
+        app_state_imu_fusion_snapshot_copy(&imu);
         app_state_motor_control_snapshot_copy(control);
         values.yaw_deg = imu.yaw_deg;
         values.yaw_rate_dps = imu.yaw_rate_dps;
@@ -106,16 +106,29 @@ static void imu_vofa_task(void *argument)
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t interval =
         pdMS_TO_TICKS(APP_IMU_VOFA_TELEMETRY_INTERVAL_MS);
-    app_imu_yaw_snapshot_t snapshot;
-    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(3U)];
+    app_imu_fusion_snapshot_t snapshot;
+    float channels[APP_IMU_FUSION_TELEMETRY_CHANNEL_COUNT];
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(
+        APP_IMU_FUSION_TELEMETRY_CHANNEL_COUNT)];
 
     (void)argument;
     for (;;) {
-        app_state_imu_yaw_snapshot_copy(&snapshot);
-        if (snapshot.valid &&
-            vofa_justfloat_encode3(frame, sizeof(frame), snapshot.yaw_deg,
-                                    snapshot.yaw_rate_dps,
-                                    snapshot.gyro_bias_z_dps)) {
+        app_state_imu_fusion_snapshot_copy(&snapshot);
+        channels[0U] = snapshot.yaw_deg;
+        channels[1U] = snapshot.yaw_rate_dps;
+        channels[2U] = snapshot.roll_deg;
+        channels[3U] = snapshot.pitch_deg;
+        channels[4U] = snapshot.accel_norm_g;
+        channels[5U] = snapshot.acceleration_valid ? 1.0f : 0.0f;
+        channels[6U] = snapshot.gyro_bias_x_dps;
+        channels[7U] = snapshot.gyro_bias_y_dps;
+        channels[8U] = snapshot.gyro_bias_z_dps;
+        channels[9U] = snapshot.stationary_confirmed ? 1.0f : 0.0f;
+        channels[10U] = snapshot.calibrated ? 1.0f : 0.0f;
+        channels[11U] = snapshot.valid ? 1.0f : 0.0f;
+        channels[12U] = snapshot.dt_s;
+        if (vofa_justfloat_encode(frame, sizeof(frame), channels,
+                                  APP_IMU_FUSION_TELEMETRY_CHANNEL_COUNT)) {
             board_uart_write(frame, sizeof(frame));
         }
         vTaskDelayUntil(&last_wake_time, interval);
