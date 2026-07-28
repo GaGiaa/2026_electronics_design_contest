@@ -30,6 +30,18 @@ uint32_t rtos_monitor_percent_x100(uint32_t part, uint32_t total)
 
 volatile rtos_monitor_snapshot_t g_rtos_monitor_snapshot;
 
+void rtos_monitor_runtime_timer_init(void)
+{
+    DL_Timer_stopCounter(RTOS_MONITOR_TIMER_INST);
+    DL_Timer_setTimerCount(RTOS_MONITOR_TIMER_INST, 0U);
+    DL_Timer_startCounter(RTOS_MONITOR_TIMER_INST);
+}
+
+uint32_t rtos_monitor_runtime_timer_now(void)
+{
+    return DL_Timer_getTimerCount(RTOS_MONITOR_TIMER_INST);
+}
+
 #if APP_RTOS_MONITOR_ENABLE
 
 static TaskStatus_t g_previous_task_status[RTOS_MONITOR_MAX_TASKS];
@@ -41,24 +53,6 @@ static uint32_t runtime_ticks_to_us(configRUN_TIME_COUNTER_TYPE ticks)
 {
     return (uint32_t)(((uint64_t)ticks * 1000000ULL) /
                       RTOS_MONITOR_TIMER_HZ);
-}
-
-void rtos_monitor_runtime_timer_init(void)
-{
-#if APP_RTOS_MONITOR_ENABLE
-    DL_Timer_stopCounter(RTOS_MONITOR_TIMER_INST);
-    DL_Timer_setTimerCount(RTOS_MONITOR_TIMER_INST, 0U);
-    DL_Timer_startCounter(RTOS_MONITOR_TIMER_INST);
-#endif
-}
-
-uint32_t rtos_monitor_runtime_timer_now(void)
-{
-#if APP_RTOS_MONITOR_ENABLE
-    return DL_Timer_getTimerCount(RTOS_MONITOR_TIMER_INST);
-#else
-    return 0U;
-#endif
 }
 
 static const TaskStatus_t *find_previous_task(TaskHandle_t handle)
@@ -188,8 +182,6 @@ void rtos_monitor_task(void *argument)
 
 #else
 
-void rtos_monitor_runtime_timer_init(void) {}
-uint32_t rtos_monitor_runtime_timer_now(void) { return 0U; }
 void rtos_monitor_task(void *argument) { (void)argument; }
 
 #endif

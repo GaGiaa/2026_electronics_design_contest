@@ -16,6 +16,8 @@ volatile uint32_t g_encoder_sample_sequence;
 volatile uint32_t g_grayscale_publish_sequence;
 volatile uint32_t g_drive_control_publish_sequence;
 volatile uint32_t g_button_publish_sequence;
+volatile app_hcsr04_snapshot_t g_hcsr04_snapshot;
+volatile uint32_t g_hcsr04_publish_sequence;
 #if APP_IMU_YAW_ENABLE
 volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
 volatile uint32_t g_imu_yaw_publish_sequence;
@@ -45,6 +47,8 @@ void app_state_init(void)
     g_grayscale_publish_sequence = 0U;
     g_drive_control_publish_sequence = 0U;
     g_button_publish_sequence = 0U;
+    g_hcsr04_snapshot = (app_hcsr04_snapshot_t){0};
+    g_hcsr04_publish_sequence = 0U;
 #if APP_IMU_YAW_ENABLE
     g_imu_yaw_snapshot = (app_imu_yaw_snapshot_t){0};
     g_imu_yaw_publish_sequence = 0U;
@@ -293,6 +297,37 @@ void app_state_buttons_snapshot_copy(app_button_snapshot_t *snapshot)
             *snapshot = g_button_snapshot;
             end_sequence = g_button_publish_sequence;
             if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
+                break;
+            }
+        }
+    }
+}
+
+void app_state_hcsr04_publish(const app_hcsr04_snapshot_t *snapshot)
+{
+    if (snapshot == NULL) {
+        return;
+    }
+    ++g_hcsr04_publish_sequence;
+    g_hcsr04_snapshot = *snapshot;
+    ++g_hcsr04_publish_sequence;
+}
+
+void app_state_hcsr04_snapshot_copy(app_hcsr04_snapshot_t *snapshot)
+{
+    uint32_t begin_sequence;
+    uint32_t end_sequence;
+
+    if (snapshot == NULL) {
+        return;
+    }
+    for (;;) {
+        begin_sequence = g_hcsr04_publish_sequence;
+        if ((begin_sequence & 1U) == 0U) {
+            *snapshot = g_hcsr04_snapshot;
+            end_sequence = g_hcsr04_publish_sequence;
+            if ((begin_sequence == end_sequence) &&
+                ((end_sequence & 1U) == 0U)) {
                 break;
             }
         }

@@ -32,6 +32,11 @@ param(
     [int] $OledTestTaskEnable,
     [ValidateSet(0, 1)]
     [int] $ServoFeatureEnable
+    ,
+    [ValidateSet(0, 1)]
+    [int] $Hcsr04Enable,
+    [ValidateSet(0, 1)]
+    [int] $Hcsr04TelemetryEnable
 )
 
 Set-StrictMode -Version Latest
@@ -123,6 +128,12 @@ if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
 }
 if ($PSBoundParameters.ContainsKey('ServoFeatureEnable')) {
     $temporaryDefines += "APP_SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
+}
+if ($PSBoundParameters.ContainsKey('Hcsr04Enable')) {
+    $temporaryDefines += "APP_HCSR04_ENABLE=$Hcsr04Enable"
+}
+if ($PSBoundParameters.ContainsKey('Hcsr04TelemetryEnable')) {
+    $temporaryDefines += "APP_HCSR04_TELEMETRY_ENABLE=$Hcsr04TelemetryEnable"
 }
 if ($temporaryDefines.Count -gt 0) {
     $projectFileBytes = [System.IO.File]::ReadAllBytes($projectFile)

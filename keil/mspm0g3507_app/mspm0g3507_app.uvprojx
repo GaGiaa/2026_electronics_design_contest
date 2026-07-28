@@ -435,6 +435,16 @@
               <FilePath>..\..\mspm0g3507_app\drivers\encoder\board_encoder.c</FilePath>
             </File>
             <File>
+              <FileName>board_hcsr04.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\drivers\hcsr04\board_hcsr04.c</FilePath>
+            </File>
+            <File>
+              <FileName>ultrasonic_measurement.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\mspm0g3507_app\algorithms\ultrasonic\ultrasonic_measurement.c</FilePath>
+            </File>
+            <File>
               <FileName>encoder_quadrature.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\mspm0g3507_app\algorithms\encoder\encoder_quadrature.c</FilePath>

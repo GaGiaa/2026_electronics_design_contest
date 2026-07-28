@@ -10,6 +10,7 @@
 #include "config/app_config.h"
 #include "drivers/buttons/board_buttons.h"
 #include "drivers/grayscale/board_grayscale.h"
+#include "drivers/hcsr04/board_hcsr04.h"
 #include "drivers/uart/board_uart.h"
 #include "protocols/vofa/vofa_justfloat.h"
 #include "services/rtos_monitor/rtos_monitor.h"
@@ -71,6 +72,31 @@ static void imu_vofa_task(void *argument)
             vofa_justfloat_encode3(frame, sizeof(frame), snapshot.yaw_deg,
                                     snapshot.yaw_rate_dps,
                                     snapshot.gyro_bias_z_dps)) {
+            board_uart_write(frame, sizeof(frame));
+        }
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+#endif
+
+#if APP_HCSR04_TELEMETRY_ENABLE
+static StaticTask_t g_hcsr04_vofa_task_buffer;
+static StackType_t g_hcsr04_vofa_task_stack[APP_HCSR04_TASK_STACK_DEPTH];
+
+static void hcsr04_vofa_task(void *argument)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t interval = pdMS_TO_TICKS(APP_HCSR04_SAMPLE_INTERVAL_MS);
+    app_hcsr04_snapshot_t snapshot;
+    uint8_t frame[VOFA_JUSTFLOAT_FRAME_SIZE(3U)];
+
+    (void)argument;
+    for (;;) {
+        app_state_hcsr04_snapshot_copy(&snapshot);
+        if (vofa_justfloat_encode3(
+                frame, sizeof(frame), (float)snapshot.distance_mm,
+                (float)snapshot.echo_time_us,
+                snapshot.valid ? 1.0f : 0.0f)) {
             board_uart_write(frame, sizeof(frame));
         }
         vTaskDelayUntil(&last_wake_time, interval);
@@ -228,6 +254,13 @@ void app_tasks_telemetry_start(void)
                      APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH, NULL,
                      APP_TELEMETRY_TASK_PRIORITY, g_imu_vofa_task_stack,
                      &g_imu_vofa_task_buffer) != NULL);
+#endif
+#if APP_HCSR04_TELEMETRY_ENABLE
+    configASSERT(xTaskCreateStatic(
+                     hcsr04_vofa_task, "hcsr04_vofa",
+                     APP_HCSR04_TASK_STACK_DEPTH, NULL,
+                     APP_TELEMETRY_TASK_PRIORITY, g_hcsr04_vofa_task_stack,
+                     &g_hcsr04_vofa_task_buffer) != NULL);
 #endif
 #if APP_VOFA_SPEED_PID_TELEMETRY_ENABLE
     configASSERT(xTaskCreateStatic(

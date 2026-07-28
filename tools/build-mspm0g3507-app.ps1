@@ -30,6 +30,11 @@ param(
     [int] $OledTestTaskEnable,
     [ValidateSet(0, 1)]
     [int] $ServoFeatureEnable
+    ,
+    [ValidateSet(0, 1)]
+    [int] $Hcsr04Enable,
+    [ValidateSet(0, 1)]
+    [int] $Hcsr04TelemetryEnable
 )
 
 Set-StrictMode -Version Latest
@@ -100,9 +105,17 @@ if ($PSBoundParameters.ContainsKey('OledTestTaskEnable')) {
 if ($PSBoundParameters.ContainsKey('ServoFeatureEnable')) {
     $commonCompilerArguments += "-DAPP_SERVO_FEATURE_ENABLE=$ServoFeatureEnable"
 }
+if ($PSBoundParameters.ContainsKey('Hcsr04Enable')) {
+    $commonCompilerArguments += "-DAPP_HCSR04_ENABLE=$Hcsr04Enable"
+}
+if ($PSBoundParameters.ContainsKey('Hcsr04TelemetryEnable')) {
+    $commonCompilerArguments += "-DAPP_HCSR04_TELEMETRY_ENABLE=$Hcsr04TelemetryEnable"
+}
 $sources = @(
     @{ Source = (Join-Path $ProjectDir 'drivers\encoder\board_encoder.c'); Object = 'board_encoder.o' },
+    @{ Source = (Join-Path $ProjectDir 'drivers\hcsr04\board_hcsr04.c'); Object = 'board_hcsr04.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\encoder\encoder_quadrature.c'); Object = 'encoder_quadrature.o' },
+    @{ Source = (Join-Path $ProjectDir 'algorithms\ultrasonic\ultrasonic_measurement.c'); Object = 'ultrasonic_measurement.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\encoder\encoder_speed_filter.c'); Object = 'encoder_speed_filter.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\buzzer\board_buzzer.c'); Object = 'board_buzzer.o' },
     @{ Source = (Join-Path $ProjectDir 'drivers\servo\board_servo.c'); Object = 'board_servo.o' },
@@ -146,6 +159,6 @@ $sources = @(
 Push-Location $BuildDir
 try {
     foreach ($source in $sources) { Invoke-CheckedCommand -FilePath $Compiler -Arguments ($commonCompilerArguments + @('-o', $source.Object, $source.Source)) -Description "Compiling $($source.Object)" }
-    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\config", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'encoder_quadrature.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_servo.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'line_control.o', 'yaw_control.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_oled.o', 'board_oled_font.o', 'board_uart.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'app_profile.o', 'app_state.o', 'app_startup.o', 'app_tasks_motor.o', 'app_tasks_sensor.o', 'app_tasks_io.o', 'app_tasks_telemetry.o', 'g3507_interrupts.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
+    Invoke-CheckedCommand -FilePath $Compiler -Arguments @('@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', '-Wl,-mmspm0g3507_app.map', "-Wl,-i$SdkRoot\source", "-Wl,-i$ProjectDir", "-Wl,-i$ProjectDir\config", "-Wl,-i$BuildDir", '-Wl,--diag_wrap=off', '-Wl,--display_error_number', '-Wl,--warn_sections', '-Wl,--rom_model', '-o', 'mspm0g3507_app.out', 'board_encoder.o', 'board_hcsr04.o', 'encoder_quadrature.o', 'ultrasonic_measurement.o', 'encoder_speed_filter.o', 'board_buzzer.o', 'board_servo.o', 'board_bmi160.o', 'board_imu_yaw.o', 'board_buttons.o', 'board_grayscale.o', 'line_tracking.o', 'line_control.o', 'yaw_control.o', 'motor_pid.o', 'motor_control.o', 'vofa_justfloat.o', 'board_motor.o', 'board_ws2812.o', 'board_oled.o', 'board_oled_font.o', 'board_uart.o', 'rtos_monitor.o', 'board_crsf_uart.o', 'crsf_protocol.o', 'crsf_control.o', 'app_profile.o', 'app_state.o', 'app_startup.o', 'app_tasks_motor.o', 'app_tasks_sensor.o', 'app_tasks_io.o', 'app_tasks_telemetry.o', 'g3507_interrupts.o', 'main.o', 'ti_msp_dl_config.o', 'startup_mspm0g350x_ticlang.o', 'freertos_list.o', 'freertos_queue.o', 'freertos_tasks.o', 'freertos_port.o', 'freertos_portasm.o', '-Wl,-ldevice_linker.cmd', '-Wl,-ldevice.cmd.genlibs', '-Wl,-llibc.a') -Description 'Linking MSPM0G3507 app firmware'
 }
 finally { Pop-Location }
