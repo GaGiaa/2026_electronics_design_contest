@@ -124,15 +124,30 @@ AD0=PB13、AD1=PB1、AD2=PB23、OUT=PA27，EN 悬空，传感器使用独立稳�
 用于 SWD 调试。下载新的 AXF 后，如果 `g_grayscale_snapshot.sequence` 持续变化，
 说明采样正在进行；如果超时计数器持续变化，说明 ADC0 没有报告 MEM0 转换完成标志。
 
-可选的 `board_imu_yaw.c` 航向估算器会编译进共享应用工程，并在现有 IMU 任务中
-运行。`APP_IMU_YAW_ENABLE` 默认值为 `1U`，需要无 IMU 硬件的调试构建时可显式改为 `0U`。它使用
-BMI160 Z 轴陀螺仪、启动时陀螺仪零偏校准，以及左右轮编码器差速计算，并使用
-`mspm0g3507_app/config/app_config.h` 中的 `APP_IMU_YAW_TRACK_WIDTH_MM`。实测左右轮中心距离为 130 mm，车辆坐标系
-为 +X 向前、+Y 向左、+Z 向上。将 `APP_IMU_TELEMETRY_ENABLE` 也设为 `1U`，即可通过
-UART 观察航向字段。
+共享应用工程现在编译 `algorithms/imu_fusion/imu_fusion.c` 纯六轴姿态融合器，并在现有 IMU 任务中
+以 5 ms / 200 Hz 运行。`APP_IMU_YAW_ENABLE` 默认值为 `1U`，需要无 IMU 硬件的调试构建时可显式改为
+`0U`。融合器使用三轴陀螺仪和三轴加速度计进行四元数姿态更新，启动时进行约一秒三轴零偏校准，
+不读取左右轮编码器，也不需要轮距参数。车辆坐标系为 +X 向前、+Y 向左、+Z 向上。将
+`APP_IMU_TELEMETRY_ENABLE` 默认值为 `0U`。需要通过 UART 观察融合调试字段时，显式设为 `1U`，即可开启
+VOFA 输出。
 
-输出为 16 字节 JustFloat 帧，通道依次为 `yaw_deg`、`yaw_rate_dps` 和
-`gyro_bias_z_dps`。进行 UART 航向测试时，使用以下 Keil 构建参数：
+输出为 56 字节 JustFloat 融合调试帧，共 13 个通道：
+`yaw_deg`、`yaw_rate_dps`、`roll_deg`、`pitch_deg`、`accel_norm_g`、`acceleration_valid`、
+`gyro_bias_x_dps`、`gyro_bias_y_dps`、`gyro_bias_z_dps`、`stationary_confirmed`、`calibrated`、
+`valid`、`dt_s`。同时可通过 SWD 观察 `g_imu_fusion_snapshot`；通道 10/11 分别表示校准完成和当前
+yaw 是否可用于控制。进行 UART 融合调试时，使用以下 Keil 构建参数：
+
+硬件诊断不再占用 VOFA 通道。通过 SWD 观察 `g_imu_debug`，并确认 `chip_id=0xD1`、
+`sample_successes` 持续增加、水平静止时 `last_sample.accel_z` 约为 `8192`；
+`g_bmi160_diagnostics` 可进一步查看配置寄存器回读值。
+
+发生 HardFault 时，可通过 SWD 读取 `g_hardfault_snapshot`。`active=1` 表示已捕获，
+`stacked_pc`/`stacked_lr`/`stacked_sp` 是异常栈帧，`cfsr`/`hfsr`/`dfsr`/`mmfar`/`bfar`/`icsr` 是 SCB
+状态镜像。Keil 启动 MSP 系统栈已扩大到 0x400 字节，以降低嵌套中断和 FreeRTOS 异常路径的栈帧破坏风险。
+
+六轴 IMU 没有磁力计或其他外部航向来源，只能输出相对于启动方向的 yaw；加速度计用于倾斜校正，
+不能消除长期 yaw 漂移。启动和重新标定期间车辆必须保持静止，未完成的倾斜、漂移和转向符号
+仍需实车验收。
 
 ```text
 -VofaSpeedPidTelemetryEnable 0 -ImuTelemetryEnable 1 -ImuYawEnable 1

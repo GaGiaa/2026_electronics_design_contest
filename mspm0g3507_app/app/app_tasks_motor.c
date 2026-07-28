@@ -8,7 +8,7 @@
 #include "config/app_config.h"
 #include "algorithms/course_following/course_following.h"
 #if APP_IMU_YAW_ENABLE
-#include "algorithms/imu_yaw/board_imu_yaw.h"
+#include "algorithms/imu_fusion/imu_fusion.h"
 #endif
 #include "algorithms/line_control/line_control.h"
 #include "algorithms/motor_control/motor_control.h"
@@ -40,7 +40,7 @@ static void motor_task(void *argument)
     course_following_state_t course_following_state;
     course_following_output_t course_output;
 #if APP_IMU_YAW_ENABLE
-    app_imu_yaw_snapshot_t imu_yaw_snapshot;
+    app_imu_fusion_snapshot_t imu_fusion_snapshot;
     bool course_imu_invalid_seen;
 #endif
     app_drive_control_snapshot_t drive_snapshot;
@@ -86,7 +86,7 @@ static void motor_task(void *argument)
         app_state_crsf_snapshot_copy(&crsf_input);
         app_state_grayscale_snapshot_copy(&grayscale);
 #if APP_IMU_YAW_ENABLE
-        app_state_imu_yaw_snapshot_copy(&imu_yaw_snapshot);
+        app_state_imu_fusion_snapshot_copy(&imu_fusion_snapshot);
 #endif
         link_active = crsf_control_get_forward_speed(
             &crsf_input, now_ms, &base_speed_mm_per_s);
@@ -98,7 +98,7 @@ static void motor_task(void *argument)
             course_following_reset(&course_following_state);
 #if APP_IMU_YAW_ENABLE
             if (mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
-                board_imu_yaw_request_recalibration();
+                imu_fusion_request_recalibration();
                 course_imu_invalid_seen = false;
             }
 #endif
@@ -115,8 +115,8 @@ static void motor_task(void *argument)
         } else if (!mode_changed && mode == CRSF_DRIVE_MODE_YAW_HOLD) {
 #if APP_IMU_YAW_ENABLE
             yaw_control_input_t yaw_input = {
-                .feedback_yaw_deg = imu_yaw_snapshot.yaw_deg,
-                .feedback_valid = imu_yaw_snapshot.valid,
+                .feedback_yaw_deg = imu_fusion_snapshot.yaw_deg,
+                .feedback_valid = imu_fusion_snapshot.valid,
                 .base_speed_mm_per_s = base_speed_mm_per_s,
                 .now_ms = now_ms,
             };
@@ -147,12 +147,12 @@ static void motor_task(void *argument)
         } else if (!mode_changed && mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
 #if APP_IMU_YAW_ENABLE
             if (!course_imu_invalid_seen) {
-                course_imu_invalid_seen = !imu_yaw_snapshot.valid;
-            } else if (imu_yaw_snapshot.valid) {
+                course_imu_invalid_seen = !imu_fusion_snapshot.valid;
+            } else if (imu_fusion_snapshot.valid) {
                 course_following_input_t course_input = {
                     .grayscale = &grayscale,
                     .yaw_valid = true,
-                    .yaw_deg = imu_yaw_snapshot.yaw_deg,
+                    .yaw_deg = imu_fusion_snapshot.yaw_deg,
                     .now_ms = now_ms,
                 };
 
@@ -217,9 +217,9 @@ static void motor_task(void *argument)
         drive_snapshot.yaw_valid = yaw_output.yaw_valid;
         drive_snapshot.yaw_target_deg = g_yaw_control_debug.target_yaw_deg;
 #if APP_IMU_YAW_ENABLE
-        drive_snapshot.yaw_feedback_deg = imu_yaw_snapshot.yaw_deg;
+        drive_snapshot.yaw_feedback_deg = imu_fusion_snapshot.yaw_deg;
         if (mode == CRSF_DRIVE_MODE_COURSE_FOLLOWING) {
-            drive_snapshot.yaw_valid = imu_yaw_snapshot.valid &&
+            drive_snapshot.yaw_valid = imu_fusion_snapshot.valid &&
                                       course_imu_invalid_seen;
         }
 #endif

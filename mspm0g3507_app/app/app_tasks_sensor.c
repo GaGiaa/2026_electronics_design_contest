@@ -1,5 +1,6 @@
 #include "app/app_tasks_sensor.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include <FreeRTOS.h>
@@ -9,8 +10,7 @@
 #include "config/rtos_monitor_config.h"
 
 #if APP_IMU_YAW_ENABLE
-#include "algorithms/imu_yaw/board_imu_yaw.h"
-#include "drivers/encoder/board_encoder.h"
+#include "algorithms/imu_fusion/imu_fusion.h"
 #include "drivers/imu/board_bmi160.h"
 #endif
 #include "algorithms/line_tracking/line_tracking.h"
@@ -73,46 +73,88 @@ static void crsf_task(void *argument)
 static void imu_task(void *argument)
 {
     TickType_t last_wake_time;
+    TickType_t last_sample_tick;
     const TickType_t interval = pdMS_TO_TICKS(APP_IMU_SAMPLE_INTERVAL_MS);
     board_bmi160_sample_t sample;
     board_bmi160_status_t status;
     uint8_t chip_id;
     uint32_t consecutive_failures;
-#if APP_IMU_YAW_ENABLE
-    board_imu_yaw_state_t yaw_state;
-    board_encoder_sample_t encoder_samples[BOARD_MOTOR_COUNT];
-#endif
+    bool has_sample_tick;
+    imu_fusion_state_t fusion_state;
+    app_imu_fusion_snapshot_t fusion_snapshot;
+
     (void)argument;
-    board_imu_yaw_init(&yaw_state, APP_IMU_YAW_TRACK_WIDTH_MM);
+    imu_fusion_init(&fusion_state);
+    has_sample_tick = false;
     for (;;) {
         chip_id = 0U;
+        ++g_imu_debug.init_attempts;
         status = board_bmi160_init(&chip_id);
+        g_imu_debug.chip_id = chip_id;
+        g_imu_debug.initialized = status == BOARD_BMI160_STATUS_OK;
+        g_imu_debug.init_status = (uint8_t)status;
+        g_imu_debug.error_register = g_bmi160_diagnostics.error_register;
+        g_imu_debug.pmu_status = g_bmi160_diagnostics.pmu_status;
+        g_imu_debug.accel_config = g_bmi160_diagnostics.accel_config;
+        g_imu_debug.accel_range = g_bmi160_diagnostics.accel_range;
+        g_imu_debug.gyro_config = g_bmi160_diagnostics.gyro_config;
+        g_imu_debug.gyro_range = g_bmi160_diagnostics.gyro_range;
+        ++g_imu_debug.sequence;
         if (status != BOARD_BMI160_STATUS_OK) {
-            app_state_imu_yaw_invalidate();
+            app_state_imu_fusion_invalidate();
             vTaskDelay(pdMS_TO_TICKS(1000U));
         } else {
             consecutive_failures = 0U;
+            imu_fusion_request_recalibration();
+            has_sample_tick = false;
             last_wake_time = xTaskGetTickCount();
             for (;;) {
+                TickType_t sample_tick = xTaskGetTickCount();
+
+                ++g_imu_debug.sample_attempts;
                 status = board_bmi160_read_sample(&sample);
+                g_imu_debug.last_read_status = (uint8_t)status;
                 if (status != BOARD_BMI160_STATUS_OK) {
-                    app_state_imu_yaw_invalidate();
+                    app_state_imu_fusion_invalidate();
                     ++consecutive_failures;
+                    g_imu_debug.consecutive_failures = consecutive_failures;
+                    ++g_imu_debug.sequence;
                     if (consecutive_failures >= APP_IMU_REINIT_FAILURE_THRESHOLD) {
                         break;
                     }
                 } else {
+                    float dt_s = has_sample_tick ?
+                        (float)(sample_tick - last_sample_tick) /
+                            (float)configTICK_RATE_HZ :
+                        (float)APP_IMU_SAMPLE_INTERVAL_MS / 1000.0f;
+
                     consecutive_failures = 0U;
-                    app_state_encoder_samples_snapshot_copy(encoder_samples);
-                    board_imu_yaw_update(&yaw_state, &sample, encoder_samples,
-                                         (float)APP_IMU_SAMPLE_INTERVAL_MS / 1000.0f);
-                    if (yaw_state.calibrated) {
-                        app_state_imu_yaw_publish(yaw_state.yaw_deg,
-                                                  yaw_state.yaw_rate_dps,
-                                                  yaw_state.gyro_bias_z_dps);
-                    } else {
-                        app_state_imu_yaw_invalidate();
-                    }
+                    ++g_imu_debug.sample_successes;
+                    g_imu_debug.consecutive_failures = 0U;
+                    g_imu_debug.last_sample = sample;
+                    ++g_imu_debug.sequence;
+                    last_sample_tick = sample_tick;
+                    has_sample_tick = true;
+                    imu_fusion_update(&fusion_state, &sample, dt_s);
+                    fusion_snapshot.yaw_deg = fusion_state.yaw_deg;
+                    fusion_snapshot.yaw_rate_dps = fusion_state.yaw_rate_dps;
+                    fusion_snapshot.roll_deg = fusion_state.roll_deg;
+                    fusion_snapshot.pitch_deg = fusion_state.pitch_deg;
+                    fusion_snapshot.accel_norm_g = fusion_state.accel_norm_g;
+                    fusion_snapshot.gyro_bias_x_dps =
+                        fusion_state.gyro_bias_x_dps;
+                    fusion_snapshot.gyro_bias_y_dps =
+                        fusion_state.gyro_bias_y_dps;
+                    fusion_snapshot.gyro_bias_z_dps =
+                        fusion_state.gyro_bias_z_dps;
+                    fusion_snapshot.dt_s = fusion_state.dt_s;
+                    fusion_snapshot.acceleration_valid =
+                        fusion_state.acceleration_valid;
+                    fusion_snapshot.stationary_confirmed =
+                        fusion_state.stationary_confirmed;
+                    fusion_snapshot.calibrated = fusion_state.calibrated;
+                    fusion_snapshot.valid = fusion_state.calibrated;
+                    app_state_imu_fusion_publish(&fusion_snapshot);
                 }
                 vTaskDelayUntil(&last_wake_time, interval);
             }

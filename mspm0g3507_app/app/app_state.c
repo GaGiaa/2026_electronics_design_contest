@@ -19,8 +19,9 @@ volatile uint32_t g_button_publish_sequence;
 volatile app_hcsr04_snapshot_t g_hcsr04_snapshot;
 volatile uint32_t g_hcsr04_publish_sequence;
 #if APP_IMU_YAW_ENABLE
-volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
-volatile uint32_t g_imu_yaw_publish_sequence;
+volatile app_imu_fusion_snapshot_t g_imu_fusion_snapshot;
+volatile uint32_t g_imu_fusion_publish_sequence;
+volatile app_imu_debug_t g_imu_debug;
 #endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
@@ -50,8 +51,9 @@ void app_state_init(void)
     g_hcsr04_snapshot = (app_hcsr04_snapshot_t){0};
     g_hcsr04_publish_sequence = 0U;
 #if APP_IMU_YAW_ENABLE
-    g_imu_yaw_snapshot = (app_imu_yaw_snapshot_t){0};
-    g_imu_yaw_publish_sequence = 0U;
+    g_imu_fusion_snapshot = (app_imu_fusion_snapshot_t){0};
+    g_imu_fusion_publish_sequence = 0U;
+    g_imu_debug = (app_imu_debug_t){0};
 #endif
 #if CRSF_REMOTE_CONTROL_ENABLE
     g_crsf_debug = (crsf_debug_state_t){0};
@@ -342,27 +344,40 @@ void app_state_hcsr04_snapshot_copy(app_hcsr04_snapshot_t *snapshot)
 }
 
 #if APP_IMU_YAW_ENABLE
-void app_state_imu_yaw_publish(float yaw_deg, float yaw_rate_dps,
-                               float gyro_bias_z_dps)
+void app_state_imu_fusion_publish(
+    const app_imu_fusion_snapshot_t *snapshot)
 {
-    ++g_imu_yaw_publish_sequence;
-    g_imu_yaw_snapshot.yaw_deg = yaw_deg;
-    g_imu_yaw_snapshot.yaw_rate_dps = yaw_rate_dps;
-    g_imu_yaw_snapshot.gyro_bias_z_dps = gyro_bias_z_dps;
-    g_imu_yaw_snapshot.valid = true;
-    ++g_imu_yaw_snapshot.sequence;
-    ++g_imu_yaw_publish_sequence;
+    if (snapshot == NULL) {
+        return;
+    }
+    ++g_imu_fusion_publish_sequence;
+    g_imu_fusion_snapshot.yaw_deg = snapshot->yaw_deg;
+    g_imu_fusion_snapshot.yaw_rate_dps = snapshot->yaw_rate_dps;
+    g_imu_fusion_snapshot.roll_deg = snapshot->roll_deg;
+    g_imu_fusion_snapshot.pitch_deg = snapshot->pitch_deg;
+    g_imu_fusion_snapshot.accel_norm_g = snapshot->accel_norm_g;
+    g_imu_fusion_snapshot.gyro_bias_x_dps = snapshot->gyro_bias_x_dps;
+    g_imu_fusion_snapshot.gyro_bias_y_dps = snapshot->gyro_bias_y_dps;
+    g_imu_fusion_snapshot.gyro_bias_z_dps = snapshot->gyro_bias_z_dps;
+    g_imu_fusion_snapshot.dt_s = snapshot->dt_s;
+    g_imu_fusion_snapshot.acceleration_valid = snapshot->acceleration_valid;
+    g_imu_fusion_snapshot.stationary_confirmed = snapshot->stationary_confirmed;
+    g_imu_fusion_snapshot.calibrated = snapshot->calibrated;
+    g_imu_fusion_snapshot.valid = snapshot->valid;
+    ++g_imu_fusion_snapshot.sequence;
+    ++g_imu_fusion_publish_sequence;
 }
 
-void app_state_imu_yaw_invalidate(void)
+void app_state_imu_fusion_invalidate(void)
 {
-    ++g_imu_yaw_publish_sequence;
-    g_imu_yaw_snapshot.valid = false;
-    ++g_imu_yaw_snapshot.sequence;
-    ++g_imu_yaw_publish_sequence;
+    ++g_imu_fusion_publish_sequence;
+    g_imu_fusion_snapshot.valid = false;
+    ++g_imu_fusion_snapshot.sequence;
+    ++g_imu_fusion_publish_sequence;
 }
 
-void app_state_imu_yaw_snapshot_copy(app_imu_yaw_snapshot_t *snapshot)
+void app_state_imu_fusion_snapshot_copy(
+    app_imu_fusion_snapshot_t *snapshot)
 {
     uint32_t begin_sequence;
     uint32_t end_sequence;
@@ -371,14 +386,10 @@ void app_state_imu_yaw_snapshot_copy(app_imu_yaw_snapshot_t *snapshot)
         return;
     }
     for (;;) {
-        begin_sequence = g_imu_yaw_publish_sequence;
+        begin_sequence = g_imu_fusion_publish_sequence;
         if ((begin_sequence & 1U) == 0U) {
-            snapshot->yaw_deg = g_imu_yaw_snapshot.yaw_deg;
-            snapshot->yaw_rate_dps = g_imu_yaw_snapshot.yaw_rate_dps;
-            snapshot->gyro_bias_z_dps = g_imu_yaw_snapshot.gyro_bias_z_dps;
-            snapshot->valid = g_imu_yaw_snapshot.valid;
-            snapshot->sequence = g_imu_yaw_snapshot.sequence;
-            end_sequence = g_imu_yaw_publish_sequence;
+            *snapshot = g_imu_fusion_snapshot;
+            end_sequence = g_imu_fusion_publish_sequence;
             if ((begin_sequence == end_sequence) && ((end_sequence & 1U) == 0U)) {
                 break;
             }

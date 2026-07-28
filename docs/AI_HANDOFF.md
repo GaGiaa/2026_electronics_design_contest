@@ -78,8 +78,15 @@ powershell -ExecutionPolicy Bypass -File tools\build-keil-mspm0g3507-app.ps1
 
 `app_state.h` 公开 `g_encoder_sample_sequence`、`g_grayscale_publish_sequence` 和
 `g_drive_control_publish_sequence` 供 SWD 观察；启用 `APP_IMU_YAW_ENABLE=1U` 时还公开
-`g_imu_yaw_snapshot` 和 `g_imu_yaw_publish_sequence`。这些 `volatile` 变量是快照序列保护状态，
+`g_imu_fusion_snapshot` 和 `g_imu_fusion_publish_sequence`。融合快照包含 yaw、roll/pitch、加速度可信度、
+三轴 gyro bias、校准状态、实际 `dt_s` 和 `valid`。这些 `volatile` 变量是快照序列保护状态，
 只应观察，不应通过调试器写入。灰度驱动的 `volatile g_grayscale_debug` 是标定参数和数字状态的只读镜像，
+
+IMU 硬件诊断通过 `volatile g_imu_debug` 提供：它包含 BMI160 芯片 ID、初始化/采样状态码、初始化尝试数、
+采样成功数、连续失败数、最近一次原始六轴样本和配置寄存器回读值；驱动层 `g_bmi160_diagnostics` 也可直接
+通过 SWD 观察。IMU VOFA 调试帧包含前 12 个融合通道，最后一个通道为 `dt_s`；上述硬件诊断量不占用 VOFA 通道，仍可通过 SWD 观察。
+`chip_id` 应为 `0xD1`，
+水平静止时 `last_sample.accel_z` 应约为 `8192`，`sample_successes` 应持续增长。
 不改变驱动内部仍保持 `static` 的标定数组。任务栈、通信缓存、编码器滤波器和 PID 内部状态继续保持私有链接。
 
 G3507 CCS 应用输出为 `mspm0g3507_app/Debug/mspm0g3507_app.out`。Keil 输出为
@@ -106,9 +113,11 @@ workspace 直接执行 `Project -> Build Project` 不是该应用的完整构建
 ### BMI160 与 IMU Yaw
 
 BMI160 使用 SPI0：`SCK=PB18`、`MOSI=PB17`、`MISO=PB19`、`CS=PB0`，配置为
-100 Hz、±4g、±500 dps。驱动已确认 `CHIP_ID=0xD1`，静止时 Z 轴加速度约为 1g，
-静止陀螺仪输出接近 0。IMU Yaw 使用静止样本估计零偏并融合编码器差速，不能提供绝对
-航向；长期零偏、漂移、方向符号和急转弯响应仍属于待完成硬件验收。
+200 Hz、±4g、±500 dps。驱动已确认 `CHIP_ID=0xD1`，静止时 Z 轴加速度约为 1g，
+BMI160 软复位后需要重新执行 SPI 接口选择事务，再进行配置寄存器写入和回读；
+静止陀螺仪输出接近 0。纯六轴 IMU 融合使用三轴陀螺仪和三轴加速度计，不读取编码器辅助 yaw，
+只能提供相对于启动方向的航向；长期零偏、漂移、方向符号、倾斜补偿和急转弯响应仍属于待完成
+硬件验收。
 
 ### 灰度、WS2812、按键和 OLED
 
@@ -183,9 +192,11 @@ SB 或 SC 任一低档为空闲，SB/SC 中/中为手动、中/高为 yaw 锁定
   `+300/-200 mm/s`，最短 500 ms、中心线连续 3 样本退出、2000 ms 超时、100 ms 重触发抑制。
 - 进入赛道模式时电机任务清零目标并请求 IMU yaw 重新标定；必须看到 yaw 快照失效后重新有效才允许赛道
   控制器输出。`app_drive_control_snapshot_t` 增加赛道航向目标和无线区/航向保持快照字段。
-- `board_imu_yaw` 完整采用 20 样本静止确认、陀螺静止阈值、启动校准离群样本拒绝与
-  `0.30 dps` 去偏置死区；所有阈值保留为具名宏。BMI160 长期漂移、静止判定、左右转向符号和急转弯响应
-  仍须实车验证。
+- `algorithms/imu_fusion/` 已替换旧 `board_imu_yaw`。融合器使用四元数 Mahony/互补校正，启动和
+  请求重标定时约一秒估计三轴陀螺仪零偏；加速度模长异常时回退为纯陀螺仪积分，静止确认后缓慢
+  跟踪零偏。IMU 任务和 BMI160 ODR 已改为 5 ms / 200 Hz，应用状态和 VOFA 已改为完整融合诊断接口。
+- 新增 `tests/test_imu_fusion.ps1`，覆盖三轴校准、纯 IMU yaw、静态倾斜、加速度失效回退、实际
+  `dt`、重标定和非法输入；旧 `test_board_imu_yaw.*` 已删除。
 - 新增默认关闭的 `APP_COURSE_FOLLOWING_VOFA_TELEMETRY_ENABLE`。默认 10 ms 发送 14 通道
   JustFloat：yaw、yaw rate、gyro bias、赛道航向目标、无线区标志、循迹误差、四轮目标速度、四轮反馈速度。
   它要求 `APP_IMU_YAW_ENABLE=1U`，与其它全部 UART0 VOFA 遥测及 UART 回显互斥；CCS/Keil 构建参数为
@@ -235,9 +246,12 @@ PowerShell 构建参数、SWD 全局变量、UART 行为和 CRSF 超时行为保
 分层迁移不代表任何尚未完成的硬件验收已经完成。
 
 IMU yaw 与 IMU VOFA 遥测采用独立任务边界：`APP_IMU_YAW_ENABLE=1U` 时创建 `imu_task`，负责
-BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENABLE=1U` 时创建独立的
-`imu_vofa_task`。两个任务通过 `app_state` 的 `app_imu_yaw_snapshot_t` 快照接口通信，快照包含
-三个 yaw 浮点值、`valid` 和序列号，并使用序列保护跨任务复制。无效采样期间不发送 VOFA 帧。
+BMI160 初始化、采样、失败重试和 yaw 融合；`APP_IMU_TELEMETRY_ENABLE` 默认值为 `0U`，显式设为 `1U` 时创建独立的
+`imu_vofa_task`。两个任务通过 `app_state` 的 `app_imu_fusion_snapshot_t` 快照接口通信，快照包含
+13 个融合诊断字段，并使用序列保护跨任务复制；BMI160 硬件诊断字段仅通过 SWD 全局变量观察。遥测帧通道依次为
+`yaw_deg`、`yaw_rate_dps`、`roll_deg`、`pitch_deg`、`accel_norm_g`、`acceleration_valid`、
+`gyro_bias_x_dps`、`gyro_bias_y_dps`、`gyro_bias_z_dps`、`stationary_confirmed`、`calibrated`、
+`valid` 和 `dt_s`。校准或采样无效期间仍发送帧，但对应状态字段为假。
 `APP_IMU_VOFA_TELEMETRY_INTERVAL_MS` 与 `APP_IMU_VOFA_TELEMETRY_TASK_STACK_DEPTH` 分别配置
 独立遥测周期和栈大小；`ImuYawEnable`、`ImuTelemetryEnable` 等既有 PowerShell 参数继续保留。
 由于该方案明确采用 yaw 开关控制 IMU 任务，关闭 `APP_IMU_YAW_ENABLE` 时不会初始化或读取 BMI160，
@@ -373,6 +387,29 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 - HC-SR04 GPIO ISR 的进入延时差、临界区/高优先级中断影响、TIMG12 回绕和实际距离误差；
 - VOFA+ 曲线数量、通道顺序、帧尾和 UART 实际接收；
 - WS2812、蜂鸣器、按键和 OLED 实物响应。
+
+### 本轮纯六轴 IMU Yaw 改造
+
+- 删除旧的 `board_imu_yaw` 编码器辅助实现和对应主机测试，新增 `algorithms/imu_fusion/`；
+  IMU 任务不再读取编码器或轮距，`app_state` 和 VOFA 现在发布完整融合诊断快照。
+- BMI160 accel/gyro ODR 与 IMU 任务周期改为 200 Hz / 5 ms；任务在每次读取开始前记录 tick，并按相邻
+  成功样本的 tick 差计算实际 `dt_s`。启动和请求重标定时约一秒估计三轴 gyro bias，四元数使用重力校正 roll/pitch；加速度不可信
+  时回退为纯 gyro 积分。六轴 IMU 仍不能提供绝对 yaw。
+- 已通过全部 `tests\*.ps1` 主机和静态测试，包括新增 `test_imu_fusion.ps1`；已通过
+  `tools\build-mspm0g3507-app.ps1` 和 `tools\build-keil-mspm0g3507-app.ps1` 软件构建。
+- 构建期间仅生成/更新被忽略的 `Debug`、`Generated` 和 Keil `Objects` 产物；本轮未执行 Flash、烧录、
+  探针连接、GDB/SWD、电机调试或任何实车验收。SysConfig 仅输出既有信息提示，无构建错误。
+
+### 本轮 HardFault 现场捕获与 Keil 系统栈修复
+
+- Keil 现场显示 `MSP=0x20205198` 位于启动文件原先仅 0x100 字节的异常系统栈，`LR=0xFFFFFFF1` 表明故障发生在
+  异常/中断上下文，`PC=0x1` 表明返回现场已经不可信；该组合优先指向异常栈余量不足或栈帧破坏，而不是 IMU
+  四元数计算本身。Keil 启动 MSP 栈已扩大到 0x400 字节，任务栈配置不变。
+- `app/app_startup.c` 新增不依赖 RTOS 的 HardFault 捕获入口，现场保存到可通过 SWD 观察的
+  `g_hardfault_snapshot`。重点字段是 `active`、`stacked_pc`、`stacked_lr`、`stacked_sp`、`exception_return`、
+  `cfsr`、`hfsr`、`dfsr`、`mmfar`、`bfar` 和 `icsr`；再次故障时应先记录这些值再复位。
+- 已通过全部 `tests\*.ps1`、TI Clang 构建和 Keil 构建。尚未执行 Flash、烧录、探针连接、GDB/SWD 或实车复验，
+  因此栈扩大后的硬件复现结果仍需在目标板上确认。
 
 ## 任务完成清单
 

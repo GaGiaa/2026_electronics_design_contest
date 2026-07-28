@@ -10,6 +10,7 @@
 #include "algorithms/motor_control/motor_control.h"
 #include "drivers/encoder/board_encoder.h"
 #include "drivers/grayscale/board_grayscale.h"
+#include "drivers/imu/board_bmi160.h"
 #include "protocols/crsf/crsf_control.h"
 #include "protocols/crsf/crsf_protocol.h"
 
@@ -79,13 +80,42 @@ extern line_tracking_state_t g_line_tracking_state;
 typedef struct {
     float yaw_deg;
     float yaw_rate_dps;
+    float roll_deg;
+    float pitch_deg;
+    float accel_norm_g;
+    float gyro_bias_x_dps;
+    float gyro_bias_y_dps;
     float gyro_bias_z_dps;
+    float dt_s;
+    bool acceleration_valid;
+    bool stationary_confirmed;
+    bool calibrated;
     bool valid;
     uint32_t sequence;
-} app_imu_yaw_snapshot_t;
+} app_imu_fusion_snapshot_t;
 
-extern volatile app_imu_yaw_snapshot_t g_imu_yaw_snapshot;
-extern volatile uint32_t g_imu_yaw_publish_sequence;
+typedef struct {
+    uint8_t chip_id;
+    bool initialized;
+    uint8_t init_status;
+    uint8_t last_read_status;
+    uint8_t error_register;
+    uint8_t pmu_status;
+    uint8_t accel_config;
+    uint8_t accel_range;
+    uint8_t gyro_config;
+    uint8_t gyro_range;
+    uint32_t init_attempts;
+    uint32_t sample_attempts;
+    uint32_t sample_successes;
+    uint32_t consecutive_failures;
+    board_bmi160_sample_t last_sample;
+    uint32_t sequence;
+} app_imu_debug_t;
+
+extern volatile app_imu_fusion_snapshot_t g_imu_fusion_snapshot;
+extern volatile uint32_t g_imu_fusion_publish_sequence;
+extern volatile app_imu_debug_t g_imu_debug;
 #endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
@@ -130,10 +160,11 @@ void app_state_hcsr04_publish(const app_hcsr04_snapshot_t *snapshot);
 void app_state_hcsr04_snapshot_copy(app_hcsr04_snapshot_t *snapshot);
 
 #if APP_IMU_YAW_ENABLE
-void app_state_imu_yaw_publish(float yaw_deg, float yaw_rate_dps,
-                               float gyro_bias_z_dps);
-void app_state_imu_yaw_invalidate(void);
-void app_state_imu_yaw_snapshot_copy(app_imu_yaw_snapshot_t *snapshot);
+void app_state_imu_fusion_publish(
+    const app_imu_fusion_snapshot_t *snapshot);
+void app_state_imu_fusion_invalidate(void);
+void app_state_imu_fusion_snapshot_copy(
+    app_imu_fusion_snapshot_t *snapshot);
 #endif
 
 #if CRSF_REMOTE_CONTROL_ENABLE
