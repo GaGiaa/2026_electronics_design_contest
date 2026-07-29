@@ -9,6 +9,16 @@
 
 最后更新：2026-07-28
 
+## H723 74HC4051 灰度传感器
+
+- 已将独立灰度采样模块接入 `stm32h723_app`：`PG3=AD0`、`PG4=AD1`、`PG5=AD2`、`PA2=OUT/ADC1_INP14`。D12、D13、A8、A9 不具备本模块所需的 ADC 外部通道。
+- H723 ADC 配置已经写入 CubeMX `.ioc`：ADC1、PA2/ADC1_INP14、12 位单次软件触发、轮询 EOC、较长采样时间；ADC1 初始化执行 offset+linearity 校准。ADC 的 `adc.h/adc.c` 必须由用户在 CubeMX 中点击 Generate Code 生成。H723 的 ADC1/ADC2 HAL 没有 `ADC_DATAALIGN_RIGHT` 宏，当前生成后的 `adc.c` 使用固定右对齐值 `0U`；CubeMX 重新生成后需保留该兼容修正。应用层使用生成的 `hadc1` 和 HAL ADC API。新增灰度 FreeRTOS 任务，默认周期 10 ms。
+- `g_h723_debug.grayscale` 提供 8 路 raw/normalized、digital、black mask、black count、line strength、line error、ADC timeout mask、sequence 和累计超时计数。默认标定数组沿用 G3507 当前白黑数组。
+- `APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE` 默认为 `0U`；启用后 UART8 输出 22 通道灰度 JustFloat，且与健康/JY901S 遥测互斥。
+- 已完成软件单元测试和 H723 IOC/Keil/debug 静态检查；尚未执行 Flash、示波器、传感器实测、VOFA 实物验证和底盘联动验收。
+
+最后更新：2026-07-29
+
 ## 使用规则
 
 任何 AI 在查看、修改、构建、调试或烧录本仓库前，必须完整阅读本文档和根目录

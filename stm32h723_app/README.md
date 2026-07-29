@@ -47,6 +47,37 @@ The default is off, so UART8 transmits nothing. Set the macro to `1U` to transmi
 
 Connect the USB-UART adapter GND to board GND and adapter RX to `PE1` (UART8 TX), respecting the board voltage level. Configure VOFA+ for JustFloat at 1,000,000 bit/s.
 
+## 74HC4051 Grayscale Sensor
+
+The independent grayscale sampler uses `PG3=AD0`, `PG4=AD1`, `PG5=AD2` and
+`PA2=OUT/ADC1_INP14`. `AD0` is address bit 0, `AD1` is bit 1 and `AD2` is
+bit 2, so channels 0..7 use address values `000`..`111`. `PA2` is sampled
+with ADC1 using software-triggered 12-bit conversions; each logical channel
+is averaged from eight conversions. ADC1 runs offset and linearity calibration
+during initialization. STM32H723 ADC1/ADC2 use fixed right alignment in this
+HAL; therefore `adc.c` keeps `hadc1.Init.DataAlign = 0U` rather than the
+unsupported `ADC_DATAALIGN_RIGHT` macro.
+
+The ADC configuration is stored in `stm32h723_app.ioc`. After changing or
+checking the pin configuration in CubeMX, click **Generate Code** so CubeMX
+creates `Core/Inc/adc.h`, `Core/Src/adc.c`, updates `main.c`, enables the ADC
+HAL module and registers the ADC sources in the Keil project. These generated
+files are intentionally not maintained by hand in this repository; the
+calibration call is in CubeMX's retained `USER CODE` block.
+
+The grayscale task runs every 10 ms and publishes raw values, normalized
+values, hysteresis digital state, black mask, line strength, line error and
+ADC timeout diagnostics in `g_h723_debug.grayscale`. Default white/black
+calibration values are migrated from the G3507 application. Grayscale VOFA
+telemetry is disabled by default; enabling
+`APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE` emits the same 22-channel JustFloat
+layout used by the G3507 application and is mutually exclusive with the
+other UART8 telemetry modes.
+
+The software implementation does not perform Flash programming or hardware
+acceptance. Verify the `000`..`111` address sequence, sensor response,
+voltage range, calibration and VOFA output with the target board.
+
 ## SWD 调试快照
 
 Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。它按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]` 与 `jy901s` 分组；例如 `g_h723_debug.crsf.channels_raw[0]`、`g_h723_debug.chassis.left_target_rpm`、`g_h723_debug.m2006[0].feedback_speed_rpm`、`g_h723_debug.jy901s.angle_deg[2]`。`m2006` 的索引 `0/1/2` 固定对应 CAN ID `1/2/3`，当前仅更新前两项，第三项为上层平衡机构预留。快照包含 16 个 CRSF 原始通道、遥控和 CAN 诊断、左右目标 RPM、两台 M2006 的反馈/PID/电流命令，以及 JY901S 原始与换算数据。不要从调试器写入；由于任务和中断可独立更新字段，跨字段组合不保证为同一时刻的原子快照。
