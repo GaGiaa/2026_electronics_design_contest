@@ -52,7 +52,14 @@ $requiredLines = @(
     'VP_FREERTOS_VS_CMSIS_V2.Mode=CMSIS_V2',
     'CORTEX_M7.CPU_DCache=Disabled',
     'PA13(JTMS/SWDIO).Mode=Serial_Wire',
-    'PA14(JTCK/SWCLK).Mode=Serial_Wire'
+    'PA14(JTCK/SWCLK).Mode=Serial_Wire',
+    'ADC1.ClockPrescaler=ADC_CLOCK_ASYNC_DIV2',
+    'ADC1.SamplingTime-0\#ChannelRegularConversion=ADC_SAMPLETIME_64CYCLES_5',
+    'RCC.ADCClockSelection=RCC_ADCCLKSOURCE_CLKP',
+    'RCC.ADCFreq_Value=64000000',
+    'PG3.Signal=GPIO_Output',
+    'PG4.Signal=GPIO_Output',
+    'PG5.Signal=GPIO_Output'
 )
 
 foreach ($line in $requiredLines) {
@@ -85,6 +92,30 @@ if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
 }
 if ($appConfig -notmatch '#define\s+APP_H723_M2006_FDCAN_INSTANCE\s+2U') {
     throw 'M2006 must default to FDCAN2.'
+}
+
+if ($ioc -notmatch '(?m)^Mcu\.IP\d+=ADC1\r?$') {
+    throw 'ADC1 must be enabled as a CubeMX peripheral.'
+}
+if ($ioc -notmatch '(?m)^PA2\.Signal=ADC(?:1|x)_INP14\r?$') {
+    throw 'PA2 must be configured as ADC input channel 14.'
+}
+foreach ($line in @(
+    '#define APP_GRAYSCALE_TASK_PERIOD_MS 10U',
+    '#define APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE 0U',
+    '#define APP_GRAYSCALE_VOFA_TELEMETRY_INTERVAL_MS 100U'
+)) {
+    if ($appConfig -notmatch [regex]::Escape($line)) {
+        throw "Missing grayscale configuration: $line"
+    }
+}
+
+$adcSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\Core\Src\adc.c') -Raw
+if ($adcSource -notmatch 'HAL_ADCEx_Calibration_Start\(\&hadc1,\s*ADC_CALIB_OFFSET_LINEARITY,\s*ADC_SINGLE_ENDED\)') {
+    throw 'ADC1 must perform offset and linearity calibration during initialization.'
+}
+if ($adcSource -match 'ADC_DATAALIGN_RIGHT') {
+    throw 'H723 ADC1/ADC2 HAL does not define ADC_DATAALIGN_RIGHT; generated adc.c must use fixed right alignment.'
 }
 if ($appConfig -notmatch '#if\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+<\s+1U\)\s+\|\|\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+>\s+3U\)') {
     throw 'M2006 FDCAN selection must reject instances outside 1U..3U.'

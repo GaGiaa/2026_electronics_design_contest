@@ -94,6 +94,19 @@ typedef struct {
 } h723_debug_jy901s_t;
 
 typedef struct {
+    uint16_t raw[8];
+    uint16_t normalized[8];
+    uint8_t digital;
+    uint8_t black_mask;
+    uint8_t adc_timeout_mask;
+    uint8_t black_count;
+    uint32_t line_strength;
+    int32_t line_error;
+    uint32_t sequence;
+    uint32_t adc_timeout_count;
+} h723_debug_grayscale_t;
+
+typedef struct {
     h723_debug_system_t system;
     h723_debug_uart8_t uart8;
     h723_debug_crsf_t crsf;
@@ -102,6 +115,7 @@ typedef struct {
     /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */
     h723_m2006_debug_t m2006[3];
     h723_debug_jy901s_t jy901s;
+    h723_debug_grayscale_t grayscale;
 } h723_debug_t;
 
 extern volatile h723_debug_t g_h723_debug;

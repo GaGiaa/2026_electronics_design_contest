@@ -57,6 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define GRAY_AD0_Pin GPIO_PIN_3
+#define GRAY_AD0_GPIO_Port GPIOG
+#define GRAY_AD1_Pin GPIO_PIN_4
+#define GRAY_AD1_GPIO_Port GPIOG
+#define GRAY_AD2_Pin GPIO_PIN_5
+#define GRAY_AD2_GPIO_Port GPIOG
 
 /* USER CODE BEGIN Private defines */
 

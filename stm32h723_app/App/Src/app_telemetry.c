@@ -9,6 +9,7 @@
 #define H723_VOFA_HEALTH_CHANNEL_COUNT 6U
 #define H723_VOFA_HEALTH_MAGIC 723.0f
 #define H723_VOFA_JY901S_CHANNEL_COUNT 10U
+#define H723_VOFA_GRAYSCALE_CHANNEL_COUNT 22U
 
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
 static uint8_t s_health_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_HEALTH_CHANNEL_COUNT)];
@@ -20,16 +21,25 @@ static uint8_t s_jy901s_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_JY901S_CHANNEL
 static uint32_t s_last_jy901s_telemetry_ms;
 #endif
 
+#if (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE == 1U)
+static uint8_t s_grayscale_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_GRAYSCALE_CHANNEL_COUNT)];
+static uint32_t s_last_grayscale_telemetry_ms;
+#endif
+
 void h723_app_telemetry_init(void)
 {
     g_h723_debug.system.boot_count++;
-    g_h723_debug.uart8.telemetry_enabled = APP_VOFA_HEALTH_TELEMETRY_ENABLE | APP_JY901S_VOFA_TELEMETRY_ENABLE;
+    g_h723_debug.uart8.telemetry_enabled = APP_VOFA_HEALTH_TELEMETRY_ENABLE |
+        APP_JY901S_VOFA_TELEMETRY_ENABLE | APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE;
     g_h723_debug.uart8.last_hal_status = HAL_OK;
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
     s_last_telemetry_ms = h723_app_time_now_ms();
 #endif
 #if (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_jy901s_telemetry_ms = h723_app_time_now_ms();
+#endif
+#if (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE == 1U)
+    s_last_grayscale_telemetry_ms = h723_app_time_now_ms();
 #endif
 }
 
@@ -96,6 +106,42 @@ void h723_app_telemetry_step(void)
         (void)vofa_justfloat_encode(s_jy901s_frame, sizeof(s_jy901s_frame), channels,
                                     H723_VOFA_JY901S_CHANNEL_COUNT);
         status = HAL_UART_Transmit_DMA(&huart8, s_jy901s_frame, sizeof(s_jy901s_frame));
+        g_h723_debug.uart8.last_hal_status = (uint32_t)status;
+        if (status == HAL_OK) {
+            g_h723_debug.uart8.tx_in_flight = 1U;
+            g_h723_debug.uart8.tx_start_count++;
+        } else {
+            g_h723_debug.uart8.tx_drop_count++;
+        }
+    }
+#endif
+
+#if (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE == 1U)
+    if ((now_ms - s_last_grayscale_telemetry_ms) >= APP_GRAYSCALE_VOFA_TELEMETRY_INTERVAL_MS) {
+        float channels[H723_VOFA_GRAYSCALE_CHANNEL_COUNT];
+        uint32_t channel;
+        HAL_StatusTypeDef status;
+
+        s_last_grayscale_telemetry_ms = now_ms;
+        if (g_h723_debug.uart8.tx_in_flight != 0U) {
+            g_h723_debug.uart8.tx_drop_count++;
+            return;
+        }
+        for (channel = 0U; channel < 8U; ++channel) {
+            channels[channel] = (float)g_h723_debug.grayscale.raw[channel];
+            channels[8U + channel] =
+                (float)g_h723_debug.grayscale.normalized[channel];
+        }
+        channels[16U] = (float)g_h723_debug.grayscale.digital;
+        channels[17U] = (float)g_h723_debug.grayscale.black_mask;
+        channels[18U] = (float)g_h723_debug.grayscale.black_count;
+        channels[19U] = (float)g_h723_debug.grayscale.line_error;
+        channels[20U] = (float)g_h723_debug.grayscale.line_strength;
+        channels[21U] = (float)g_h723_debug.grayscale.sequence;
+        (void)vofa_justfloat_encode(s_grayscale_frame, sizeof(s_grayscale_frame),
+                                    channels, H723_VOFA_GRAYSCALE_CHANNEL_COUNT);
+        status = HAL_UART_Transmit_DMA(&huart8, s_grayscale_frame,
+                                       sizeof(s_grayscale_frame));
         g_h723_debug.uart8.last_hal_status = (uint32_t)status;
         if (status == HAL_OK) {
             g_h723_debug.uart8.tx_in_flight = 1U;
