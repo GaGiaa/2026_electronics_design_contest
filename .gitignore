@@ -3,6 +3,14 @@
 /mspm0g3507_bringup/Debug/
 /mspm0g3507_freertos/Debug/
 /mspm0g3507_app/Debug/
+/stm32h723_app/MDK-ARM/stm32h723_app/
+/stm32h723_app/MDK-ARM/*.lst
+/stm32h723_app/MDK-ARM/*.uvoptx
+/stm32h723_app/MDK-ARM/*.uvguix*
+/stm32h723_app/MDK-ARM/Objects/
+/stm32h723_app/MDK-ARM/Listings/
+/stm32h723_app/Middlewares/ST/ARM/DSP/
+/stm32h723_app/Middlewares/Third_Party/ARM/DSP/
 
 # Keil MDK build output
 /keil/mspm0g3507_app/Generated/

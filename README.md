@@ -13,6 +13,7 @@
 | `mspm0g3507_freertos/` | 独立的 G3507 FreeRTOS 静态分配基线 | [`README.md`](mspm0g3507_freertos/README.md) |
 | `mspm0g3507_app/` | 分层的 G3507 电机、传感器、协议和应用组合工程 | [`README.md`](mspm0g3507_app/README.md) |
 | `keil/mspm0g3507_app/` | G3507 应用的 Keil MDK 构建和调试工程 | [`README.md`](keil/mspm0g3507_app/README.md) |
+| `stm32h723_app/` | STM32H723ZGT6 的 CubeMX、FreeRTOS、UART8 VOFA 健康遥测和 FDCAN 基础工程 | [`README.md`](stm32h723_app/README.md) |
 
 ## 文档地图
 

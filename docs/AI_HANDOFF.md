@@ -445,6 +445,17 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 - 本轮未执行 Flash 擦除、烧录、探针枚举、GDB/SWD 连接、电机调试、示波器/逻辑分析仪测量或任何实物验收。
   纯六轴 yaw 的长期漂移、左右转方向与急转弯响应，以及四轮方向标定和后左轮 PID 的实车表现仍需在安全条件下复核。
 
+## STM32H723 应用基础工程
+
+最后更新：2026-07-29
+
+- 新增独立目录 `stm32h723_app/`。其 `stm32h723_app.ioc` 从 `D:\desktop\2026RC\Control\single_motor_test\single_motor_test.ioc` 复制后，在 STM32CubeMX 6.15.0 图形界面中裁剪并生成 `MDK-ARM` 工程。配置为 `STM32H723ZGT6`、HSE 25 MHz、550 MHz、SWD、D-Cache 关闭、FreeRTOS CMSIS-RTOS v2、UART8 `PE0/PE1` 和 UART8 TX DMA。
+- FDCAN1、FDCAN2、FDCAN3 的 1 Mbit/s 时序和消息 RAM 分区保留。当前仅执行 CubeMX 初始化，不调用 `HAL_FDCAN_Start`、不发送 CAN 帧，也不包含 M2006、PID、PWM 或平衡控制。
+- `App/` 提供默认关闭的 `APP_VOFA_HEALTH_TELEMETRY_ENABLE=0U`。打开后，UART8 以 1 Mbit/s 的 VOFA+ JustFloat 协议发送六通道健康帧。`volatile g_h723_debug` 面向 Keil SWD Watch 提供只读调试快照。
+- 已执行 `tests\test_stm32h723_vofa_justfloat.ps1`、`tests\test_stm32h723_ioc.ps1` 和 `tests\test_stm32h723_keil_project.ps1`，均通过；`Core/` 与 `App/` 中没有 `HAL_FDCAN_Start` 或 CAN 发送调用。
+- 已使用 `D:\Keil_v5\UV4\UV4.exe -r .\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx -j0` 完成纯软件重建，生成 `MDK-ARM\stm32h723_app\stm32h723_app.axf`。构建日志为 `0 Error(s), 5 Warning(s)`；实际使用 Arm Compiler 6.24。若后续 Keil 再次错误地切换至 Arm Compiler 5，应先检查项目的 Arm Compiler 6 目标选择，而不要手工替换 CubeMX 生成的 FreeRTOS port。
+- 未执行 Flash 擦除或烧录、探针连接、GDB/SWD 会话、UART/VOFA 实物收发、CAN 总线测试、电机测试或硬件验收。后续接入 M2006 前必须在安全条件下验证 FDCAN 引脚、时序、收发器和实际总线。
+
 ## 任务完成清单
 
 每个开发任务结束时，必须：

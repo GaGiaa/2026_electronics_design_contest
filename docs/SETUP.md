@@ -97,6 +97,18 @@ FreeRTOS、CMSIS 和 TI Arm Clang Cortex-M0+ 参数，默认 IntelliSense 目标
 把 `__MSPM0L1306__` 和 `__MSPM0G3507__` 同时加入同一个配置；应切换到对应工程的独立
 VS Code 配置。
 
+## STM32H723 CubeMX 和 Keil
+
+安装 STM32CubeMX 6.15.0、STM32Cube FW_H7 V1.12.1 和 H7 对应的 Keil CMSIS-Pack 后，打开 `stm32h723_app/stm32h723_app.ioc`。工程目标已配置为 `MDK-ARM`；在 CubeMX 内修改后，生成目录必须保持为 `stm32h723_app/`。
+
+从仓库根目录执行以下命令进行纯构建验证：
+
+```powershell
+& 'D:\Keil_v5\UV4\UV4.exe' -b '.\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx' -j0
+```
+
+此命令仅编译，不会烧录 Flash、连接调试器或启动 SWD/GDB 会话。UART8 健康遥测和 FDCAN 的使用边界见 `stm32h723_app/README.md`。
+
 ## 文档维护
 
 开发完成后必须先更新 `docs/AI_HANDOFF.md`。工具版本或环境变量变化时更新

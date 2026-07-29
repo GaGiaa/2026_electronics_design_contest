@@ -157,6 +157,18 @@ L1306 的设备包、启动文件、linker、SysConfig 或引脚配置。
 | Arm Compiler | 6.24 |
 | pyOCD | `>=0.45,<0.46` |
 
+## 10. STM32H723 应用基础工程
+
+`stm32h723_app/` 使用以下本地工具链。`.ioc` 和 CubeMX 生成的源码纳入仓库；Keil 构建产物不纳入仓库。
+
+| 依赖 | 版本或用途 |
+| --- | --- |
+| STM32CubeMX | 6.15.0；图形化外设配置和代码生成 |
+| STM32Cube FW_H7 | V1.12.1；STM32H723 HAL、CMSIS 和 FreeRTOS middleware |
+| Keil MDK-ARM | 本机 `D:\Keil_v5\UV4\UV4.exe`；构建 `stm32h723_app/MDK-ARM/stm32h723_app.uvprojx` |
+
+应安装生成 Keil 工程所需的 STM32H7 CMSIS-Pack。只允许从 `stm32h723_app/stm32h723_app.ioc` 重新生成 H7 外设代码；不得把 H7 的 HAL、启动文件、linker 或 FreeRTOS 文件混入 MSPM0 工程。
+
 版本不一致时，首先检查 CCS Build Console 或构建脚本实际解析出的路径，尤其关注
 SDK、SysConfig 和 TI Arm Clang 的版本号。构建输出出现旧 SDK 路径时，应重新配置
 环境变量或在全新的 CCS workspace 中重新导入工程。
