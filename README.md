@@ -1,6 +1,6 @@
 # 2026 电子设计竞赛工程
 
-H723 差速底盘工程现已包含 JY901S UART9 IMU 基础接入：`PG0/PG1`、234000 bit/s、200 Hz 接收、Keil Watch 调试快照和可选 UART8 十通道 VOFA。接线、数据单位与宏开关见 [`docs/STM32H723_JY901S.md`](docs/STM32H723_JY901S.md)。
+H723 差速底盘工程现已包含 JY901S UART9 IMU 基础接入：`PG0/PG1`、234000 bit/s、200 Hz 接收、Keil Watch 调试快照和可选 UART8 十通道 VOFA；同时提供默认关闭的单个 M2006 速度环 PID 调试模式，可通过 Watch 修改目标速度和 PID 参数并以 1 ms 频率输出 8 通道 VOFA。接线、数据单位与宏开关见 [`stm32h723_app/README.md`](stm32h723_app/README.md) 和 [`docs/STM32H723_JY901S.md`](docs/STM32H723_JY901S.md)。
 
 本仓库包含 MSPM0L1306、MSPM0G3507 的 bring-up 工程、FreeRTOS 基线工程、G3507
 应用工程和 Keil MDK 工程。根目录 README 只负责项目导航和 AI 接手流程；工程细节、

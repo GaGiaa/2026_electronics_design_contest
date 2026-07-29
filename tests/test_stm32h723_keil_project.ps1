@@ -33,6 +33,7 @@ foreach ($line in @(
     '<FilePath>../App/Src/app_m2006.c</FilePath>',
     '<FilePath>../App/Src/app_chassis.c</FilePath>',
     '<FilePath>../App/Src/app_chassis_service.c</FilePath>',
+    '<FilePath>../App/Src/app_single_motor.c</FilePath>',
     '<FilePath>../../shared/pid/pid.c</FilePath>',
     '../../shared/pid'
 )) {

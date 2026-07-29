@@ -93,7 +93,6 @@ if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
 if ($appConfig -notmatch '#define\s+APP_H723_M2006_FDCAN_INSTANCE\s+2U') {
     throw 'M2006 must default to FDCAN2.'
 }
-
 if ($ioc -notmatch '(?m)^Mcu\.IP\d+=ADC1\r?$') {
     throw 'ADC1 must be enabled as a CubeMX peripheral.'
 }
@@ -117,6 +116,29 @@ if ($adcSource -notmatch 'HAL_ADCEx_Calibration_Start\(\&hadc1,\s*ADC_CALIB_OFFS
 if ($adcSource -match 'ADC_DATAALIGN_RIGHT') {
     throw 'H723 ADC1/ADC2 HAL does not define ADC_DATAALIGN_RIGHT; generated adc.c must use fixed right alignment.'
 }
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE\s+0U') {
+    throw 'Single-motor PID debug must default to disabled.'
+}
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE\s+0U') {
+    throw 'Single-motor VOFA telemetry must default to disabled.'
+}
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS\s+1U') {
+    throw 'Single-motor VOFA telemetry interval must default to 1 ms.'
+}
+foreach ($line in @(
+    '#define APP_H723_CHASSIS_MAX_OUTPUT_RPM 550.0f',
+    '#define APP_H723_M2006_PID_KP 0.25f',
+    '#define APP_H723_M2006_PID_KI 5.0f',
+    '#define APP_H723_M2006_PID_KD 0.0f',
+    '#define APP_H723_M2006_PID_INTEGRAL_LIMIT 100000.0f',
+    '#define APP_H723_M2006_PID_OUTPUT_DELTA_LIMIT 0.0f',
+    '#define APP_H723_M2006_PID_DEADBAND_RPM 0.0f',
+    '#define APP_H723_M2006_PID_INTEGRAL_SEPARATION_RPM 0.0f'
+)) {
+    if ($appConfig -notmatch [regex]::Escape($line)) {
+        throw "Missing chassis PID tuning default: $line"
+    }
+}
 if ($appConfig -notmatch '#if\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+<\s+1U\)\s+\|\|\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+>\s+3U\)') {
     throw 'M2006 FDCAN selection must reject instances outside 1U..3U.'
 }
@@ -131,6 +153,9 @@ foreach ($line in @('return &hfdcan3;', 'void h723_chassis_on_fdcan3_rx(void)'))
     if ($chassisSource -notmatch [regex]::Escape($line)) {
         throw "Chassis service must support FDCAN3: $line"
     }
+}
+if ($chassisSource -notmatch 'header.Identifier\s*<=\s*0x203U') {
+    throw 'Single-motor debug must accept M2006 feedback ID 0x203.'
 }
 
 if ($fdcanSource -notmatch 'hfdcan->Instance == FDCAN3' -or

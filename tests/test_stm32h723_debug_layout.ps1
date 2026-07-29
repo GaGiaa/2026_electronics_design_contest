@@ -21,7 +21,8 @@ foreach ($member in @(
     'h723_debug_system_t system;', 'h723_debug_uart8_t uart8;',
     'h723_debug_crsf_t crsf;', 'h723_debug_chassis_t chassis;',
     'h723_debug_fdcan_t fdcan;', 'h723_m2006_debug_t m2006[3];',
-    'h723_debug_jy901s_t jy901s;', 'h723_debug_grayscale_t grayscale;'
+    'h723_debug_jy901s_t jy901s;', 'h723_debug_grayscale_t grayscale;',
+    'h723_debug_single_motor_t single_motor;'
 )) {
     if ($header -notmatch [regex]::Escape($member)) { throw "Missing grouped debug member: $member" }
 }
@@ -30,9 +31,11 @@ $sourceFiles = Get-ChildItem (Join-Path $ProjectRoot 'stm32h723_app\App\Src') -F
 $source = ($sourceFiles | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
 foreach ($path in @(
     'g_h723_debug.system.uptime_ms', 'g_h723_debug.uart8.tx_start_count',
-    'g_h723_debug.crsf.channels_raw', 'g_h723_debug.chassis.left_target_rpm',
-    'g_h723_debug.fdcan.rx_count', 'g_h723_debug.jy901s.angle_deg'
-    , 'g_h723_debug.grayscale.raw', 'g_h723_debug.grayscale.line_error'
+    'g_h723_debug.crsf.channels_raw', 'g_h723_debug.chassis.left_target_output_speed_rpm',
+    'g_h723_debug.fdcan.rx_count', 'g_h723_debug.jy901s.angle_deg',
+    'g_h723_debug.grayscale.raw', 'g_h723_debug.grayscale.line_error',
+    'g_h723_debug.single_motor.target_output_speed_rpm',
+    'g_h723_debug.single_motor.max_target_output_speed_rpm'
 )) {
     if ($source -notmatch [regex]::Escape($path)) { throw "Missing grouped debug access: $path" }
 }
