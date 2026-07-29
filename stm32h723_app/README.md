@@ -19,7 +19,7 @@ CRSF 始终解析 16 个 11-bit 通道，CH3（数组索引 2）为前进/后退
 
 `App/Inc/app_config.h` 中的 `APP_H723_CHASSIS_ACTUATION_ENABLE` 默认是 `0U`。该状态下 CRSF、混控、PID 和 Watch 调试量仍会更新，但选中的 FDCAN 总线的 `0x200` 只允许发送四个零电流槽位。只有显式改为 `1U` 才会发送非零电流，首次实车前必须将车架悬空，核对 CAN 收发器、反馈 ID、左右方向宏和 PID 参数。无反馈排查时，在 Keil Watch 观察 `g_h723_debug.fdcan.instance`、`g_h723_debug.fdcan.rx_count`、`g_h723_debug.fdcan.last_status`、`g_h723_debug.fdcan.protocol_last_error`、`g_h723_debug.fdcan.protocol_bus_off`、`g_h723_debug.fdcan.tx_error_counter` 与 `g_h723_debug.fdcan.rx_error_counter`。
 
-PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，控制量统一为 M2006 减速箱输出轴 RPM，输出统一为安培。M2006 减速比为 `36:1`，C610 电流换算为 `16384 raw = 10 A`；底盘默认目标速度上限为 `550 output RPM`，电流输出上限为 `10 A`。当前底盘与单电机调试默认参数为 `kp=0.25 A/RPM`、`ki=5 A/(RPM*s)`、`kd=0`、积分限幅 `100000 A`、每周期输出变化限幅 `0 A`、死区 `0 RPM`、积分分离阈值 `0 RPM`，这些值来自当前速度环调试配置，仍需悬空实车验证。
+PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，控制量统一为 M2006 减速箱输出轴 RPM，输出统一为安培。M2006 减速比为 `36:1`，C610 电流换算为 `16384 raw = 10 A`；底盘默认目标速度上限为 `550 output RPM`，电流输出上限为 `10 A`。当前底盘与单电机调试默认速度环参数为 `kp=0.25 A/RPM`、`ki=5 A/(RPM*s)`、`kd=0`、积分限幅 `100000 A`、每周期输出变化限幅 `0 A`、死区 `0.1 RPM`、积分分离阈值 `0 RPM`，这些值来自当前速度环调试配置，仍需悬空实车验证。
 
 ## 单电机速度/位置环 PID 调试
 
@@ -27,7 +27,7 @@ PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，控制量统一为 M20
 
 `control_mode=0U` 为速度模式：`target_output_speed_rpm` 与现有增量速度 PID 每 1 ms 生效。`control_mode=1U` 为串级位置模式：`target_position_deg` 是相对于使能后首帧有效反馈的输出轴连续角度，外环位置式 PID 每 `APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS`（默认 5 ms）输出目标输出轴 RPM，内环仍以 1 ms 速度 PID 输出电流。M2006 的单圈编码器按 8192 counts/电机转展开为多圈位置，并按减速比 `36:1` 换算为输出轴 `deg`；位置跟踪的反馈间隔超过 `APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS`（默认 1 ms）或反馈超时后，均重新建立跟踪基准。
 
-Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadband`、`integral_output_limit`、`integral_separation_threshold`、`derivative_filter_N`、`output_delta_limit`，以及位置 PID 的 `position_kp`、`position_ki`、`position_kd`、`position_output_limit_rpm`、`position_deadband_deg`。位置 PID 默认增益均为 `0`，输出限幅默认 `550 RPM`。`max_target_output_speed_rpm` 是两种模式的硬性输出轴速度上限；位置目标只要求为有限浮点值，不设置角度上限。位置反馈、原点状态、外环目标 RPM、P/I/D 分量和 5 ms 周期计数均位于 `g_h723_debug.single_motor`。
+Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadband`、`integral_output_limit`、`integral_separation_threshold`、`derivative_filter_N`、`output_delta_limit`，以及位置 PID 的 `position_kp`、`position_ki`、`position_kd`、`position_output_limit_rpm`、`position_deadband_deg`。位置 PID 默认参数为 `Kp=2`、`Ki=0`、`Kd=0`、输出限幅 `550 RPM`、死区 `0 deg`。`max_target_output_speed_rpm` 是两种模式的硬性输出轴速度上限；位置目标只要求为有限浮点值，不设置角度上限。位置反馈、原点状态、外环目标 RPM、P/I/D 分量和 5 ms 周期计数均位于 `g_h723_debug.single_motor`。
 
 实际非零电流必须同时满足编译宏开启、`enable=1`、选中电机反馈年龄小于 50 ms、速度/位置目标及参数有效，且位置模式已建立相对零点。ID、`enable` 或 `control_mode` 切换时当前周期强制清零并复位两级 PID；位置模式随后先建立零点，再在下一次 5 ms 外环周期开始控制。单电机模式不依赖 `APP_H723_CHASSIS_ACTUATION_ENABLE`；首次调试必须车架悬空。
 

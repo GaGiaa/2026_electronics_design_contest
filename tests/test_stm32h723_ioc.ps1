@@ -127,7 +127,7 @@ if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVA
 }
 foreach ($line in @(
     '#define APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS 5U',
-    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KP 0.0f',
+    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KP 2.0f',
     '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KI 0.0f',
     '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KD 0.0f',
     '#define APP_H723_SINGLE_MOTOR_POSITION_PID_OUTPUT_LIMIT_RPM APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM',
@@ -145,7 +145,7 @@ foreach ($line in @(
     '#define APP_H723_M2006_PID_KD 0.0f',
     '#define APP_H723_M2006_PID_INTEGRAL_LIMIT 100000.0f',
     '#define APP_H723_M2006_PID_OUTPUT_DELTA_LIMIT 0.0f',
-    '#define APP_H723_M2006_PID_DEADBAND_RPM 0.0f',
+    '#define APP_H723_M2006_PID_DEADBAND_RPM 0.1f',
     '#define APP_H723_M2006_PID_INTEGRAL_SEPARATION_RPM 0.0f'
 )) {
     if ($appConfig -notmatch [regex]::Escape($line)) {

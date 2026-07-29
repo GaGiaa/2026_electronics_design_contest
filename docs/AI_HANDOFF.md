@@ -491,7 +491,7 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 - `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 默认 `0U`。开启后 `control_mode=0U` 保持现有 1 ms 输出轴 RPM 速度环；`control_mode=1U` 启用 5 ms 基础位置式 PID 外环，其输出受 `max_target_output_speed_rpm` 和 `position_output_limit_rpm` 双重限幅后送入同一速度内环。位置目标与反馈单位均为减速后输出轴连续 `deg`。
 - `app_m2006` 新增 8192 counts/转多圈展开器，FDCAN 反馈连续时累计位置；位置跟踪反馈间隔超过 `APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS`（默认 1 ms）或超过 50 ms 反馈超时后，会重置跟踪器并使位置零点失效，避免高速丢帧时的错误展开。位置模式在 ID、enable 或模式变更后先发送零电流并复位两级 PID，收到新的有效反馈后把当前位置设为相对零点，再等待下一个 5 ms 周期控制。未使能、反馈超时、无效参数/目标、无效模式、未建立零点或位置 PID 状态非有限时三个 `0x200` 电流槽位均为零。
-- Watch 的位置输入为 `target_position_deg` 和 `position_kp/ki/kd/output_limit_rpm/deadband_deg`；默认增益均为 `0`，输出限幅默认 `550 RPM`。`feedback_position_deg`、`position_reference_valid`、外环速度目标、P/I/D、总输出和 `position_cycle_count` 用于观察。速度环参数及电流字段保留原有含义。
+- Watch 的位置输入为 `target_position_deg` 和 `position_kp/ki/kd/output_limit_rpm/deadband_deg`；默认参数为 `Kp=2`、`Ki=0`、`Kd=0`、输出限幅 `550 RPM`、死区 `0 deg`。`feedback_position_deg`、`position_reference_valid`、外环速度目标、P/I/D、总输出和 `position_cycle_count` 用于观察。速度环参数及电流字段保留原有含义，当前默认死区为 `0.1 RPM`。
 - `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 默认 `0U`，默认发送周期为 1 ms。速度模式继续发送原有 8 通道；位置模式发送 9 通道：目标/反馈位置、位置 P/I/D、外环速度目标、内环速度反馈、目标电流和反馈电流。DMA 忙时丢帧，且与其他 UART8 遥测编译期互斥。
 
 - 已通过 M2006 多圈跟踪/位置换算、单电机串级调度、VOFA、debug/IOC/Keil 静态检查，以及默认与启用单电机调试宏的 Keil 纯构建。未执行 Flash、烧录、SWD、CAN 总线、电机或 VOFA+ 实物验收。实物调参前必须车架悬空，确认实际 FDCAN 实例、ID、反馈方向、编码器连续性与低增益响应。
