@@ -5,7 +5,7 @@
 
 #include "app_crsf.h"
 
-/* Keil Watch-only snapshot. Application control must not read these fields. */
+/* Keil Watch snapshot; single_motor input fields are the explicit debug control interface. */
 typedef struct {
     uint32_t boot_count;
     uint32_t uptime_ms;
@@ -64,12 +64,46 @@ typedef struct {
     uint8_t temperature_celsius;
     uint32_t feedback_age_ms;
     float target_speed_rpm;
+    float pid_raw_output;
     float pid_p_out;
     float pid_i_out;
     float pid_d_out;
     float pid_output;
     int16_t commanded_current;
 } h723_m2006_debug_t;
+
+typedef struct {
+    /* Watch inputs. Set enable to 1 only with the chassis lifted safely. */
+    uint32_t enable;
+    uint32_t selected_id;
+    uint32_t default_id;
+    float target_speed_rpm;
+    float kp;
+    float ki;
+    float kd;
+    float output_limit;
+    float deadband;
+    float integral_output_limit;
+    float integral_separation_threshold;
+    float derivative_filter_N;
+    float output_delta_limit;
+    /* Program outputs and selected-motor feedback. */
+    uint32_t active;
+    uint32_t reset_pid;
+    uint32_t safety_reason;
+    uint32_t cycle_count;
+    uint16_t feedback_encoder;
+    int16_t feedback_speed_rpm;
+    int16_t feedback_current;
+    uint8_t feedback_temperature_celsius;
+    uint32_t feedback_age_ms;
+    int16_t target_current;
+    float pid_raw_output;
+    float pid_p_out;
+    float pid_i_out;
+    float pid_d_out;
+    float pid_output;
+} h723_debug_single_motor_t;
 
 typedef struct {
     int16_t acceleration_raw[3];
@@ -101,6 +135,7 @@ typedef struct {
     h723_debug_fdcan_t fdcan;
     /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */
     h723_m2006_debug_t m2006[3];
+    h723_debug_single_motor_t single_motor;
     h723_debug_jy901s_t jy901s;
 } h723_debug_t;
 

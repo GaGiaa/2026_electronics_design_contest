@@ -48,6 +48,7 @@ typedef struct {
     float p_out;
     float i_out;
     float d_out;
+    float raw_output;
     float output;
     bool has_feedback_history;
     bool integral_saturated;

@@ -87,7 +87,7 @@ Assert-Condition ($handoffText -match 'app_state_buttons_publish') 'AI_HANDOFF i
 Assert-Condition ($handoffText -notmatch 'APP_BUTTON_FEATURE_ENABLE|key,pa7=down|key,pa7=up') 'Documentation contains the removed button text telemetry design.'
 
 foreach ($relativePath in $markdownFiles) {
-    Assert-Condition ($texts[$relativePath] -notmatch 'motor_pid') "文档包含失效 motor_pid 路径：$relativePath"
+    Assert-Condition ($texts[$relativePath] -notmatch 'motor_pid[/\\]|motor_pid\.h') "文档包含失效 motor_pid 路径：$relativePath"
 }
 
 $freertosText = $texts['mspm0g3507_freertos/README.md']

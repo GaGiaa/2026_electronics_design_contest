@@ -8,7 +8,7 @@
 - HSE 25 MHz，系统时钟 550 MHz；SWD 使用 `PA13/PA14`；M7 D-Cache 关闭，避免 DMA 缓冲区一致性问题。
 - UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
 - UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
-- M2006 总线使用 1 Mbit/s，接收 ID `0x201/0x202`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。若实物接线位于 FDCAN1，则将该宏改为 `1U`，重新编译即可切换。
+- M2006 总线使用 1 Mbit/s，接收 ID `0x201..0x203`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。若实物接线位于 FDCAN1，则将该宏改为 `1U`，重新编译即可切换。
 - FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
 两台 M2006 实物位于 FDCAN1：左轮 ID 1、方向 `+1`；右轮 ID 2、方向 `-1`。ID 3 的上层平衡机构不属于本轮实现。
@@ -20,6 +20,27 @@ CRSF 始终解析 16 个 11-bit 通道，CH3（数组索引 2）为前进/后退
 `App/Inc/app_config.h` 中的 `APP_H723_CHASSIS_ACTUATION_ENABLE` 默认是 `0U`。该状态下 CRSF、混控、PID 和 Watch 调试量仍会更新，但选中的 FDCAN 总线的 `0x200` 只允许发送四个零电流槽位。只有显式改为 `1U` 才会发送非零电流，首次实车前必须将车架悬空，核对 CAN 收发器、反馈 ID、左右方向宏和 PID 参数。无反馈排查时，在 Keil Watch 观察 `g_h723_debug.fdcan.instance`、`g_h723_debug.fdcan.rx_count`、`g_h723_debug.fdcan.last_status`、`g_h723_debug.fdcan.protocol_last_error`、`g_h723_debug.fdcan.protocol_bus_off`、`g_h723_debug.fdcan.tx_error_counter` 与 `g_h723_debug.fdcan.rx_error_counter`。
 
 PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，初始参数为 1 ms、`kp=1.0`、`ki=10.0`、`kd=0`、输出限幅 3000、积分限幅 1500、每周期输出变化限幅 250。这些值只是安全起点，尚未进行硬件整定。
+
+## 单电机速度环 PID 调试
+
+单电机调试由 `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 控制，默认 `0U`。设为 `1U` 后，单电机模式在现有 `chassisTask` 的 1 ms 节拍内完全接管 `0x200` 组控帧，CRSF 不再产生底盘差速目标；非选中电机的电流槽位始终为零。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 提供默认 ID（`1U..3U`），Keil Watch 中的 `g_h723_debug.single_motor.selected_id` 可以运行时覆盖它。ID 切换或 `enable` 状态切换时当前周期强制清零并复位 PID，下一周期才重新计算。
+
+实际非零电流必须同时满足编译宏开启、`g_h723_debug.single_motor.enable=1`、选中电机反馈年龄小于 50 ms、目标速度不超过 3000 rpm 且所有 PID 参数为有限的非负值。单电机模式不依赖 `APP_H723_CHASSIS_ACTUATION_ENABLE`；首次调试必须车架悬空，并先确认 `g_h723_debug.fdcan.instance`、选中 ID、反馈速度方向和反馈年龄。
+
+Watch 可直接修改 `target_speed_rpm`、`kp`、`ki`、`kd`、`output_limit`、`deadband`、`integral_output_limit`、`integral_separation_threshold`、`derivative_filter_N` 和 `output_delta_limit`，下一次 1 ms 周期直接应用。选中电机的反馈和控制字段位于 `g_h723_debug.single_motor`，同时保留在 `g_h723_debug.m2006[selected_id-1]` 中。`target_current` 是经过执行限幅后实际写入 CAN 的 `int16` 电流指令；`pid_raw_output` 是最大输出限幅和输出增量限幅之前的增量式计算值；`pid_output` 是 PID 最大输出限幅后的结果，P/I/D 为对应分项。
+
+将 `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 设为 `1U` 可通过 UART8 以 `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS`（默认 1 ms）发送 8 通道 JustFloat。顺序固定为：
+
+1. `target_current`：实际下发电流指令；
+2. `feedback_current`：M2006 反馈电流；
+3. `target_speed_rpm`；
+4. `feedback_speed_rpm`；
+5. `pid_raw_output`：最大值限幅前总值；
+6. `pid_p_out`；
+7. `pid_i_out`；
+8. `pid_d_out`。
+
+该遥测宏与健康遥测和 JY901S 十通道遥测编译期互斥，三者均默认关闭。UART8 仍使用 PE1 TX、1 Mbit/s 和 `DMA1_Stream1`；DMA 忙时丢弃本周期帧并递增 UART8 丢帧计数，不阻塞控制环。
 
 ## CubeMX Regeneration
 
@@ -49,7 +70,7 @@ Connect the USB-UART adapter GND to board GND and adapter RX to `PE1` (UART8 TX)
 
 ## SWD 调试快照
 
-Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。它按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]` 与 `jy901s` 分组；例如 `g_h723_debug.crsf.channels_raw[0]`、`g_h723_debug.chassis.left_target_rpm`、`g_h723_debug.m2006[0].feedback_speed_rpm`、`g_h723_debug.jy901s.angle_deg[2]`。`m2006` 的索引 `0/1/2` 固定对应 CAN ID `1/2/3`，当前仅更新前两项，第三项为上层平衡机构预留。快照包含 16 个 CRSF 原始通道、遥控和 CAN 诊断、左右目标 RPM、两台 M2006 的反馈/PID/电流命令，以及 JY901S 原始与换算数据。不要从调试器写入；由于任务和中断可独立更新字段，跨字段组合不保证为同一时刻的原子快照。
+Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的全局变量 `volatile g_h723_debug`。它按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]`、`single_motor` 与 `jy901s` 分组；例如 `g_h723_debug.crsf.channels_raw[0]`、`g_h723_debug.chassis.left_target_rpm`、`g_h723_debug.m2006[0].feedback_speed_rpm`、`g_h723_debug.single_motor.pid_raw_output` 和 `g_h723_debug.jy901s.angle_deg[2]`。`m2006` 的索引 `0/1/2` 固定对应 CAN ID `1/2/3`。快照包含 16 个 CRSF 原始通道、遥控和 CAN 诊断、底盘目标、三台 M2006 的反馈/PID/电流命令、单电机调参输入与 JY901S 原始/换算数据。不要从调试器写入普通状态字段；单电机调试宏开启时，`single_motor` 中标记为 Watch 输入的字段例外。由于任务和中断可独立更新字段，跨字段组合不保证为同一时刻的原子快照。
 
 详见 [JY901S 接入说明](../docs/STM32H723_JY901S.md)。
 
@@ -68,6 +89,7 @@ Expected artifact: `MDK-ARM\stm32h723_app\stm32h723_app.axf`.
 ```powershell
 .\tests\test_stm32h723_vofa_justfloat.ps1
 .\tests\test_stm32h723_chassis.ps1
+.\tests\test_stm32h723_single_motor.ps1
 .\tests\test_stm32h723_debug_layout.ps1
 .\tests\test_stm32h723_ioc.ps1
 .\tests\test_stm32h723_keil_project.ps1

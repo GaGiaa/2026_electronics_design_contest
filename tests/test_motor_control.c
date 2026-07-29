@@ -39,6 +39,8 @@ static void test_incremental_pid_accumulates_and_resets(void)
     PID_Incremental_Init(&pid, &params, 0.01f);
     expect_close(PID_Incremental_Calc(&pid, 10.0f, 0.0f), 5.0f, 0.001f,
                  "incremental PID must apply the proportional increment");
+    expect_close(pid.raw_output, 5.0f, 0.001f,
+                 "incremental PID must expose the pre-limit total output");
     expect_close(PID_Incremental_Calc(&pid, 10.0f, 0.0f), 5.0f, 0.001f,
                  "unchanged error must not add proportional output twice");
     PID_Incremental_Reset(&pid);
@@ -64,8 +66,12 @@ static void test_incremental_pid_applies_speed_loop_protections(void)
     PID_Incremental_Init(&pid, &params, 0.1f);
     expect_close(PID_Incremental_Calc(&pid, 10.0f, 0.0f), 0.0f, 0.001f,
                  "incremental PID must separate integration outside the error threshold");
+    expect_close(pid.raw_output, 0.0f, 0.001f,
+                 "pre-limit output must be available when integral separation is active");
     expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 0.2f, 0.001f,
                  "incremental PID output must obey the per-cycle slew limit");
+    expect_close(pid.raw_output, 1.0f, 0.001f,
+                 "pre-limit output must precede the output slew limit");
     expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 0.4f, 0.001f,
                  "incremental PID must accumulate an allowed integral contribution");
     expect_close(PID_Incremental_Calc(&pid, 1.0f, 0.0f), 0.6f, 0.001f,

@@ -70,6 +70,7 @@ void PID_Incremental_Reset(PID_Incremental *pid)
     pid->p_out = 0.0f;
     pid->i_out = 0.0f;
     pid->d_out = 0.0f;
+    pid->raw_output = 0.0f;
     pid->output = 0.0f;
     pid->has_feedback_history = false;
     pid->integral_saturated = false;
@@ -138,6 +139,8 @@ float PID_Incremental_Calc(PID_Incremental *pid, float target, float feedback)
     } else {
         pid->integral_saturated = false;
     }
+
+    pid->raw_output = raw_output;
 
     if (pid_has_positive_limit(pid->params.output_delta_limit)) {
         output_delta = limited_output - pid->output;

@@ -114,11 +114,20 @@ static void test_m2006_feedback_and_group_command(void)
     assert(parsed.encoder == 4096U);
     assert(parsed.speed_rpm == 500);
     assert(parsed.current == -200);
-    assert(!app_m2006_parse_feedback(0x203U, feedback, &parsed));
+    assert(app_m2006_parse_feedback(0x203U, feedback, &parsed));
+    assert(parsed.motor_id == 3U);
     app_m2006_encode_group_current(1000, -1000, command);
     assert(command[0] == 0x03U && command[1] == 0xE8U);
     assert(command[2] == 0xFCU && command[3] == 0x18U);
     assert(command[4] == 0U && command[7] == 0U);
+    {
+        const int16_t currents[3] = {100, -200, 300};
+        app_m2006_encode_group_current_slots(currents, command);
+        assert(command[0] == 0U && command[1] == 100U);
+        assert(command[2] == 0xFFU && command[3] == 0x38U);
+        assert(command[4] == 1U && command[5] == 44U);
+        assert(command[6] == 0U && command[7] == 0U);
+    }
 }
 
 int main(void)

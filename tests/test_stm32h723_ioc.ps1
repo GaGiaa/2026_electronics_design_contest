@@ -86,6 +86,15 @@ if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
 if ($appConfig -notmatch '#define\s+APP_H723_M2006_FDCAN_INSTANCE\s+2U') {
     throw 'M2006 must default to FDCAN2.'
 }
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE\s+0U') {
+    throw 'Single-motor PID debug must default to disabled.'
+}
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE\s+0U') {
+    throw 'Single-motor VOFA telemetry must default to disabled.'
+}
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS\s+1U') {
+    throw 'Single-motor VOFA telemetry interval must default to 1 ms.'
+}
 if ($appConfig -notmatch '#if\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+<\s+1U\)\s+\|\|\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+>\s+3U\)') {
     throw 'M2006 FDCAN selection must reject instances outside 1U..3U.'
 }
@@ -100,6 +109,9 @@ foreach ($line in @('return &hfdcan3;', 'void h723_chassis_on_fdcan3_rx(void)'))
     if ($chassisSource -notmatch [regex]::Escape($line)) {
         throw "Chassis service must support FDCAN3: $line"
     }
+}
+if ($chassisSource -notmatch 'header.Identifier\s*<=\s*0x203U') {
+    throw 'Single-motor debug must accept M2006 feedback ID 0x203.'
 }
 
 if ($fdcanSource -notmatch 'hfdcan->Instance == FDCAN3' -or
