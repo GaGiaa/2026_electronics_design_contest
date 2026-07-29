@@ -29,10 +29,16 @@ $requiredLines = @(
     'Dma.UART7_RX.0.Instance=DMA1_Stream0',
     'Dma.UART8_TX.1.Instance=DMA1_Stream1',
     'UART7.BaudRate=420000',
+    'UART9.BaudRate=234000',
     'PE7.Signal=UART7_RX',
     'PE8.Signal=UART7_TX',
+    'PG0.Signal=UART9_RX',
+    'PG1.Signal=UART9_TX',
     'NVIC.DMA1_Stream0_IRQn=true',
+    'NVIC.DMA1_Stream2_IRQn=true',
     'NVIC.UART7_IRQn=true',
+    'NVIC.UART9_IRQn=true',
+    'Dma.UART9_RX.2.Instance=DMA1_Stream2',
     'FDCAN1.CalculateBaudRateNominal=1000000',
     'FDCAN2.CalculateBaudRateNominal=1000000',
     'FDCAN3.CalculateBaudRateNominal=1000000',
@@ -70,6 +76,9 @@ foreach ($line in @('PD0     ------> FDCAN1_RX', 'PD1     ------> FDCAN1_TX', 'H
 
 if ($appConfig -notmatch '#define\s+APP_VOFA_HEALTH_TELEMETRY_ENABLE\s+0U') {
     throw 'APP_VOFA_HEALTH_TELEMETRY_ENABLE must default to 0U.'
+}
+if ($appConfig -notmatch '#define\s+APP_JY901S_VOFA_TELEMETRY_ENABLE\s+0U') {
+    throw 'APP_JY901S_VOFA_TELEMETRY_ENABLE must default to 0U.'
 }
 if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
     throw 'APP_H723_CHASSIS_ACTUATION_ENABLE must default to 0U.'

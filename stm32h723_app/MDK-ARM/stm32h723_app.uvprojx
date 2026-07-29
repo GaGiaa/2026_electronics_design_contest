@@ -455,6 +455,16 @@
               <FilePath>../App/Src/app_telemetry.c</FilePath>
             </File>
             <File>
+              <FileName>app_jy901s.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_jy901s.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_jy901s_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_jy901s_service.c</FilePath>
+            </File>
+            <File>
               <FileName>app_time.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_time.c</FilePath>

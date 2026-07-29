@@ -1,5 +1,12 @@
 # MSPM0 核心板工程交接索引
 
+## H723 JY901S UART9 IMU
+
+- STM32CubeMX 已配置并生成 UART9：`PG0=UART9_RX`、`PG1=UART9_TX`、234000 bit/s、DMA1 Stream2 RX 与 DMA/UART9 中断。
+- `App/app_jy901s` 解析标准 `0x55 0x51/0x52/0x53` 帧及温度；`jy901sTask` 用 FreeRTOS 5 ms 时基通过 ReceiveToIdle DMA 环形缓冲发布数据。
+- `g_h723_debug.jy901s_*` 供 Keil Watch 观察十项原始/换算数据与接收诊断。`APP_JY901S_VOFA_TELEMETRY_ENABLE=0U` 默认关闭，开启后 UART8 发送 `Ax, Ay, Az, Gx, Gy, Gz, Roll, Pitch, Yaw, TemperatureC` 十通道 JustFloat；它与健康遥测编译期互斥。
+- 未执行烧录、探针/SWD/GDB、JY901S 或 VOFA 实物测试。详细接线、单位和验收条件见 [`docs/STM32H723_JY901S.md`](STM32H723_JY901S.md)。
+
 最后更新：2026-07-28
 
 ## 使用规则

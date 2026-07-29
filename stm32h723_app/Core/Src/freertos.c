@@ -29,6 +29,7 @@
 #include "app_telemetry.h"
 #include "app_chassis_service.h"
 #include "app_config.h"
+#include "app_jy901s_service.h"
 #include "app_time.h"
 
 /* USER CODE END Includes */
@@ -58,6 +59,13 @@ static const osThreadAttr_t chassisTask_attributes = {
   .priority = (osPriority_t)osPriorityHigh,
 };
 
+static osThreadId_t jy901sTaskHandle;
+static const osThreadAttr_t jy901sTask_attributes = {
+  .name = "jy901sTask",
+  .stack_size = 1024 * 2,
+  .priority = (osPriority_t)osPriorityAboveNormal,
+};
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -71,6 +79,7 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE BEGIN FunctionPrototypes */
 
 void startChassisTask(void *argument);
+void startJy901sTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -123,6 +132,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_THREADS */
   chassisTaskHandle = osThreadNew(startChassisTask, NULL, &chassisTask_attributes);
   configASSERT(chassisTaskHandle != NULL);
+  jy901sTaskHandle = osThreadNew(startJy901sTask, NULL, &jy901sTask_attributes);
+  configASSERT(jy901sTaskHandle != NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -164,6 +175,19 @@ void startChassisTask(void *argument)
   for (;;) {
     h723_chassis_service_step(h723_app_time_now_ms());
     next_wake_tick += APP_H723_CHASSIS_TASK_PERIOD_MS;
+    (void)osDelayUntil(next_wake_tick);
+  }
+}
+
+void startJy901sTask(void *argument)
+{
+  uint32_t next_wake_tick = osKernelGetTickCount();
+
+  (void)argument;
+  h723_jy901s_service_init();
+  for (;;) {
+    h723_jy901s_service_step(h723_app_time_now_ms());
+    next_wake_tick += APP_JY901S_TASK_PERIOD_MS;
     (void)osDelayUntil(next_wake_tick);
   }
 }

@@ -23,6 +23,8 @@ foreach ($line in @(
     '<PackURL>https://www.keil.com/pack/</PackURL>',
     '<FilePath>../App/Src/app_debug.c</FilePath>',
     '<FilePath>../App/Src/app_telemetry.c</FilePath>',
+    '<FilePath>../App/Src/app_jy901s.c</FilePath>',
+    '<FilePath>../App/Src/app_jy901s_service.c</FilePath>',
     '<FilePath>../App/Src/vofa_justfloat.c</FilePath>',
     '<FilePath>../App/Src/app_crsf.c</FilePath>',
     '<FilePath>../App/Src/app_m2006.c</FilePath>',

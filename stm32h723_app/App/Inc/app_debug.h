@@ -58,6 +58,25 @@ typedef struct {
     uint32_t fdcan_tx_error_counter;
     uint32_t fdcan_rx_error_counter;
     h723_m2006_debug_t m2006[2];
+    int16_t jy901s_acceleration_raw[3];
+    int16_t jy901s_temperature_raw;
+    int16_t jy901s_angular_rate_raw[3];
+    int16_t jy901s_angle_raw[3];
+    float jy901s_acceleration_g[3];
+    float jy901s_temperature_celsius;
+    float jy901s_angular_rate_dps[3];
+    float jy901s_angle_deg[3];
+    uint32_t jy901s_acceleration_frame_count;
+    uint32_t jy901s_gyro_frame_count;
+    uint32_t jy901s_angle_frame_count;
+    uint32_t jy901s_checksum_error_count;
+    uint32_t jy901s_format_error_count;
+    uint32_t jy901s_complete_sample_count;
+    uint32_t jy901s_uart_error_count;
+    uint32_t jy901s_ring_overrun_count;
+    uint32_t jy901s_sample_age_ms;
+    uint32_t jy901s_sample_valid;
+    uint32_t jy901s_dma_active;
 } h723_debug_t;
 
 extern volatile h723_debug_t g_h723_debug;

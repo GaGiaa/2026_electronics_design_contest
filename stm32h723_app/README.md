@@ -51,6 +51,8 @@ Connect the USB-UART adapter GND to board GND and adapter RX to `PE1` (UART8 TX)
 
 Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。其中包括 16 个 CRSF 原始通道值、有效帧/CRC/格式/UART/环形缓冲/超时统计、当前手动模式、前进和转向归一化量、左右目标 RPM，以及每个 M2006 的反馈 ID、编码器、实际 RPM、反馈年龄、PID P/I/D/输出、目标速度和最终 CAN 电流命令。不要从调试器写入这个快照。
 
+详见 [JY901S 接入说明](../docs/STM32H723_JY901S.md)。
+
 ## Build And Checks
 
 Build only; this does not program the board:

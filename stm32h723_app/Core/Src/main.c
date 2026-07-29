@@ -105,6 +105,7 @@ int main(void)
   MX_FDCAN2_Init();
   MX_UART7_Init();
   MX_UART8_Init();
+  MX_UART9_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
