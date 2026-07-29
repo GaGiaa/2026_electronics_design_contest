@@ -30,26 +30,26 @@ static void h723_jy901s_publish_debug(uint32_t now_ms)
     uint32_t index;
 
     for (index = 0U; index < 3U; ++index) {
-        g_h723_debug.jy901s_acceleration_raw[index] = s_sample.acceleration_raw[index];
-        g_h723_debug.jy901s_angular_rate_raw[index] = s_sample.angular_rate_raw[index];
-        g_h723_debug.jy901s_angle_raw[index] = s_sample.angle_raw[index];
-        g_h723_debug.jy901s_acceleration_g[index] = s_sample.acceleration_g[index];
-        g_h723_debug.jy901s_angular_rate_dps[index] = s_sample.angular_rate_dps[index];
-        g_h723_debug.jy901s_angle_deg[index] = s_sample.angle_deg[index];
+        g_h723_debug.jy901s.acceleration_raw[index] = s_sample.acceleration_raw[index];
+        g_h723_debug.jy901s.angular_rate_raw[index] = s_sample.angular_rate_raw[index];
+        g_h723_debug.jy901s.angle_raw[index] = s_sample.angle_raw[index];
+        g_h723_debug.jy901s.acceleration_g[index] = s_sample.acceleration_g[index];
+        g_h723_debug.jy901s.angular_rate_dps[index] = s_sample.angular_rate_dps[index];
+        g_h723_debug.jy901s.angle_deg[index] = s_sample.angle_deg[index];
     }
-    g_h723_debug.jy901s_temperature_raw = s_sample.temperature_raw;
-    g_h723_debug.jy901s_temperature_celsius = s_sample.temperature_celsius;
-    g_h723_debug.jy901s_acceleration_frame_count = s_sample.acceleration_frame_count;
-    g_h723_debug.jy901s_gyro_frame_count = s_sample.gyro_frame_count;
-    g_h723_debug.jy901s_angle_frame_count = s_sample.angle_frame_count;
-    g_h723_debug.jy901s_checksum_error_count = s_sample.checksum_error_count;
-    g_h723_debug.jy901s_format_error_count = s_sample.format_error_count;
-    g_h723_debug.jy901s_complete_sample_count = s_sample.complete_sample_count;
-    g_h723_debug.jy901s_uart_error_count = s_uart_error_count;
-    g_h723_debug.jy901s_ring_overrun_count = s_ring_overrun_count;
-    g_h723_debug.jy901s_dma_active = huart9.RxState == HAL_UART_STATE_BUSY_RX ? 1U : 0U;
-    g_h723_debug.jy901s_sample_valid = s_sample.valid ? 1U : 0U;
-    g_h723_debug.jy901s_sample_age_ms = s_sample.valid ? (uint32_t)(now_ms - s_sample.last_sample_ms) : UINT_MAX;
+    g_h723_debug.jy901s.temperature_raw = s_sample.temperature_raw;
+    g_h723_debug.jy901s.temperature_celsius = s_sample.temperature_celsius;
+    g_h723_debug.jy901s.acceleration_frame_count = s_sample.acceleration_frame_count;
+    g_h723_debug.jy901s.gyro_frame_count = s_sample.gyro_frame_count;
+    g_h723_debug.jy901s.angle_frame_count = s_sample.angle_frame_count;
+    g_h723_debug.jy901s.checksum_error_count = s_sample.checksum_error_count;
+    g_h723_debug.jy901s.format_error_count = s_sample.format_error_count;
+    g_h723_debug.jy901s.complete_sample_count = s_sample.complete_sample_count;
+    g_h723_debug.jy901s.uart_error_count = s_uart_error_count;
+    g_h723_debug.jy901s.ring_overrun_count = s_ring_overrun_count;
+    g_h723_debug.jy901s.dma_active = huart9.RxState == HAL_UART_STATE_BUSY_RX ? 1U : 0U;
+    g_h723_debug.jy901s.sample_valid = s_sample.valid ? 1U : 0U;
+    g_h723_debug.jy901s.sample_age_ms = s_sample.valid ? (uint32_t)(now_ms - s_sample.last_sample_ms) : UINT_MAX;
 }
 
 void h723_jy901s_service_init(void)

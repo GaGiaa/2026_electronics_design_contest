@@ -48,15 +48,15 @@ static void h723_update_fdcan_diagnostics(void)
     FDCAN_ErrorCountersTypeDef counters = {0};
     FDCAN_HandleTypeDef *fdcan = h723_m2006_fdcan();
 
-    g_h723_debug.fdcan_instance = APP_H723_M2006_FDCAN_INSTANCE;
+    g_h723_debug.fdcan.instance = APP_H723_M2006_FDCAN_INSTANCE;
     if (HAL_FDCAN_GetProtocolStatus(fdcan, &protocol) == HAL_OK) {
-        g_h723_debug.fdcan_protocol_last_error = protocol.LastErrorCode;
-        g_h723_debug.fdcan_protocol_activity = protocol.Activity;
-        g_h723_debug.fdcan_protocol_bus_off = protocol.BusOff;
+        g_h723_debug.fdcan.protocol_last_error = protocol.LastErrorCode;
+        g_h723_debug.fdcan.protocol_activity = protocol.Activity;
+        g_h723_debug.fdcan.protocol_bus_off = protocol.BusOff;
     }
     if (HAL_FDCAN_GetErrorCounters(fdcan, &counters) == HAL_OK) {
-        g_h723_debug.fdcan_tx_error_counter = counters.TxErrorCnt;
-        g_h723_debug.fdcan_rx_error_counter = counters.RxErrorCnt;
+        g_h723_debug.fdcan.tx_error_counter = counters.TxErrorCnt;
+        g_h723_debug.fdcan.rx_error_counter = counters.RxErrorCnt;
     }
 }
 
@@ -108,8 +108,8 @@ void h723_chassis_service_init(void)
     if (HAL_FDCAN_ConfigFilter(fdcan, &filter) == HAL_OK &&
         HAL_FDCAN_Start(fdcan) == HAL_OK &&
         HAL_FDCAN_ActivateNotification(fdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0U) == HAL_OK) {
-        g_h723_debug.fdcan_last_status = HAL_OK;
-    } else { g_h723_debug.fdcan_last_status = HAL_ERROR; }
+        g_h723_debug.fdcan.last_status = HAL_OK;
+    } else { g_h723_debug.fdcan.last_status = HAL_ERROR; }
     h723_start_uart7_receive();
 }
 
@@ -156,7 +156,7 @@ static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan)
             uint32_t index = header.Identifier - 0x201U;
             s_feedback_time_ms[index] = h723_app_time_now_ms();
             s_feedback_valid[index] = true;
-            ++g_h723_debug.fdcan_rx_count;
+            ++g_h723_debug.fdcan.rx_count;
         }
     }
 }
@@ -174,26 +174,26 @@ void h723_chassis_service_step(uint32_t now_ms)
     }
     app_chassis_mix(&s_crsf_input, now_ms, &s_command);
     for (index = 0U; index < APP_CRSF_CHANNEL_COUNT; ++index) {
-        g_h723_debug.crsf_channels_raw[index] = s_crsf_input.channels[index];
+        g_h723_debug.crsf.channels_raw[index] = s_crsf_input.channels[index];
     }
-    g_h723_debug.crsf_valid_frame_count = s_crsf_input.valid_frame_count;
-    g_h723_debug.crsf_crc_error_count = s_crsf_input.crc_error_count;
-    g_h723_debug.crsf_frame_error_count = s_crsf_input.frame_error_count;
-    g_h723_debug.crsf_age_ms = s_crsf_input.valid ? (uint32_t)(now_ms - s_crsf_input.last_valid_ms) : UINT32_MAX;
-    g_h723_debug.crsf_uart_error_count = s_crsf_uart_error_count;
-    g_h723_debug.crsf_ring_overrun_count = s_crsf_ring_overrun_count;
-    g_h723_debug.crsf_sb_state = h723_crsf_switch_state(s_crsf_input.channels[6]);
-    g_h723_debug.crsf_sc_state = h723_crsf_switch_state(s_crsf_input.channels[7]);
-    if (g_h723_debug.crsf_age_ms >= APP_H723_CRSF_TIMEOUT_MS) {
-        if (!s_crsf_was_timed_out) { ++g_h723_debug.crsf_timeout_count; }
+    g_h723_debug.crsf.valid_frame_count = s_crsf_input.valid_frame_count;
+    g_h723_debug.crsf.crc_error_count = s_crsf_input.crc_error_count;
+    g_h723_debug.crsf.frame_error_count = s_crsf_input.frame_error_count;
+    g_h723_debug.crsf.age_ms = s_crsf_input.valid ? (uint32_t)(now_ms - s_crsf_input.last_valid_ms) : UINT32_MAX;
+    g_h723_debug.crsf.uart_error_count = s_crsf_uart_error_count;
+    g_h723_debug.crsf.ring_overrun_count = s_crsf_ring_overrun_count;
+    g_h723_debug.crsf.sb_state = h723_crsf_switch_state(s_crsf_input.channels[6]);
+    g_h723_debug.crsf.sc_state = h723_crsf_switch_state(s_crsf_input.channels[7]);
+    if (g_h723_debug.crsf.age_ms >= APP_H723_CRSF_TIMEOUT_MS) {
+        if (!s_crsf_was_timed_out) { ++g_h723_debug.crsf.timeout_count; }
         s_crsf_was_timed_out = true;
     } else { s_crsf_was_timed_out = false; }
-    g_h723_debug.chassis_mode = s_command.manual_active ? 1U : 0U;
-    g_h723_debug.chassis_actuation_enabled = APP_H723_CHASSIS_ACTUATION_ENABLE;
-    g_h723_debug.chassis_forward_normalized = s_command.forward_normalized;
-    g_h723_debug.chassis_turn_normalized = s_command.turn_normalized;
-    g_h723_debug.chassis_left_target_rpm = s_command.left_target_rpm;
-    g_h723_debug.chassis_right_target_rpm = s_command.right_target_rpm;
+    g_h723_debug.chassis.mode = s_command.manual_active ? 1U : 0U;
+    g_h723_debug.chassis.actuation_enabled = APP_H723_CHASSIS_ACTUATION_ENABLE;
+    g_h723_debug.chassis.forward_normalized = s_command.forward_normalized;
+    g_h723_debug.chassis.turn_normalized = s_command.turn_normalized;
+    g_h723_debug.chassis.left_target_rpm = s_command.left_target_rpm;
+    g_h723_debug.chassis.right_target_rpm = s_command.right_target_rpm;
     for (index = 0U; index < 2U; ++index) {
         float target = index == 0U ? s_command.left_target_rpm : s_command.right_target_rpm;
         bool feedback_fresh = s_feedback_valid[index] && (uint32_t)(now_ms - s_feedback_time_ms[index]) < APP_H723_M2006_FEEDBACK_TIMEOUT_MS;
@@ -215,7 +215,7 @@ void h723_chassis_service_step(uint32_t now_ms)
     app_m2006_encode_group_current(output[0], output[1], data);
     header.Identifier = 0x200U; header.IdType = FDCAN_STANDARD_ID; header.TxFrameType = FDCAN_DATA_FRAME; header.DataLength = FDCAN_DLC_BYTES_8;
     header.ErrorStateIndicator = FDCAN_ESI_ACTIVE; header.BitRateSwitch = FDCAN_BRS_OFF; header.FDFormat = FDCAN_CLASSIC_CAN; header.TxEventFifoControl = FDCAN_NO_TX_EVENTS; header.MessageMarker = 0U;
-    g_h723_debug.fdcan_last_status = HAL_FDCAN_AddMessageToTxFifoQ(fdcan, &header, data);
-    if (g_h723_debug.fdcan_last_status == HAL_OK) { ++g_h723_debug.fdcan_tx_count; } else { ++g_h723_debug.fdcan_tx_error_count; }
+    g_h723_debug.fdcan.last_status = HAL_FDCAN_AddMessageToTxFifoQ(fdcan, &header, data);
+    if (g_h723_debug.fdcan.last_status == HAL_OK) { ++g_h723_debug.fdcan.tx_count; } else { ++g_h723_debug.fdcan.tx_error_count; }
     h723_update_fdcan_diagnostics();
 }

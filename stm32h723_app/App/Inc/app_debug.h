@@ -1,10 +1,60 @@
 #ifndef APP_DEBUG_H
 #define APP_DEBUG_H
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "app_crsf.h"
+
+/* Keil Watch-only snapshot. Application control must not read these fields. */
+typedef struct {
+    uint32_t boot_count;
+    uint32_t uptime_ms;
+    uint32_t task_loop_count;
+} h723_debug_system_t;
+
+typedef struct {
+    uint32_t telemetry_enabled;
+    uint32_t tx_start_count;
+    uint32_t tx_complete_count;
+    uint32_t tx_drop_count;
+    uint32_t last_hal_status;
+    uint32_t tx_in_flight;
+} h723_debug_uart8_t;
+
+typedef struct {
+    uint16_t channels_raw[APP_CRSF_CHANNEL_COUNT];
+    uint32_t valid_frame_count;
+    uint32_t crc_error_count;
+    uint32_t frame_error_count;
+    uint32_t uart_error_count;
+    uint32_t ring_overrun_count;
+    uint32_t timeout_count;
+    uint32_t sb_state;
+    uint32_t sc_state;
+    uint32_t age_ms;
+} h723_debug_crsf_t;
+
+typedef struct {
+    uint32_t mode;
+    uint32_t actuation_enabled;
+    float forward_normalized;
+    float turn_normalized;
+    float left_target_rpm;
+    float right_target_rpm;
+} h723_debug_chassis_t;
+
+typedef struct {
+    uint32_t rx_count;
+    uint32_t tx_count;
+    uint32_t tx_error_count;
+    uint32_t last_status;
+    uint32_t instance;
+    uint32_t protocol_last_error;
+    uint32_t protocol_activity;
+    uint32_t protocol_bus_off;
+    uint32_t tx_error_counter;
+    uint32_t rx_error_counter;
+} h723_debug_fdcan_t;
 
 typedef struct {
     uint16_t feedback_id;
@@ -22,61 +72,36 @@ typedef struct {
 } h723_m2006_debug_t;
 
 typedef struct {
-    uint32_t boot_count;
-    uint32_t uptime_ms;
-    uint32_t task_loop_count;
-    uint32_t telemetry_enabled;
-    uint32_t tx_start_count;
-    uint32_t tx_complete_count;
-    uint32_t tx_drop_count;
-    uint32_t last_hal_status;
-    uint32_t tx_in_flight;
-    uint16_t crsf_channels_raw[APP_CRSF_CHANNEL_COUNT];
-    uint32_t crsf_valid_frame_count;
-    uint32_t crsf_crc_error_count;
-    uint32_t crsf_frame_error_count;
-    uint32_t crsf_uart_error_count;
-    uint32_t crsf_ring_overrun_count;
-    uint32_t crsf_timeout_count;
-    uint32_t crsf_sb_state;
-    uint32_t crsf_sc_state;
-    uint32_t crsf_age_ms;
-    uint32_t chassis_mode;
-    uint32_t chassis_actuation_enabled;
-    float chassis_forward_normalized;
-    float chassis_turn_normalized;
-    float chassis_left_target_rpm;
-    float chassis_right_target_rpm;
-    uint32_t fdcan_rx_count;
-    uint32_t fdcan_tx_count;
-    uint32_t fdcan_tx_error_count;
-    uint32_t fdcan_last_status;
-    uint32_t fdcan_instance;
-    uint32_t fdcan_protocol_last_error;
-    uint32_t fdcan_protocol_activity;
-    uint32_t fdcan_protocol_bus_off;
-    uint32_t fdcan_tx_error_counter;
-    uint32_t fdcan_rx_error_counter;
-    h723_m2006_debug_t m2006[2];
-    int16_t jy901s_acceleration_raw[3];
-    int16_t jy901s_temperature_raw;
-    int16_t jy901s_angular_rate_raw[3];
-    int16_t jy901s_angle_raw[3];
-    float jy901s_acceleration_g[3];
-    float jy901s_temperature_celsius;
-    float jy901s_angular_rate_dps[3];
-    float jy901s_angle_deg[3];
-    uint32_t jy901s_acceleration_frame_count;
-    uint32_t jy901s_gyro_frame_count;
-    uint32_t jy901s_angle_frame_count;
-    uint32_t jy901s_checksum_error_count;
-    uint32_t jy901s_format_error_count;
-    uint32_t jy901s_complete_sample_count;
-    uint32_t jy901s_uart_error_count;
-    uint32_t jy901s_ring_overrun_count;
-    uint32_t jy901s_sample_age_ms;
-    uint32_t jy901s_sample_valid;
-    uint32_t jy901s_dma_active;
+    int16_t acceleration_raw[3];
+    int16_t temperature_raw;
+    int16_t angular_rate_raw[3];
+    int16_t angle_raw[3];
+    float acceleration_g[3];
+    float temperature_celsius;
+    float angular_rate_dps[3];
+    float angle_deg[3];
+    uint32_t acceleration_frame_count;
+    uint32_t gyro_frame_count;
+    uint32_t angle_frame_count;
+    uint32_t checksum_error_count;
+    uint32_t format_error_count;
+    uint32_t complete_sample_count;
+    uint32_t uart_error_count;
+    uint32_t ring_overrun_count;
+    uint32_t sample_age_ms;
+    uint32_t sample_valid;
+    uint32_t dma_active;
+} h723_debug_jy901s_t;
+
+typedef struct {
+    h723_debug_system_t system;
+    h723_debug_uart8_t uart8;
+    h723_debug_crsf_t crsf;
+    h723_debug_chassis_t chassis;
+    h723_debug_fdcan_t fdcan;
+    /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */
+    h723_m2006_debug_t m2006[3];
+    h723_debug_jy901s_t jy901s;
 } h723_debug_t;
 
 extern volatile h723_debug_t g_h723_debug;

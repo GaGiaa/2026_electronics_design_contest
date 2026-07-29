@@ -22,9 +22,9 @@ static uint32_t s_last_jy901s_telemetry_ms;
 
 void h723_app_telemetry_init(void)
 {
-    g_h723_debug.boot_count++;
-    g_h723_debug.telemetry_enabled = APP_VOFA_HEALTH_TELEMETRY_ENABLE | APP_JY901S_VOFA_TELEMETRY_ENABLE;
-    g_h723_debug.last_hal_status = HAL_OK;
+    g_h723_debug.system.boot_count++;
+    g_h723_debug.uart8.telemetry_enabled = APP_VOFA_HEALTH_TELEMETRY_ENABLE | APP_JY901S_VOFA_TELEMETRY_ENABLE;
+    g_h723_debug.uart8.last_hal_status = HAL_OK;
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
     s_last_telemetry_ms = h723_app_time_now_ms();
 #endif
@@ -37,71 +37,71 @@ void h723_app_telemetry_step(void)
 {
     uint32_t now_ms = h723_app_time_now_ms();
 
-    g_h723_debug.uptime_ms = now_ms;
-    g_h723_debug.task_loop_count++;
+    g_h723_debug.system.uptime_ms = now_ms;
+    g_h723_debug.system.task_loop_count++;
 
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
     if ((now_ms - s_last_telemetry_ms) >= APP_VOFA_HEALTH_TELEMETRY_INTERVAL_MS) {
         const float channels[H723_VOFA_HEALTH_CHANNEL_COUNT] = {
             H723_VOFA_HEALTH_MAGIC,
-            (float)g_h723_debug.uptime_ms,
-            (float)g_h723_debug.task_loop_count,
-            (float)g_h723_debug.tx_start_count,
-            (float)g_h723_debug.tx_complete_count,
-            (float)g_h723_debug.tx_drop_count
+            (float)g_h723_debug.system.uptime_ms,
+            (float)g_h723_debug.system.task_loop_count,
+            (float)g_h723_debug.uart8.tx_start_count,
+            (float)g_h723_debug.uart8.tx_complete_count,
+            (float)g_h723_debug.uart8.tx_drop_count
         };
         HAL_StatusTypeDef status;
 
         s_last_telemetry_ms = now_ms;
-        if (g_h723_debug.tx_in_flight != 0U) {
-            g_h723_debug.tx_drop_count++;
+        if (g_h723_debug.uart8.tx_in_flight != 0U) {
+            g_h723_debug.uart8.tx_drop_count++;
             return;
         }
 
         (void)vofa_justfloat_encode(s_health_frame, sizeof(s_health_frame), channels,
                                     H723_VOFA_HEALTH_CHANNEL_COUNT);
         status = HAL_UART_Transmit_DMA(&huart8, s_health_frame, sizeof(s_health_frame));
-        g_h723_debug.last_hal_status = (uint32_t)status;
+        g_h723_debug.uart8.last_hal_status = (uint32_t)status;
         if (status == HAL_OK) {
-            g_h723_debug.tx_in_flight = 1U;
-            g_h723_debug.tx_start_count++;
+            g_h723_debug.uart8.tx_in_flight = 1U;
+            g_h723_debug.uart8.tx_start_count++;
         } else {
-            g_h723_debug.tx_drop_count++;
+            g_h723_debug.uart8.tx_drop_count++;
         }
     }
 #endif
 
 #if (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
-    if (g_h723_debug.jy901s_sample_valid != 0U &&
+    if (g_h723_debug.jy901s.sample_valid != 0U &&
         (now_ms - s_last_jy901s_telemetry_ms) >= APP_JY901S_VOFA_TELEMETRY_INTERVAL_MS) {
         const float channels[H723_VOFA_JY901S_CHANNEL_COUNT] = {
-            g_h723_debug.jy901s_acceleration_g[0],
-            g_h723_debug.jy901s_acceleration_g[1],
-            g_h723_debug.jy901s_acceleration_g[2],
-            g_h723_debug.jy901s_angular_rate_dps[0],
-            g_h723_debug.jy901s_angular_rate_dps[1],
-            g_h723_debug.jy901s_angular_rate_dps[2],
-            g_h723_debug.jy901s_angle_deg[0],
-            g_h723_debug.jy901s_angle_deg[1],
-            g_h723_debug.jy901s_angle_deg[2],
-            g_h723_debug.jy901s_temperature_celsius
+            g_h723_debug.jy901s.acceleration_g[0],
+            g_h723_debug.jy901s.acceleration_g[1],
+            g_h723_debug.jy901s.acceleration_g[2],
+            g_h723_debug.jy901s.angular_rate_dps[0],
+            g_h723_debug.jy901s.angular_rate_dps[1],
+            g_h723_debug.jy901s.angular_rate_dps[2],
+            g_h723_debug.jy901s.angle_deg[0],
+            g_h723_debug.jy901s.angle_deg[1],
+            g_h723_debug.jy901s.angle_deg[2],
+            g_h723_debug.jy901s.temperature_celsius
         };
         HAL_StatusTypeDef status;
 
         s_last_jy901s_telemetry_ms = now_ms;
-        if (g_h723_debug.tx_in_flight != 0U) {
-            g_h723_debug.tx_drop_count++;
+        if (g_h723_debug.uart8.tx_in_flight != 0U) {
+            g_h723_debug.uart8.tx_drop_count++;
             return;
         }
         (void)vofa_justfloat_encode(s_jy901s_frame, sizeof(s_jy901s_frame), channels,
                                     H723_VOFA_JY901S_CHANNEL_COUNT);
         status = HAL_UART_Transmit_DMA(&huart8, s_jy901s_frame, sizeof(s_jy901s_frame));
-        g_h723_debug.last_hal_status = (uint32_t)status;
+        g_h723_debug.uart8.last_hal_status = (uint32_t)status;
         if (status == HAL_OK) {
-            g_h723_debug.tx_in_flight = 1U;
-            g_h723_debug.tx_start_count++;
+            g_h723_debug.uart8.tx_in_flight = 1U;
+            g_h723_debug.uart8.tx_start_count++;
         } else {
-            g_h723_debug.tx_drop_count++;
+            g_h723_debug.uart8.tx_drop_count++;
         }
     }
 #endif
@@ -110,17 +110,17 @@ void h723_app_telemetry_step(void)
 void h723_app_telemetry_on_uart_tx_complete(UART_HandleTypeDef *huart)
 {
     if (huart == &huart8) {
-        g_h723_debug.tx_in_flight = 0U;
-        g_h723_debug.tx_complete_count++;
-        g_h723_debug.last_hal_status = HAL_OK;
+        g_h723_debug.uart8.tx_in_flight = 0U;
+        g_h723_debug.uart8.tx_complete_count++;
+        g_h723_debug.uart8.last_hal_status = HAL_OK;
     }
 }
 
 void h723_app_telemetry_on_uart_error(UART_HandleTypeDef *huart)
 {
     if (huart == &huart8) {
-        g_h723_debug.tx_in_flight = 0U;
-        g_h723_debug.tx_drop_count++;
-        g_h723_debug.last_hal_status = HAL_ERROR;
+        g_h723_debug.uart8.tx_in_flight = 0U;
+        g_h723_debug.uart8.tx_drop_count++;
+        g_h723_debug.uart8.last_hal_status = HAL_ERROR;
     }
 }
