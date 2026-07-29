@@ -59,7 +59,6 @@ $expectedDirectories = @(
     'drivers\buzzer',
     'drivers\servo',
     'drivers\ws2812',
-    'algorithms\pid',
     'algorithms\encoder',
     'algorithms\line_tracking',
     'algorithms\line_control',
@@ -80,7 +79,7 @@ $main = Join-Path $projectDir 'main.c'
 $startup = Join-Path $projectDir 'app\app_startup.c'
 $interrupts = Join-Path $projectDir 'platform\g3507_interrupts.c'
 $canonicalMotorHeader = Join-Path $projectDir 'drivers\motor\board_motor.h'
-$canonicalPid = Join-Path $projectDir 'algorithms\pid\pid.c'
+$canonicalPid = Join-Path $ProjectRoot 'shared\pid\pid.c'
 $compatibilityFiles = @(
     'app_config.h',
     'board_bmi160.h',

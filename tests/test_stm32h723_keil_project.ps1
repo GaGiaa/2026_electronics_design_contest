@@ -23,7 +23,13 @@ foreach ($line in @(
     '<PackURL>https://www.keil.com/pack/</PackURL>',
     '<FilePath>../App/Src/app_debug.c</FilePath>',
     '<FilePath>../App/Src/app_telemetry.c</FilePath>',
-    '<FilePath>../App/Src/vofa_justfloat.c</FilePath>'
+    '<FilePath>../App/Src/vofa_justfloat.c</FilePath>',
+    '<FilePath>../App/Src/app_crsf.c</FilePath>',
+    '<FilePath>../App/Src/app_m2006.c</FilePath>',
+    '<FilePath>../App/Src/app_chassis.c</FilePath>',
+    '<FilePath>../App/Src/app_chassis_service.c</FilePath>',
+    '<FilePath>../../shared/pid/pid.c</FilePath>',
+    '../../shared/pid'
 )) {
     if ($project -notmatch [regex]::Escape($line)) {
         throw "Missing expected Keil configuration: $line"

@@ -1,5 +1,5 @@
-#include "algorithms/pid/pid.h"
-#include "algorithms/pid/app_math.h"
+#include "pid.h"
+#include "app_math.h"
 
 #include <math.h>
 #include <stddef.h>

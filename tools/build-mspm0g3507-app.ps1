@@ -69,7 +69,7 @@ foreach ($path in @($ProjectDir, $SdkRoot, $SysConfig, $Compiler, $FreeRtosRoot,
 New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 Invoke-CheckedCommand -FilePath $SysConfig -Arguments @('--script', (Join-Path $ProjectDir 'mspm0g3507_app.syscfg'), '-o', $BuildDir, '-s', (Join-Path $SdkRoot '.metadata\product.json'), '--compiler', 'ticlang') -Description 'Generating MSPM0G3507 app SysConfig files'
 
-$commonCompilerArguments = @('-c', '@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', "-I$ProjectDir", "-I$ProjectDir\app", "-I$ProjectDir\drivers", "-I$ProjectDir\algorithms", "-I$ProjectDir\protocols", "-I$ProjectDir\services", "-I$ProjectDir\platform", "-I$ProjectDir\config", "-I$BuildDir", "-I$FreeRtosRoot\include", "-I$FreeRtosPort", "-I$SdkRoot\source\third_party\CMSIS\Core\Include", "-I$SdkRoot\source")
+$commonCompilerArguments = @('-c', '@device.opt', '-march=thumbv6m', '-mcpu=cortex-m0plus', '-mfloat-abi=soft', '-mlittle-endian', '-mthumb', '-O2', '-gdwarf-3', "-I$ProjectDir", "-I$ProjectDir\app", "-I$ProjectDir\drivers", "-I$ProjectDir\algorithms", "-I$ProjectDir\protocols", "-I$ProjectDir\services", "-I$ProjectDir\platform", "-I$ProjectDir\config", "-I$ProjectRoot\shared\pid", "-I$BuildDir", "-I$FreeRtosRoot\include", "-I$FreeRtosPort", "-I$SdkRoot\source\third_party\CMSIS\Core\Include", "-I$SdkRoot\source")
 if ($PSBoundParameters.ContainsKey('VofaSpeedPidTelemetryEnable')) {
     $commonCompilerArguments += "-DAPP_VOFA_SPEED_PID_TELEMETRY_ENABLE=$VofaSpeedPidTelemetryEnable"
 }
@@ -137,7 +137,7 @@ $sources = @(
     @{ Source = (Join-Path $ProjectDir 'algorithms\line_control\line_control.c'); Object = 'line_control.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\yaw_control\yaw_control.c'); Object = 'yaw_control.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\course_following\course_following.c'); Object = 'course_following.o' },
-    @{ Source = (Join-Path $ProjectDir 'algorithms\pid\pid.c'); Object = 'motor_pid.o' },
+    @{ Source = (Join-Path $ProjectRoot 'shared\pid\pid.c'); Object = 'motor_pid.o' },
     @{ Source = (Join-Path $ProjectDir 'algorithms\motor_control\motor_control.c'); Object = 'motor_control.o' },
     @{ Source = (Join-Path $ProjectDir 'protocols\vofa\vofa_justfloat.c'); Object = 'vofa_justfloat.o' },
     @{ Source = (Join-Path $ProjectDir 'protocols\vofa\course_following_telemetry.c'); Object = 'course_following_telemetry.o' },

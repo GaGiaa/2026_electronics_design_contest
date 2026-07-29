@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_PWR_LDO_SUPPLY,USE_HAL_DRIVER,STM32H723xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../App/Inc;../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include</IncludePath>
+              <IncludePath>../App/Inc;../../shared/pid;../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -458,6 +458,36 @@
               <FileName>vofa_justfloat.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/vofa_justfloat.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_crsf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_crsf.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_chassis.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_chassis.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_m2006.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_m2006.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_chassis_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_chassis_service.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Application/User/Shared</GroupName>
+          <Files>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../../shared/pid/pid.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "algorithms/pid/pid.h"
+#include "pid.h"
 #include "drivers/motor/board_motor.h"
 
 typedef struct {

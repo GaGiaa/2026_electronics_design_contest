@@ -26,11 +26,21 @@ $requiredLines = @(
     'Mcu.Name=STM32H723ZGTx',
     'UART8.BaudRate=1000000',
     'UART8.Mode=MODE_TX',
-    'Dma.UART8_TX.0.Instance=DMA1_Stream1',
+    'Dma.UART7_RX.0.Instance=DMA1_Stream0',
+    'Dma.UART8_TX.1.Instance=DMA1_Stream1',
+    'UART7.BaudRate=420000',
+    'PE7.Signal=UART7_RX',
+    'PE8.Signal=UART7_TX',
+    'NVIC.DMA1_Stream0_IRQn=true',
+    'NVIC.UART7_IRQn=true',
     'FDCAN1.CalculateBaudRateNominal=1000000',
     'FDCAN2.CalculateBaudRateNominal=1000000',
     'FDCAN3.CalculateBaudRateNominal=1000000',
     'FDCAN1.MessageRAMOffset=0',
+    'PD0.Locked=true',
+    'PD0.Signal=FDCAN1_RX',
+    'PD1.Locked=true',
+    'PD1.Signal=FDCAN1_TX',
     'FDCAN2.MessageRAMOffset=89',
     'FDCAN3.MessageRAMOffset=178',
     'VP_FREERTOS_VS_CMSIS_V2.Mode=CMSIS_V2',
@@ -45,14 +55,27 @@ foreach ($line in $requiredLines) {
     }
 }
 
-foreach ($removedLine in @('UART7.BaudRate=', 'Mcu.IP11=UART7', 'X-CUBE-ALGOBUILD', 'X-CUBE-TOF')) {
+foreach ($removedLine in @('X-CUBE-ALGOBUILD', 'X-CUBE-TOF')) {
     if ($ioc -match [regex]::Escape($removedLine)) {
         throw "Unexpected retained configuration: $removedLine"
     }
 }
 
+$fdcanSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\Core\Src\fdcan.c') -Raw
+foreach ($line in @('PD0     ------> FDCAN1_RX', 'PD1     ------> FDCAN1_TX', 'HAL_GPIO_Init(GPIOD, &GPIO_InitStruct)')) {
+    if ($fdcanSource -notmatch [regex]::Escape($line)) {
+        throw "CubeMX did not generate expected FDCAN1 GPIO initialization: $line"
+    }
+}
+
 if ($appConfig -notmatch '#define\s+APP_VOFA_HEALTH_TELEMETRY_ENABLE\s+0U') {
     throw 'APP_VOFA_HEALTH_TELEMETRY_ENABLE must default to 0U.'
+}
+if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
+    throw 'APP_H723_CHASSIS_ACTUATION_ENABLE must default to 0U.'
+}
+if ($appConfig -notmatch '#define\s+APP_H723_M2006_FDCAN_INSTANCE\s+1U') {
+    throw 'M2006 must select FDCAN1.'
 }
 
 Write-Output 'STM32H723 CubeMX configuration test passed.'

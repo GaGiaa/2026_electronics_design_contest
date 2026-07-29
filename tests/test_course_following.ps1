@@ -13,9 +13,9 @@ $appDir = Join-Path $ProjectRoot 'mspm0g3507_app'
 $output = Join-Path $env:TEMP 'mspm0g3507_course_following_test.exe'
 
 try {
-    & $gcc '-std=c11' '-Wall' '-Wextra' '-Werror' "-I$appDir" `
+    & $gcc '-std=c11' '-Wall' '-Wextra' '-Werror' "-I$appDir" "-I$(Join-Path $ProjectRoot 'shared\pid')" `
         (Join-Path $appDir 'algorithms\course_following\course_following.c') `
-        (Join-Path $appDir 'algorithms\pid\pid.c') `
+        (Join-Path $ProjectRoot 'shared\pid\pid.c') `
         (Join-Path $PSScriptRoot 'test_course_following.c') '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) { throw "Course following test build failed (exit code $LASTEXITCODE)." }
     & $output

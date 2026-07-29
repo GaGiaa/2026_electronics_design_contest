@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 
 #include "app_telemetry.h"
+#include "app_chassis_service.h"
+#include "app_config.h"
 
 /* USER CODE END Includes */
 
@@ -48,6 +50,13 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 
+static osThreadId_t chassisTaskHandle;
+static const osThreadAttr_t chassisTask_attributes = {
+  .name = "chassisTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t)osPriorityHigh,
+};
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -59,6 +68,8 @@ const osThreadAttr_t defaultTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
+
+void startChassisTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -109,6 +120,8 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadNew(startDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
+  chassisTaskHandle = osThreadNew(startChassisTask, NULL, &chassisTask_attributes);
+  configASSERT(chassisTaskHandle != NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -140,6 +153,19 @@ __weak void startDefaultTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
+void startChassisTask(void *argument)
+{
+  uint32_t next_wake_tick = osKernelGetTickCount();
+
+  (void)argument;
+  h723_chassis_service_init();
+  for (;;) {
+    h723_chassis_service_step(HAL_GetTick());
+    next_wake_tick += APP_H723_CHASSIS_TASK_PERIOD_MS;
+    (void)osDelayUntil(next_wake_tick);
+  }
+}
 
 /* USER CODE END Application */
 

@@ -105,7 +105,7 @@ powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistU
 - SDK FreeRTOS Kernel；
 - SDK TI Arm Clang FreeRTOS port；
 - 本地 `FreeRTOSConfig.h`；
-- 本地 `mspm0g3507_app/algorithms/pid` PID 模块；
+- 本地 `shared/pid` 纯 C PID 模块；
 - SysConfig 生成的 `ti_msp_dl_config.c` 和 `ti_msp_dl_config.h`；
 - CMSIS Core headers。
 
@@ -123,7 +123,8 @@ G3507 应用源码按以下职责分层：`app/` 负责应用启动、任务和�
 | `mspm0l1306_bringup/` | MSPM0L1306 DriverLib、SysConfig 生成文件、L1306 linker | `tools/build-mspm0l1306.ps1` |
 | `mspm0g3507_bringup/` | MSPM0G3507 DriverLib、SysConfig 生成文件、G3507 linker | `tools/build-mspm0g3507.ps1` |
 | `mspm0g3507_freertos/` | G3507 DriverLib、SDK FreeRTOS Kernel、工程 `FreeRTOSConfig.h` | `tools/build-mspm0g3507-freertos.ps1` |
-| `mspm0g3507_app/` | G3507 DriverLib、SDK FreeRTOS Kernel、TI Arm Clang port、`algorithms/pid` 和分层应用源码 | `tools/build-mspm0g3507-app.ps1` |
+| `mspm0g3507_app/` | G3507 DriverLib、SDK FreeRTOS Kernel、TI Arm Clang port、共享 `shared/pid` 和分层应用源码 | `tools/build-mspm0g3507-app.ps1` |
+| `stm32h723_app/` | STM32Cube FW_H7、CubeMX 生成代码、FreeRTOS、共享 `shared/pid` 和 Keil MDK-ARM | `stm32h723_app/MDK-ARM/stm32h723_app.uvprojx` |
 | `keil/mspm0g3507_app/` | Keil Arm Compiler、SDK FreeRTOS Kernel、本地 `freertos_port/ARM_CM0` 和共享 G3507 应用源码 | `tools/build-keil-mspm0g3507-app.ps1` |
 
 ## 8. 运行时硬件依赖

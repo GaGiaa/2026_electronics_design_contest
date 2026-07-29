@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stddef.h>
 
-#include "algorithms/pid/app_math.h"
+#include "app_math.h"
 #include "config/app_config.h"
 #include "config/crsf_config.h"
 

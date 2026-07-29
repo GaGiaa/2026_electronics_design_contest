@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>__MSPM0G3507__</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\mspm0g3507_app;..\..\mspm0g3507_app\app;..\..\mspm0g3507_app\drivers;..\..\mspm0g3507_app\algorithms;..\..\mspm0g3507_app\protocols;..\..\mspm0g3507_app\services;..\..\mspm0g3507_app\platform;..\..\mspm0g3507_app\config;.\Generated;@MSPM0_SDK_ROOT@\source;@MSPM0_SDK_ROOT@\source\third_party\CMSIS\Core\Include;@MSPM0_SDK_ROOT@\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
+              <IncludePath>..\..\mspm0g3507_app;..\..\mspm0g3507_app\app;..\..\mspm0g3507_app\drivers;..\..\mspm0g3507_app\algorithms;..\..\mspm0g3507_app\protocols;..\..\mspm0g3507_app\services;..\..\mspm0g3507_app\platform;..\..\mspm0g3507_app\config;..\..\shared\pid;.\Generated;@MSPM0_SDK_ROOT@\source;@MSPM0_SDK_ROOT@\source\third_party\CMSIS\Core\Include;@MSPM0_SDK_ROOT@\kernel\freertos\Source\include;.\freertos_port\ARM_CM0</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -527,7 +527,7 @@
             <File>
               <FileName>pid.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\mspm0g3507_app\algorithms\pid\pid.c</FilePath>
+              <FilePath>..\..\shared\pid\pid.c</FilePath>
             </File>
             <File>
               <FileName>board_uart.c</FileName>

@@ -14,11 +14,11 @@ $gcc = (Get-Command gcc -ErrorAction Stop).Source
 $includeRoot = Join-Path $ProjectRoot 'mspm0g3507_app'
 $testSource = Join-Path $PSScriptRoot 'test_line_control.c'
 $lineControlSource = Join-Path $includeRoot 'algorithms\line_control\line_control.c'
-$pidSource = Join-Path $includeRoot 'algorithms\pid\pid.c'
+$pidSource = Join-Path $ProjectRoot 'shared\pid\pid.c'
 $output = Join-Path $env:TEMP 'mspm0g3507_line_control_test.exe'
 
 try {
-    & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$includeRoot" `
+    & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$includeRoot" "-I$(Join-Path $ProjectRoot 'shared\pid')" `
         "-I$(Join-Path $includeRoot 'algorithms\line_control')" `
         $testSource $lineControlSource $pidSource '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) {

@@ -1,0 +1,130 @@
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "app_chassis.h"
+#include "app_crsf.h"
+#include "app_m2006.h"
+
+static uint8_t crc8(const uint8_t *data, uint32_t length)
+{
+    uint8_t crc = 0U;
+    uint32_t index;
+    uint8_t bit;
+
+    for (index = 0U; index < length; ++index) {
+        crc ^= data[index];
+        for (bit = 0U; bit < 8U; ++bit) {
+            crc = (crc & 0x80U) != 0U ? (uint8_t)((crc << 1U) ^ 0xD5U) :
+                                        (uint8_t)(crc << 1U);
+        }
+    }
+    return crc;
+}
+
+static void make_channels_frame(uint8_t frame[26], const uint16_t channels[16])
+{
+    uint32_t channel;
+
+    memset(frame, 0, 26U);
+    frame[0] = 0xC8U;
+    frame[1] = 24U;
+    frame[2] = 0x16U;
+    for (channel = 0U; channel < 16U; ++channel) {
+        uint32_t bit_offset = channel * 11U;
+        uint32_t byte_offset = bit_offset / 8U;
+        uint32_t packed = (uint32_t)channels[channel] << (bit_offset % 8U);
+
+        frame[3U + byte_offset] |= (uint8_t)packed;
+        frame[3U + byte_offset + 1U] |= (uint8_t)(packed >> 8U);
+        frame[3U + byte_offset + 2U] |= (uint8_t)(packed >> 16U);
+    }
+    frame[25] = crc8(&frame[2], 23U);
+}
+
+static void test_crsf_manual_mix_and_switch_guard(void)
+{
+    app_crsf_parser_t parser;
+    app_crsf_input_t input = {0};
+    uint16_t channels[16] = {992U};
+    uint8_t frame[26];
+    uint32_t index;
+    app_chassis_command_t command;
+
+    channels[2] = 1811U;
+    channels[0] = 992U;
+    channels[6] = 992U;
+    channels[7] = 992U;
+    make_channels_frame(frame, channels);
+    app_crsf_parser_init(&parser);
+    for (index = 0U; index < sizeof(frame); ++index) {
+        (void)app_crsf_parser_feed(&parser, frame[index], 10U, &input);
+    }
+    assert(input.valid);
+    assert(input.channels[2] == 1811U);
+    app_chassis_mix(&input, 10U, &command);
+    assert(command.manual_active);
+    assert(command.left_target_rpm == 3000.0f);
+    assert(command.right_target_rpm == -3000.0f);
+
+    input.channels[6] = 172U;
+    app_chassis_mix(&input, 10U, &command);
+    assert(!command.manual_active);
+    assert(command.left_target_rpm == 0.0f);
+
+    input.channels[6] = 992U;
+    input.channels[0] = 1811U;
+    app_chassis_mix(&input, 10U, &command);
+    assert(command.manual_active);
+    assert(command.left_target_rpm == 3000.0f);
+    assert(command.right_target_rpm == 0.0f);
+
+    app_chassis_mix(&input, 111U, &command);
+    assert(!command.manual_active);
+    assert(command.left_target_rpm == 0.0f);
+    assert(command.right_target_rpm == 0.0f);
+}
+
+static void test_crsf_crc_rejection(void)
+{
+    app_crsf_parser_t parser;
+    app_crsf_input_t input = {0};
+    uint16_t channels[16] = {992U};
+    uint8_t frame[26];
+    uint32_t index;
+
+    make_channels_frame(frame, channels);
+    frame[25] ^= 0x01U;
+    app_crsf_parser_init(&parser);
+    for (index = 0U; index < sizeof(frame); ++index) {
+        (void)app_crsf_parser_feed(&parser, frame[index], 10U, &input);
+    }
+    assert(!input.valid);
+    assert(input.crc_error_count == 1U);
+}
+
+static void test_m2006_feedback_and_group_command(void)
+{
+    const uint8_t feedback[8] = {0x10U, 0x00U, 0x01U, 0xF4U, 0xFFU, 0x38U, 0x55U, 0U};
+    app_m2006_feedback_t parsed;
+    uint8_t command[8];
+
+    assert(app_m2006_parse_feedback(0x201U, feedback, &parsed));
+    assert(parsed.motor_id == 1U);
+    assert(parsed.encoder == 4096U);
+    assert(parsed.speed_rpm == 500);
+    assert(parsed.current == -200);
+    assert(!app_m2006_parse_feedback(0x203U, feedback, &parsed));
+    app_m2006_encode_group_current(1000, -1000, command);
+    assert(command[0] == 0x03U && command[1] == 0xE8U);
+    assert(command[2] == 0xFCU && command[3] == 0x18U);
+    assert(command[4] == 0U && command[7] == 0U);
+}
+
+int main(void)
+{
+    test_crsf_manual_mix_and_switch_guard();
+    test_crsf_crc_rejection();
+    test_m2006_feedback_and_group_command();
+    return 0;
+}

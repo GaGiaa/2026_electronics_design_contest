@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stddef.h>
 
-#include "algorithms/pid/app_math.h"
+#include "app_math.h"
 #include "config/crsf_config.h"
 
 #define MOTOR_CONTROL_DT_S 0.01f

@@ -54,7 +54,7 @@ PB22，频率为 2.666667 MHz；PB9 是未使用的 SPI 时钟输出。WS2812 �
 还可能选择旧版本的 SDK 或 SysConfig。
 
 可复现的应用构建应使用仓库构建脚本。脚本会加入 SDK 中的 FreeRTOS include 和 port 目录、
-仓库内 `algorithms/pid` 的 include 目录，以及所需的 FreeRTOS 内核源文件：
+仓库内 `shared/pid` 的 include 目录，以及所需的 FreeRTOS 内核源文件：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\configure-toolchain.ps1 -PersistUserEnvironment
@@ -62,7 +62,7 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 ```
 
 如果必须使用 CCS 图形界面构建，需要在本机工程中配置相同的 SDK FreeRTOS include/port
-目录和 `algorithms/pid` include 目录，然后将 SDK 中的 `list.c`、`queue.c`、`tasks.c`、
+目录和 `shared/pid` include 目录，然后将 SDK 中的 `list.c`、`queue.c`、`tasks.c`、
 `portable\TI_ARM_CLANG\ARM_CM0\port.c` 和 `portasm.c` 加入工程并链接对应对象。这属于
 每台电脑自己的 CCS workspace 配置，不应替换为仓库中的绝对路径。
 
@@ -110,7 +110,7 @@ B 相用于判断方向。`board_encoder` 明确声明电机机械参数：电�
 重新构建，并在速度环前手动确认四个轮位的计数符号、单圈计数和轮位隔离。
 
 电机任务每次 10 ms 的迭代依次采样带符号编码器增量、累积计数和计算得到的 mm/s 速度，
-然后更新 PWM。每个轮位使用一个增量式 PID 速度控制器。`algorithms/pid/` 是从外部
+然后更新 PWM。每个轮位使用一个增量式 PID 速度控制器。`shared/pid/` 是从外部
 MotorLib 中受控复制的、仅包含平台无关 PID 核心的目录；CAN 协议、STM32 HAL、DJI 和
 RobStride 代码没有被引入。可通过 SWD 写入的 `volatile g_motor_speed_targets_mm_s[4]`
 提供普通的四轮 mm/s 目标值，初始时所有目标均为 0。

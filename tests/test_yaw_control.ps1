@@ -14,11 +14,11 @@ $gcc = (Get-Command gcc -ErrorAction Stop).Source
 $includeRoot = Join-Path $ProjectRoot 'mspm0g3507_app'
 $testSource = Join-Path $PSScriptRoot 'test_yaw_control.c'
 $yawSource = Join-Path $includeRoot 'algorithms\yaw_control\yaw_control.c'
-$pidSource = Join-Path $includeRoot 'algorithms\pid\pid.c'
+$pidSource = Join-Path $ProjectRoot 'shared\pid\pid.c'
 $output = Join-Path $env:TEMP 'mspm0g3507_yaw_control_test.exe'
 
 try {
-    & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$includeRoot" `
+    & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$includeRoot" "-I$(Join-Path $ProjectRoot 'shared\pid')" `
         "-I$(Join-Path $includeRoot 'algorithms\yaw_control')" `
         $testSource $yawSource $pidSource '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) {

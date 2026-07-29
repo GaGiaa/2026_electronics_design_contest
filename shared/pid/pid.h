@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "algorithms/pid/pid_config.h"
+#include "pid_config.h"
 
 typedef struct {
     float kp;

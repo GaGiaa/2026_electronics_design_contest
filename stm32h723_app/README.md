@@ -1,29 +1,32 @@
-# STM32H723 Application Base
+# STM32H723 差速底盘应用工程
 
-This is the independent STM32H723ZGT6 application base for the 2026 electronics design contest. Its CubeMX configuration is the source of truth for chip clocks, pins, DMA, FreeRTOS, UART8, and FDCAN.
+这是 2026 电赛的独立 STM32H723ZGT6 工程。芯片时钟、引脚、DMA、FreeRTOS 和 HAL 外设初始化以 `stm32h723_app.ioc` 为唯一事实来源；禁止手写或替换 CubeMX 生成的初始化代码。
 
-## Scope
+## 当前范围
 
-- MCU: `STM32H723ZGT6`.
-- Toolchain: STM32CubeMX 6.15.0, STM32Cube FW_H7 V1.12.1, and Keil MDK-ARM.
-- Clock: HSE 25 MHz, system clock 550 MHz.
-- Debug: SWD on `PA13` and `PA14`; D-Cache is disabled.
-- UART8: `PE0` RX and `PE1` TX, 8-N-1 at 1,000,000 bit/s. TX uses `DMA1_Stream1`; RX is reserved and no receive protocol is implemented.
-- FreeRTOS: CMSIS-RTOS v2 default task invokes the application telemetry service.
-- FDCAN: FDCAN1, FDCAN2, and FDCAN3 retain the CubeMX 1 Mbit/s timing and message RAM layout. They are initialized only. This base never calls `HAL_FDCAN_Start` and sends no CAN frame.
+- MCU 为 `STM32H723ZGT6`，使用 STM32CubeMX 6.15.0、STM32Cube FW_H7 V1.12.1 和 Keil MDK-ARM。
+- HSE 25 MHz，系统时钟 550 MHz；SWD 使用 `PA13/PA14`；M7 D-Cache 关闭，避免 DMA 缓冲区一致性问题。
+- UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
+- UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
+- M2006 总线使用 FDCAN1：`PD0` RX、`PD1` TX、1 Mbit/s，接收 ID `0x201/0x202`，每 1 ms 发送标准帧 `0x200`。FDCAN2 的 `PB12/PB13` 与 FDCAN3 仍由 CubeMX 保留；在 `App/Inc/app_config.h` 将 `APP_H723_M2006_FDCAN_INSTANCE` 改为 `2U` 可切换至 FDCAN2。
+- FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
-The intended later assignment is M2006 CAN IDs 1 and 2 for the differential-drive left/right wheels and ID 3 for the balancing mechanism. No M2006 protocol, PWM, PID, or balancing control belongs to this base.
+两台 M2006 位于 FDCAN1：左轮 ID 1、方向 `+1`；右轮 ID 2、方向 `-1`。ID 3 的上层平衡机构不属于本轮实现。
+
+## CRSF 与安全状态机
+
+CRSF 始终解析 16 个 11-bit 通道，CH3（数组索引 2）为前进/后退，CH1（索引 0）为左右转向。有效范围为 `172/992/1811`，归一化死区为 `0.2`。仅 SB（索引 6）和 SC（索引 7）均处于中档时进入手动差速；任一低档或高档、CRSF 超过 100 ms 未收到有效帧、任一电机反馈超过 50 ms 时都复位 PID 并下发零电流。
+
+`App/Inc/app_config.h` 中的 `APP_H723_CHASSIS_ACTUATION_ENABLE` 默认是 `0U`。该状态下 CRSF、混控、PID 和 Watch 调试量仍会更新，但选中的 FDCAN 总线的 `0x200` 只允许发送四个零电流槽位。只有显式改为 `1U` 才会发送非零电流，首次实车前必须将车架悬空，核对 CAN 收发器、反馈 ID、左右方向宏和 PID 参数。无反馈排查时，在 Keil Watch 观察 `g_h723_debug.fdcan_instance`、`fdcan_rx_count`、`fdcan_last_status`、`fdcan_protocol_last_error`、`fdcan_protocol_bus_off`、`fdcan_tx_error_counter` 与 `fdcan_rx_error_counter`。
+
+PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，初始参数为 1 ms、`kp=1.0`、`ki=10.0`、`kd=0`、输出限幅 3000、积分限幅 1500、每周期输出变化限幅 250。这些值只是安全起点，尚未进行硬件整定。
 
 ## CubeMX Regeneration
 
-1. Open `stm32h723_app.ioc` in STM32CubeMX.
-2. Make peripheral or clock changes in CubeMX. Do not hand-edit HAL initialization code.
-3. Keep the project target as `MDK-ARM`, then use `Generate Code` into this directory.
-4. Preserve code only in CubeMX `USER CODE` sections. Application logic belongs in `App/`.
-5. After generation, ensure the Keil project still includes `App/Src/app_debug.c`, `App/Src/app_telemetry.c`, and `App/Src/vofa_justfloat.c`, with `App/Inc` in its include paths.
-6. Run the static configuration and JustFloat tests before building with Keil.
-
-The original template was `D:\desktop\2026RC\Control\single_motor_test\single_motor_test.ioc`. UART7 and unrelated X-CUBE packages were removed during the CubeMX configuration pass.
+1. 在 STM32CubeMX 中打开 `stm32h723_app.ioc`，修改外设或时钟后生成到当前目录，工程目标保持 `MDK-ARM`。
+2. 保留生成代码的 `USER CODE` 区域；应用逻辑只能放在 `App/` 或这些区域。
+3. 本轮配置由 CubeMX 6.15.0 重新生成。可用 `cubemx_generate_crsf.txt` 通过 CubeMX 命令行重现生成；该脚本加载相同 `.ioc` 后执行 `project generate`。
+4. 重新生成后检查 Keil 工程仍包含 `App/Src/app_debug.c`、`app_telemetry.c`、`app_crsf.c`、`app_m2006.c`、`app_chassis.c`、`app_chassis_service.c` 与 `../../shared/pid/pid.c`，并具有 `App/Inc` 与 `shared/pid` include 路径。
 
 ## UART8 VOFA Health Telemetry
 
@@ -44,9 +47,9 @@ The default is off, so UART8 transmits nothing. Set the macro to `1U` to transmi
 
 Connect the USB-UART adapter GND to board GND and adapter RX to `PE1` (UART8 TX), respecting the board voltage level. Configure VOFA+ for JustFloat at 1,000,000 bit/s.
 
-## SWD Debug Snapshot
+## SWD 调试快照
 
-Keil Watch can directly observe the read-only-by-convention global `volatile g_h723_debug` from `App/Inc/app_debug.h`. It exposes boot count, uptime, task loop count, telemetry enable state, UART DMA start/completion/drop counters, the last HAL status, and the in-flight flag. Do not modify this variable from the debugger.
+Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。其中包括 16 个 CRSF 原始通道值、有效帧/CRC/格式/UART/环形缓冲/超时统计、当前手动模式、前进和转向归一化量、左右目标 RPM，以及每个 M2006 的反馈 ID、编码器、实际 RPM、反馈年龄、PID P/I/D/输出、目标速度和最终 CAN 电流命令。不要从调试器写入这个快照。
 
 ## Build And Checks
 
@@ -58,11 +61,13 @@ Build only; this does not program the board:
 
 Expected artifact: `MDK-ARM\stm32h723_app\stm32h723_app.axf`.
 
-Run the host and CubeMX static checks from the repository root:
+从仓库根目录运行主机测试和 CubeMX 静态检查：
 
 ```powershell
 .\tests\test_stm32h723_vofa_justfloat.ps1
+.\tests\test_stm32h723_chassis.ps1
 .\tests\test_stm32h723_ioc.ps1
+.\tests\test_stm32h723_keil_project.ps1
 ```
 
-No flash, probe connection, SWD session, CAN bus test, motor test, or hardware acceptance test is performed by these commands.
+上述命令不执行 Flash、烧录、探针连接、SWD 会话、CRSF 实物收发、CAN 总线或电机测试。实物验收仍需在车架悬空条件下进行。

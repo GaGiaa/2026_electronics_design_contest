@@ -6,7 +6,7 @@
 #include "algorithms/encoder/encoder_quadrature.h"
 #include "algorithms/encoder/encoder_speed_filter.h"
 #include "algorithms/motor_control/motor_control.h"
-#include "algorithms/pid/pid.h"
+#include "pid.h"
 #include "protocols/vofa/vofa_justfloat.h"
 
 static void expect_close(float actual, float expected, float tolerance, const char *message)

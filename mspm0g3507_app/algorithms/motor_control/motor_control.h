@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "drivers/encoder/board_encoder.h"
-#include "algorithms/pid/pid.h"
+#include "pid.h"
 
 typedef enum {
     MOTOR_CONTROL_DEBUG_MODE_STOP = 0U,
