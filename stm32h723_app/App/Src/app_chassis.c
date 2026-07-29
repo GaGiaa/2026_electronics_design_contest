@@ -29,6 +29,6 @@ void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis
     right = command->forward_normalized - command->turn_normalized;
     maximum = fmaxf(fabsf(left), fabsf(right));
     if (maximum > 1.0f) { left /= maximum; right /= maximum; }
-    command->left_target_rpm = left * APP_H723_CHASSIS_MAX_RPM * APP_H723_LEFT_SIGN;
-    command->right_target_rpm = right * APP_H723_CHASSIS_MAX_RPM * APP_H723_RIGHT_SIGN;
+    command->left_target_rpm = left * APP_H723_CHASSIS_MAX_OUTPUT_RPM * APP_H723_LEFT_SIGN;
+    command->right_target_rpm = right * APP_H723_CHASSIS_MAX_OUTPUT_RPM * APP_H723_RIGHT_SIGN;
 }

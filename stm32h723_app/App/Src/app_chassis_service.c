@@ -1,5 +1,6 @@
 #include "app_chassis_service.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "app_chassis.h"
@@ -69,19 +70,19 @@ static const PID_Incremental_Param_Config s_speed_pid_params = {
     .kp = APP_H723_M2006_PID_KP,
     .ki = APP_H723_M2006_PID_KI,
     .kd = APP_H723_M2006_PID_KD,
-    .output_limit = APP_H723_M2006_CURRENT_LIMIT,
-    .deadband = 10.0f,
+    .output_limit = APP_H723_M2006_CURRENT_LIMIT_A,
+    .deadband = APP_H723_M2006_PID_DEADBAND_RPM,
     .integral_output_limit = APP_H723_M2006_PID_INTEGRAL_LIMIT,
-    .integral_separation_threshold = 800.0f,
+    .integral_separation_threshold = APP_H723_M2006_PID_INTEGRAL_SEPARATION_RPM,
     .derivative_filter_N = 0.0f,
     .output_delta_limit = APP_H723_M2006_PID_OUTPUT_DELTA_LIMIT,
 };
 
-static int16_t h723_clamp_current(float value)
+static float h723_clamp_current(float value)
 {
-    if (value > APP_H723_M2006_CURRENT_LIMIT) { return (int16_t)APP_H723_M2006_CURRENT_LIMIT; }
-    if (value < -APP_H723_M2006_CURRENT_LIMIT) { return (int16_t)-APP_H723_M2006_CURRENT_LIMIT; }
-    return (int16_t)value;
+    if (value > APP_H723_M2006_CURRENT_LIMIT_A) { return APP_H723_M2006_CURRENT_LIMIT_A; }
+    if (value < -APP_H723_M2006_CURRENT_LIMIT_A) { return -APP_H723_M2006_CURRENT_LIMIT_A; }
+    return value;
 }
 
 static uint32_t h723_crsf_switch_state(uint16_t raw)
@@ -107,11 +108,12 @@ void h723_chassis_service_init(void)
     g_h723_debug.single_motor.default_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.selected_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.enable = 0U;
-    g_h723_debug.single_motor.target_speed_rpm = 0.0f;
+    g_h723_debug.single_motor.target_output_speed_rpm = 0.0f;
+    g_h723_debug.single_motor.max_target_output_speed_rpm = APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM;
     g_h723_debug.single_motor.kp = APP_H723_M2006_PID_KP;
     g_h723_debug.single_motor.ki = APP_H723_M2006_PID_KI;
     g_h723_debug.single_motor.kd = APP_H723_M2006_PID_KD;
-    g_h723_debug.single_motor.output_limit = APP_H723_M2006_CURRENT_LIMIT;
+    g_h723_debug.single_motor.output_limit = APP_H723_M2006_CURRENT_LIMIT_A;
     g_h723_debug.single_motor.deadband = s_speed_pid_params.deadband;
     g_h723_debug.single_motor.integral_output_limit = APP_H723_M2006_PID_INTEGRAL_LIMIT;
     g_h723_debug.single_motor.integral_separation_threshold = s_speed_pid_params.integral_separation_threshold;
@@ -205,15 +207,17 @@ static void h723_update_m2006_debug(uint32_t index, uint32_t now_ms, float targe
                              (uint32_t)(now_ms - s_feedback_time_ms[index]) : UINT32_MAX;
     if (s_feedback_valid[index]) {
         debug->encoder = s_feedback[index].encoder;
-        debug->feedback_speed_rpm = s_feedback[index].speed_rpm;
-        debug->feedback_current = s_feedback[index].current;
+        debug->rotor_speed_rpm = s_feedback[index].rotor_speed_rpm;
+        debug->feedback_current_raw = s_feedback[index].current_raw;
+        debug->feedback_output_speed_rpm = s_feedback[index].output_speed_rpm;
+        debug->feedback_current_A = s_feedback[index].current_a;
         debug->temperature_celsius = s_feedback[index].temperature_celsius;
     }
-    debug->target_speed_rpm = target_rpm;
+    debug->target_output_speed_rpm = target_rpm;
 }
 
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
-static void h723_single_motor_service_step(uint32_t now_ms, int16_t output[3])
+static void h723_single_motor_service_step(uint32_t now_ms, float output_current_A[3])
 {
     app_single_motor_step_input_t input = {0};
     app_single_motor_step_output_t result = {0};
@@ -221,15 +225,19 @@ static void h723_single_motor_service_step(uint32_t now_ms, int16_t output[3])
     uint32_t selected_id;
     uint32_t selected_index;
     uint32_t index;
+    float max_target_output_speed_rpm;
 
     selected_id = app_single_motor_sanitize_id(g_h723_debug.single_motor.selected_id,
                                                 APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID);
     selected_index = selected_id - 1U;
     g_h723_debug.single_motor.selected_id = selected_id;
+    max_target_output_speed_rpm = app_single_motor_sanitize_max_output_speed_rpm(
+        g_h723_debug.single_motor.max_target_output_speed_rpm);
+    g_h723_debug.single_motor.max_target_output_speed_rpm = max_target_output_speed_rpm;
     input.enable = g_h723_debug.single_motor.enable;
     input.selected_id = selected_id;
     input.default_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
-    input.target_speed_rpm = g_h723_debug.single_motor.target_speed_rpm;
+    input.target_output_speed_rpm = g_h723_debug.single_motor.target_output_speed_rpm;
     params.kp = g_h723_debug.single_motor.kp;
     params.ki = g_h723_debug.single_motor.ki;
     params.kd = g_h723_debug.single_motor.kd;
@@ -245,28 +253,29 @@ static void h723_single_motor_service_step(uint32_t now_ms, int16_t output[3])
     input.feedback_valid = h723_m2006_feedback_is_fresh(selected_index, now_ms);
     input.feedback_age_ms = h723_m2006_feedback_is_fresh(selected_index, now_ms) ?
                             (uint32_t)(now_ms - s_feedback_time_ms[selected_index]) : UINT32_MAX;
-    input.feedback_speed_rpm = s_feedback[selected_index].speed_rpm;
+    input.feedback_output_speed_rpm = s_feedback[selected_index].output_speed_rpm;
     s_single_motor_last_id = selected_id;
     s_single_motor_last_enable = input.enable;
 
     for (index = 0U; index < 3U; ++index) {
-        h723_update_m2006_debug(index, now_ms, index == selected_index ? input.target_speed_rpm : 0.0f);
+        h723_update_m2006_debug(index, now_ms, index == selected_index ? input.target_output_speed_rpm : 0.0f);
         if (index != selected_index) {
             PID_Incremental_Reset(&s_speed_pid[index]);
-            g_h723_debug.m2006[index].pid_raw_output = 0.0f;
-            g_h723_debug.m2006[index].pid_p_out = 0.0f;
-            g_h723_debug.m2006[index].pid_i_out = 0.0f;
-            g_h723_debug.m2006[index].pid_d_out = 0.0f;
-            g_h723_debug.m2006[index].pid_output = 0.0f;
-            g_h723_debug.m2006[index].commanded_current = 0;
+            g_h723_debug.m2006[index].pid_raw_output_A = 0.0f;
+            g_h723_debug.m2006[index].pid_p_out_A = 0.0f;
+            g_h723_debug.m2006[index].pid_i_out_A = 0.0f;
+            g_h723_debug.m2006[index].pid_d_out_A = 0.0f;
+            g_h723_debug.m2006[index].pid_output_A = 0.0f;
+            g_h723_debug.m2006[index].commanded_current_raw = 0;
+            g_h723_debug.m2006[index].commanded_current_A = 0.0f;
         }
-        output[index] = 0;
+        output_current_A[index] = 0.0f;
     }
     if (!input.configuration_changed) {
         (void)app_single_motor_step(&s_speed_pid[selected_index], &input,
                                     APP_H723_M2006_FEEDBACK_TIMEOUT_MS,
-                                    APP_H723_SINGLE_MOTOR_MAX_TARGET_RPM,
-                                    APP_H723_M2006_CURRENT_LIMIT, &result);
+                                    max_target_output_speed_rpm,
+                                    APP_H723_M2006_CURRENT_LIMIT_A, &result);
     } else {
         PID_Incremental_Reset(&s_speed_pid[selected_index]);
         result.selected_id = selected_id;
@@ -274,7 +283,7 @@ static void h723_single_motor_service_step(uint32_t now_ms, int16_t output[3])
         result.safety_reason = APP_SINGLE_MOTOR_SAFETY_CONFIGURATION_CHANGED;
     }
     if (result.active) {
-        output[selected_index] = result.commanded_current;
+        output_current_A[selected_index] = result.commanded_current_A;
     }
 
     g_h723_debug.single_motor.active = result.active ? 1U : 0U;
@@ -282,21 +291,26 @@ static void h723_single_motor_service_step(uint32_t now_ms, int16_t output[3])
     g_h723_debug.single_motor.safety_reason = result.safety_reason;
     g_h723_debug.single_motor.cycle_count++;
     g_h723_debug.single_motor.feedback_encoder = g_h723_debug.m2006[selected_index].encoder;
-    g_h723_debug.single_motor.feedback_speed_rpm = g_h723_debug.m2006[selected_index].feedback_speed_rpm;
-    g_h723_debug.single_motor.feedback_current = g_h723_debug.m2006[selected_index].feedback_current;
+    g_h723_debug.single_motor.rotor_speed_rpm = g_h723_debug.m2006[selected_index].rotor_speed_rpm;
+    g_h723_debug.single_motor.feedback_output_speed_rpm = g_h723_debug.m2006[selected_index].feedback_output_speed_rpm;
+    g_h723_debug.single_motor.feedback_current_raw = g_h723_debug.m2006[selected_index].feedback_current_raw;
+    g_h723_debug.single_motor.feedback_current_A = g_h723_debug.m2006[selected_index].feedback_current_A;
     g_h723_debug.single_motor.feedback_temperature_celsius = g_h723_debug.m2006[selected_index].temperature_celsius;
     g_h723_debug.single_motor.feedback_age_ms = g_h723_debug.m2006[selected_index].feedback_age_ms;
-    g_h723_debug.single_motor.target_current = output[selected_index];
-    g_h723_debug.single_motor.pid_raw_output = result.raw_output;
-    g_h723_debug.single_motor.pid_p_out = result.pid_p_out;
-    g_h723_debug.single_motor.pid_i_out = result.pid_i_out;
-    g_h723_debug.single_motor.pid_d_out = result.pid_d_out;
-    g_h723_debug.single_motor.pid_output = result.pid_output;
-    g_h723_debug.m2006[selected_index].pid_p_out = result.pid_p_out;
-    g_h723_debug.m2006[selected_index].pid_i_out = result.pid_i_out;
-    g_h723_debug.m2006[selected_index].pid_d_out = result.pid_d_out;
-    g_h723_debug.m2006[selected_index].pid_output = result.pid_output;
-    g_h723_debug.m2006[selected_index].commanded_current = output[selected_index];
+    g_h723_debug.single_motor.target_current_A = output_current_A[selected_index];
+    g_h723_debug.single_motor.target_current_raw = app_m2006_current_a_to_raw(output_current_A[selected_index]);
+    g_h723_debug.single_motor.target_current_A = app_m2006_raw_current_to_a(g_h723_debug.single_motor.target_current_raw);
+    g_h723_debug.single_motor.pid_raw_output_A = result.raw_output_A;
+    g_h723_debug.single_motor.pid_p_out_A = result.pid_p_out_A;
+    g_h723_debug.single_motor.pid_i_out_A = result.pid_i_out_A;
+    g_h723_debug.single_motor.pid_d_out_A = result.pid_d_out_A;
+    g_h723_debug.single_motor.pid_output_A = result.pid_output_A;
+    g_h723_debug.m2006[selected_index].pid_p_out_A = result.pid_p_out_A;
+    g_h723_debug.m2006[selected_index].pid_i_out_A = result.pid_i_out_A;
+    g_h723_debug.m2006[selected_index].pid_d_out_A = result.pid_d_out_A;
+    g_h723_debug.m2006[selected_index].pid_output_A = result.pid_output_A;
+    g_h723_debug.m2006[selected_index].commanded_current_raw = g_h723_debug.single_motor.target_current_raw;
+    g_h723_debug.m2006[selected_index].commanded_current_A = g_h723_debug.single_motor.target_current_A;
 }
 #endif
 
@@ -305,7 +319,8 @@ void h723_chassis_service_step(uint32_t now_ms)
     FDCAN_TxHeaderTypeDef header = {0};
     FDCAN_HandleTypeDef *fdcan = h723_m2006_fdcan();
     uint8_t data[8];
-    int16_t output[3] = {0, 0, 0};
+    float output_current_A[3] = {0.0f, 0.0f, 0.0f};
+    int16_t output_raw[3] = {0, 0, 0};
     uint32_t index;
     while (s_crsf_read_index != s_crsf_write_index) {
         (void)app_crsf_parser_feed(&s_crsf_parser, s_crsf_ring[s_crsf_read_index], now_ms, &s_crsf_input);
@@ -331,16 +346,16 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.chassis.actuation_enabled = APP_H723_CHASSIS_ACTUATION_ENABLE;
     g_h723_debug.chassis.forward_normalized = s_command.forward_normalized;
     g_h723_debug.chassis.turn_normalized = s_command.turn_normalized;
-    g_h723_debug.chassis.left_target_rpm = s_command.left_target_rpm;
-    g_h723_debug.chassis.right_target_rpm = s_command.right_target_rpm;
+    g_h723_debug.chassis.left_target_output_speed_rpm = s_command.left_target_rpm;
+    g_h723_debug.chassis.right_target_output_speed_rpm = s_command.right_target_rpm;
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
     g_h723_debug.chassis.mode = 2U;
     g_h723_debug.chassis.actuation_enabled = g_h723_debug.single_motor.enable;
     g_h723_debug.chassis.forward_normalized = 0.0f;
     g_h723_debug.chassis.turn_normalized = 0.0f;
-    g_h723_debug.chassis.left_target_rpm = 0.0f;
-    g_h723_debug.chassis.right_target_rpm = 0.0f;
-    h723_single_motor_service_step(now_ms, output);
+    g_h723_debug.chassis.left_target_output_speed_rpm = 0.0f;
+    g_h723_debug.chassis.right_target_output_speed_rpm = 0.0f;
+    h723_single_motor_service_step(now_ms, output_current_A);
 #else
     for (index = 0U; index < 3U; ++index) {
         float target = index == 0U ? s_command.left_target_rpm : s_command.right_target_rpm;
@@ -348,19 +363,24 @@ void h723_chassis_service_step(uint32_t now_ms)
         volatile h723_m2006_debug_t *debug = &g_h723_debug.m2006[index];
         if (index == 2U) { target = 0.0f; }
         h723_update_m2006_debug(index, now_ms, target);
-        debug->target_speed_rpm = target;
+        debug->target_output_speed_rpm = target;
         if (index == 2U || !s_command.manual_active || !feedback_fresh) {
             PID_Incremental_Reset(&s_speed_pid[index]);
-            output[index] = 0;
+            output_current_A[index] = 0.0f;
         } else {
-            output[index] = h723_clamp_current(PID_Incremental_Calc(&s_speed_pid[index], target, (float)debug->feedback_speed_rpm));
+            output_current_A[index] = h723_clamp_current(PID_Incremental_Calc(&s_speed_pid[index], target, debug->feedback_output_speed_rpm));
         }
-        debug->pid_raw_output = s_speed_pid[index].raw_output; debug->pid_p_out = s_speed_pid[index].p_out; debug->pid_i_out = s_speed_pid[index].i_out; debug->pid_d_out = s_speed_pid[index].d_out; debug->pid_output = s_speed_pid[index].output;
-        if (APP_H723_CHASSIS_ACTUATION_ENABLE == 0U) { output[index] = 0; }
-        debug->commanded_current = output[index];
+        debug->pid_raw_output_A = s_speed_pid[index].raw_output; debug->pid_p_out_A = s_speed_pid[index].p_out; debug->pid_i_out_A = s_speed_pid[index].i_out; debug->pid_d_out_A = s_speed_pid[index].d_out; debug->pid_output_A = s_speed_pid[index].output;
+        if (APP_H723_CHASSIS_ACTUATION_ENABLE == 0U) { output_current_A[index] = 0.0f; }
+        debug->commanded_current_raw = app_m2006_current_a_to_raw(output_current_A[index]);
+        debug->commanded_current_A = app_m2006_raw_current_to_a(debug->commanded_current_raw);
+        output_current_A[index] = debug->commanded_current_A;
     }
 #endif
-    app_m2006_encode_group_current_slots(output, data);
+    for (index = 0U; index < 3U; ++index) {
+        output_raw[index] = app_m2006_current_a_to_raw(output_current_A[index]);
+    }
+    app_m2006_encode_group_current_slots(output_raw, data);
     header.Identifier = 0x200U; header.IdType = FDCAN_STANDARD_ID; header.TxFrameType = FDCAN_DATA_FRAME; header.DataLength = FDCAN_DLC_BYTES_8;
     header.ErrorStateIndicator = FDCAN_ESI_ACTIVE; header.BitRateSwitch = FDCAN_BRS_OFF; header.FDFormat = FDCAN_CLASSIC_CAN; header.TxEventFifoControl = FDCAN_NO_TX_EVENTS; header.MessageMarker = 0U;
     g_h723_debug.fdcan.last_status = HAL_FDCAN_AddMessageToTxFifoQ(fdcan, &header, data);

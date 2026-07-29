@@ -120,14 +120,14 @@ void h723_app_telemetry_step(void)
 #if (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE == 1U)
     if ((now_ms - s_last_single_motor_telemetry_ms) >= APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS) {
         const float channels[H723_VOFA_SINGLE_MOTOR_CHANNEL_COUNT] = {
-            (float)g_h723_debug.single_motor.target_current,
-            (float)g_h723_debug.single_motor.feedback_current,
-            g_h723_debug.single_motor.target_speed_rpm,
-            (float)g_h723_debug.single_motor.feedback_speed_rpm,
-            g_h723_debug.single_motor.pid_raw_output,
-            g_h723_debug.single_motor.pid_p_out,
-            g_h723_debug.single_motor.pid_i_out,
-            g_h723_debug.single_motor.pid_d_out
+            g_h723_debug.single_motor.target_current_A,
+            g_h723_debug.single_motor.feedback_current_A,
+            g_h723_debug.single_motor.target_output_speed_rpm,
+            g_h723_debug.single_motor.feedback_output_speed_rpm,
+            g_h723_debug.single_motor.pid_output_A,
+            g_h723_debug.single_motor.pid_p_out_A,
+            g_h723_debug.single_motor.pid_i_out_A,
+            g_h723_debug.single_motor.pid_d_out_A
         };
         HAL_StatusTypeDef status;
 

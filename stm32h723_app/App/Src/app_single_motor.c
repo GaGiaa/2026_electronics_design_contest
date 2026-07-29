@@ -17,26 +17,20 @@ static bool app_single_motor_params_are_valid(const PID_Incremental_Param_Config
            params->derivative_filter_N >= 0.0f && params->output_delta_limit >= 0.0f;
 }
 
-static int16_t app_single_motor_clamp_current(float value, float limit)
+static float app_single_motor_clamp_current(float value, float limit)
 {
     if (!isfinite(value)) {
-        return 0;
+        return 0.0f;
     }
     if (!isfinite(limit) || limit <= 0.0f) {
-        return 0;
+        return 0.0f;
     }
     if (value > limit) {
         value = limit;
     } else if (value < -limit) {
         value = -limit;
     }
-    if (value > 32767.0f) {
-        return 32767;
-    }
-    if (value < -32768.0f) {
-        return -32768;
-    }
-    return (int16_t)value;
+    return value;
 }
 
 uint32_t app_single_motor_sanitize_id(uint32_t requested_id, uint32_t default_id)
@@ -50,11 +44,19 @@ uint32_t app_single_motor_sanitize_id(uint32_t requested_id, uint32_t default_id
     return 1U;
 }
 
+float app_single_motor_sanitize_max_output_speed_rpm(float requested_limit)
+{
+    if (!isfinite(requested_limit) || requested_limit <= 0.0f) {
+        return 0.0f;
+    }
+    return requested_limit;
+}
+
 bool app_single_motor_step(PID_Incremental *pid,
                            const app_single_motor_step_input_t *input,
                            uint32_t feedback_timeout_ms,
-                           float max_target_speed_rpm,
-                           float max_command_current,
+                           float max_target_output_speed_rpm,
+                           float max_command_current_A,
                            app_single_motor_step_output_t *output)
 {
     bool valid;
@@ -72,9 +74,9 @@ bool app_single_motor_step(PID_Incremental *pid,
     output->selected_id = app_single_motor_sanitize_id(input->selected_id, input->default_id);
     valid = !input->configuration_changed && input->enable == 1U && input->feedback_valid &&
             input->feedback_age_ms < feedback_timeout_ms &&
-            isfinite(input->target_speed_rpm) && isfinite(max_target_speed_rpm) &&
-            max_target_speed_rpm > 0.0f &&
-            fabsf(input->target_speed_rpm) <= max_target_speed_rpm &&
+            isfinite(input->target_output_speed_rpm) && isfinite(max_target_output_speed_rpm) &&
+            max_target_output_speed_rpm > 0.0f &&
+            fabsf(input->target_output_speed_rpm) <= max_target_output_speed_rpm &&
             app_single_motor_params_are_valid(&input->params);
     if (!valid) {
         PID_Incremental_Reset(pid);
@@ -85,9 +87,9 @@ bool app_single_motor_step(PID_Incremental *pid,
             output->safety_reason = APP_SINGLE_MOTOR_SAFETY_DISABLED;
         } else if (!input->feedback_valid || input->feedback_age_ms >= feedback_timeout_ms) {
             output->safety_reason = APP_SINGLE_MOTOR_SAFETY_FEEDBACK;
-        } else if (!isfinite(input->target_speed_rpm) || !isfinite(max_target_speed_rpm) ||
-                   max_target_speed_rpm <= 0.0f ||
-                   fabsf(input->target_speed_rpm) > max_target_speed_rpm) {
+        } else if (!isfinite(input->target_output_speed_rpm) || !isfinite(max_target_output_speed_rpm) ||
+                   max_target_output_speed_rpm <= 0.0f ||
+                   fabsf(input->target_output_speed_rpm) > max_target_output_speed_rpm) {
             output->safety_reason = APP_SINGLE_MOTOR_SAFETY_TARGET;
         } else {
             output->safety_reason = APP_SINGLE_MOTOR_SAFETY_PARAMS;
@@ -96,15 +98,15 @@ bool app_single_motor_step(PID_Incremental *pid,
     }
 
     pid->params = input->params;
-    (void)PID_Incremental_Calc(pid, input->target_speed_rpm,
-                                (float)input->feedback_speed_rpm);
+    (void)PID_Incremental_Calc(pid, input->target_output_speed_rpm,
+                                input->feedback_output_speed_rpm);
     output->active = true;
-    output->commanded_current = app_single_motor_clamp_current(pid->output, max_command_current);
-    output->raw_output = pid->raw_output;
-    output->pid_output = pid->output;
-    output->pid_p_out = pid->p_out;
-    output->pid_i_out = pid->i_out;
-    output->pid_d_out = pid->d_out;
+    output->commanded_current_A = app_single_motor_clamp_current(pid->output, max_command_current_A);
+    output->raw_output_A = pid->raw_output;
+    output->pid_output_A = pid->output;
+    output->pid_p_out_A = pid->p_out;
+    output->pid_i_out_A = pid->i_out;
+    output->pid_d_out_A = pid->d_out;
     output->safety_reason = APP_SINGLE_MOTOR_SAFETY_OK;
     return true;
 }

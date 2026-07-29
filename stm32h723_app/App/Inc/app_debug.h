@@ -39,8 +39,8 @@ typedef struct {
     uint32_t actuation_enabled;
     float forward_normalized;
     float turn_normalized;
-    float left_target_rpm;
-    float right_target_rpm;
+    float left_target_output_speed_rpm;
+    float right_target_output_speed_rpm;
 } h723_debug_chassis_t;
 
 typedef struct {
@@ -59,17 +59,20 @@ typedef struct {
 typedef struct {
     uint16_t feedback_id;
     uint16_t encoder;
-    int16_t feedback_speed_rpm;
-    int16_t feedback_current;
+    int16_t rotor_speed_rpm;
+    int16_t feedback_current_raw;
+    float feedback_output_speed_rpm;
+    float feedback_current_A;
     uint8_t temperature_celsius;
     uint32_t feedback_age_ms;
-    float target_speed_rpm;
-    float pid_raw_output;
-    float pid_p_out;
-    float pid_i_out;
-    float pid_d_out;
-    float pid_output;
-    int16_t commanded_current;
+    float target_output_speed_rpm;
+    float pid_raw_output_A;
+    float pid_p_out_A;
+    float pid_i_out_A;
+    float pid_d_out_A;
+    float pid_output_A;
+    int16_t commanded_current_raw;
+    float commanded_current_A;
 } h723_m2006_debug_t;
 
 typedef struct {
@@ -77,7 +80,9 @@ typedef struct {
     uint32_t enable;
     uint32_t selected_id;
     uint32_t default_id;
-    float target_speed_rpm;
+    float target_output_speed_rpm;
+    /* Runtime target limit in output-shaft RPM; initialized from the config default. */
+    float max_target_output_speed_rpm;
     float kp;
     float ki;
     float kd;
@@ -93,16 +98,19 @@ typedef struct {
     uint32_t safety_reason;
     uint32_t cycle_count;
     uint16_t feedback_encoder;
-    int16_t feedback_speed_rpm;
-    int16_t feedback_current;
+    int16_t rotor_speed_rpm;
+    int16_t feedback_current_raw;
+    float feedback_output_speed_rpm;
+    float feedback_current_A;
     uint8_t feedback_temperature_celsius;
     uint32_t feedback_age_ms;
-    int16_t target_current;
-    float pid_raw_output;
-    float pid_p_out;
-    float pid_i_out;
-    float pid_d_out;
-    float pid_output;
+    int16_t target_current_raw;
+    float target_current_A;
+    float pid_raw_output_A;
+    float pid_p_out_A;
+    float pid_i_out_A;
+    float pid_d_out_A;
+    float pid_output_A;
 } h723_debug_single_motor_t;
 
 typedef struct {

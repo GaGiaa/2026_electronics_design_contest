@@ -64,8 +64,8 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     assert(input.channels[2] == 1811U);
     app_chassis_mix(&input, 10U, &command);
     assert(command.manual_active);
-    assert(command.left_target_rpm == 3000.0f);
-    assert(command.right_target_rpm == -3000.0f);
+    assert(command.left_target_rpm == (3000.0f / 36.0f));
+    assert(command.right_target_rpm == (-3000.0f / 36.0f));
 
     input.channels[6] = 172U;
     app_chassis_mix(&input, 10U, &command);
@@ -76,7 +76,7 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     input.channels[0] = 1811U;
     app_chassis_mix(&input, 10U, &command);
     assert(command.manual_active);
-    assert(command.left_target_rpm == 3000.0f);
+    assert(command.left_target_rpm == (3000.0f / 36.0f));
     assert(command.right_target_rpm == 0.0f);
 
     app_chassis_mix(&input, 111U, &command);
@@ -112,8 +112,10 @@ static void test_m2006_feedback_and_group_command(void)
     assert(app_m2006_parse_feedback(0x201U, feedback, &parsed));
     assert(parsed.motor_id == 1U);
     assert(parsed.encoder == 4096U);
-    assert(parsed.speed_rpm == 500);
-    assert(parsed.current == -200);
+    assert(parsed.rotor_speed_rpm == 500);
+    assert(parsed.output_speed_rpm == (500.0f / 36.0f));
+    assert(parsed.current_raw == -200);
+    assert(parsed.current_a == (-200.0f * 10.0f / 16384.0f));
     assert(app_m2006_parse_feedback(0x203U, feedback, &parsed));
     assert(parsed.motor_id == 3U);
     app_m2006_encode_group_current(1000, -1000, command);
@@ -130,10 +132,21 @@ static void test_m2006_feedback_and_group_command(void)
     }
 }
 
+static void test_m2006_current_conversion(void)
+{
+    assert(app_m2006_raw_current_to_a(16384) == 10.0f);
+    assert(app_m2006_raw_current_to_a(-16384) == -10.0f);
+    assert(app_m2006_current_a_to_raw(2.0f) == 3277);
+    assert(app_m2006_current_a_to_raw(-2.0f) == -3277);
+    assert(app_m2006_current_a_to_raw(100.0f) == 16384);
+    assert(app_m2006_current_a_to_raw(-100.0f) == -16384);
+}
+
 int main(void)
 {
     test_crsf_manual_mix_and_switch_guard();
     test_crsf_crc_rejection();
     test_m2006_feedback_and_group_command();
+    test_m2006_current_conversion();
     return 0;
 }

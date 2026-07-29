@@ -26,6 +26,14 @@ static void test_selected_id_uses_macro_default_and_watch_override(void)
     assert(app_single_motor_sanitize_id(3U, 2U) == 3U);
 }
 
+static void test_runtime_speed_limit_sanitization(void)
+{
+    assert(fabsf(app_single_motor_sanitize_max_output_speed_rpm(40.0f) - 40.0f) < 0.0001f);
+    assert(fabsf(app_single_motor_sanitize_max_output_speed_rpm(10000.0f) - 10000.0f) < 0.0001f);
+    assert(app_single_motor_sanitize_max_output_speed_rpm(0.0f) == 0.0f);
+    assert(app_single_motor_sanitize_max_output_speed_rpm(NAN) == 0.0f);
+}
+
 static void test_feedback_timeout_and_disable_force_zero(void)
 {
     app_single_motor_step_input_t input = {0};
@@ -35,27 +43,27 @@ static void test_feedback_timeout_and_disable_force_zero(void)
 
     input.enable = 1U;
     input.selected_id = 2U;
-    input.target_speed_rpm = 100.0f;
+    input.target_output_speed_rpm = 10.0f;
     input.params = params;
     input.feedback_valid = true;
     input.feedback_age_ms = 10U;
-    input.feedback_speed_rpm = 0;
+    input.feedback_output_speed_rpm = 0.0f;
     PID_Incremental_Init(&pid, &params, 0.001f);
 
-    assert(app_single_motor_step(&pid, &input, 50U, 3000.0f, 3000.0f, &output));
+    assert(app_single_motor_step(&pid, &input, 50U, 83.333333f, 10.0f, &output));
     assert(output.selected_id == 2U);
-    assert(output.commanded_current == 100);
-    assert(fabsf(output.raw_output - 100.0f) < 0.001f);
+    assert(output.commanded_current_A == 10.0f);
+    assert(fabsf(output.raw_output_A - 10.0f) < 0.001f);
 
     input.feedback_age_ms = 50U;
     assert(!app_single_motor_step(&pid, &input, 50U, 3000.0f, 3000.0f, &output));
-    assert(output.commanded_current == 0);
+    assert(output.commanded_current_A == 0.0f);
     assert(output.reset_pid);
 
     input.feedback_age_ms = 0U;
     input.enable = 0U;
     assert(!app_single_motor_step(&pid, &input, 50U, 3000.0f, 3000.0f, &output));
-    assert(output.commanded_current == 0);
+    assert(output.commanded_current_A == 0.0f);
 }
 
 static void test_target_speed_and_parameters_are_rejected_when_invalid(void)
@@ -67,24 +75,25 @@ static void test_target_speed_and_parameters_are_rejected_when_invalid(void)
 
     input.enable = 1U;
     input.selected_id = 1U;
-    input.target_speed_rpm = 4000.0f;
+    input.target_output_speed_rpm = 100.0f;
     input.params = params;
     input.feedback_valid = true;
-    input.feedback_speed_rpm = 0;
+    input.feedback_output_speed_rpm = 0.0f;
     PID_Incremental_Init(&pid, &params, 0.001f);
-    assert(!app_single_motor_step(&pid, &input, 50U, 3000.0f, 3000.0f, &output));
-    assert(output.commanded_current == 0);
+    assert(!app_single_motor_step(&pid, &input, 50U, 83.333333f, 10.0f, &output));
+    assert(output.commanded_current_A == 0.0f);
     assert(output.reset_pid);
 
-    input.target_speed_rpm = 100.0f;
+    input.target_output_speed_rpm = 10.0f;
     input.params.kp = NAN;
-    assert(!app_single_motor_step(&pid, &input, 50U, 3000.0f, 3000.0f, &output));
-    assert(output.commanded_current == 0);
+    assert(!app_single_motor_step(&pid, &input, 50U, 83.333333f, 10.0f, &output));
+    assert(output.commanded_current_A == 0.0f);
 }
 
 int main(void)
 {
     test_selected_id_uses_macro_default_and_watch_override();
+    test_runtime_speed_limit_sanitization();
     test_feedback_timeout_and_disable_force_zero();
     test_target_speed_and_parameters_are_rejected_when_invalid();
     return 0;

@@ -30,9 +30,10 @@ $sourceFiles = Get-ChildItem (Join-Path $ProjectRoot 'stm32h723_app\App\Src') -F
 $source = ($sourceFiles | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
 foreach ($path in @(
     'g_h723_debug.system.uptime_ms', 'g_h723_debug.uart8.tx_start_count',
-    'g_h723_debug.crsf.channels_raw', 'g_h723_debug.chassis.left_target_rpm',
+    'g_h723_debug.crsf.channels_raw', 'g_h723_debug.chassis.left_target_output_speed_rpm',
     'g_h723_debug.fdcan.rx_count', 'g_h723_debug.jy901s.angle_deg',
-    'g_h723_debug.single_motor.target_speed_rpm'
+    'g_h723_debug.single_motor.target_output_speed_rpm',
+    'g_h723_debug.single_motor.max_target_output_speed_rpm'
 )) {
     if ($source -notmatch [regex]::Escape($path)) { throw "Missing grouped debug access: $path" }
 }

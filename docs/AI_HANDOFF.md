@@ -477,9 +477,9 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 ## STM32H723 单个 M2006 速度环 PID 调试
 
-`APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 默认 `0U`。设为 `1U` 后，现有 1 ms `chassisTask` 完全接管 `0x200` 组控帧，Watch 输入位于 `g_h723_debug.single_motor`，包括 `enable`、`selected_id`、`target_speed_rpm` 和全部增量 PID 参数。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 默认 `1U`，运行时可由 Watch 覆盖为 1/2/3；ID 或 enable 切换时当前周期清零并复位 PID。非选中槽位始终为零，反馈超时 50 ms、非法参数、目标速度超过 3000 rpm 或未使能时也会复位并清零。
+`APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 默认 `0U`。设为 `1U` 后，现有 1 ms `chassisTask` 完全接管 `0x200` 组控帧，Watch 输入位于 `g_h723_debug.single_motor`，包括 `enable`、`selected_id`、输出轴 `target_output_speed_rpm`、运行时 `max_target_output_speed_rpm` 和全部增量 PID 参数。M2006 的速度环统一使用输出轴 RPM，减速比为 `36:1`；运行时目标上限默认 `83.3333 RPM`，`APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM` 只提供初始化默认值，不限制 Watch 的运行时调节范围。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 默认 `1U`，运行时可由 Watch 覆盖为 1/2/3；ID 或 enable 切换时当前周期清零并复位 PID。非选中槽位始终为零，反馈超时 50 ms、非法目标/限速、非法参数或未使能时也会复位并清零。
 
-`APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 默认 `0U`，开启后 UART8 每 1 ms 尝试发送 8 通道 JustFloat：实际目标电流、反馈电流、目标速度、反馈速度、PID 限幅前总值、P、I、D。遥测 DMA 忙时丢弃本帧并记录 UART8 丢帧计数；它与健康/JY901S 遥测编译期互斥。共享 PID 新增 `raw_output` 观测字段，但不改变 `PID_Incremental_Calc` 的原有输出限幅和控制行为。
+`APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 默认 `0U`，开启后 UART8 每 1 ms 尝试发送 8 通道 JustFloat：目标电流 A、反馈电流 A、目标输出轴 RPM、反馈输出轴 RPM、PID 总输出 A、P 项 A、I 项 A、D 项 A。C610 电流换算为 `16384 raw = 10 A`，CAN 帧仍使用原始 `int16` 电流值；Watch 调试快照同时提供 raw 与物理量字段。遥测 DMA 忙时丢弃本帧并记录 UART8 丢帧计数；它与健康/JY901S 遥测编译期互斥。
 
 本轮单电机功能只完成软件主机测试、静态检查和 Keil 构建，未执行 Flash、烧录、SWD、CAN 总线、电机实物或 VOFA+ 实物验收。实物调参前必须车架悬空，先确认当前默认 FDCAN2 与实际接线一致，必要时修改 `APP_H723_M2006_FDCAN_INSTANCE` 并重新构建。
 
