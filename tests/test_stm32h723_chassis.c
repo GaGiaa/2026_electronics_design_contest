@@ -64,8 +64,8 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     assert(input.channels[2] == 1811U);
     app_chassis_mix(&input, 10U, &command);
     assert(command.manual_active);
-    assert(command.left_target_rpm == (3000.0f / 36.0f));
-    assert(command.right_target_rpm == (-3000.0f / 36.0f));
+    assert(command.left_target_rpm == 550.0f);
+    assert(command.right_target_rpm == -550.0f);
 
     input.channels[6] = 172U;
     app_chassis_mix(&input, 10U, &command);
@@ -76,7 +76,7 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     input.channels[0] = 1811U;
     app_chassis_mix(&input, 10U, &command);
     assert(command.manual_active);
-    assert(command.left_target_rpm == (3000.0f / 36.0f));
+    assert(command.left_target_rpm == 550.0f);
     assert(command.right_target_rpm == 0.0f);
 
     app_chassis_mix(&input, 111U, &command);

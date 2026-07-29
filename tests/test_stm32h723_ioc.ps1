@@ -95,6 +95,20 @@ if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE\
 if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS\s+1U') {
     throw 'Single-motor VOFA telemetry interval must default to 1 ms.'
 }
+foreach ($line in @(
+    '#define APP_H723_CHASSIS_MAX_OUTPUT_RPM 550.0f',
+    '#define APP_H723_M2006_PID_KP 0.25f',
+    '#define APP_H723_M2006_PID_KI 5.0f',
+    '#define APP_H723_M2006_PID_KD 0.0f',
+    '#define APP_H723_M2006_PID_INTEGRAL_LIMIT 100000.0f',
+    '#define APP_H723_M2006_PID_OUTPUT_DELTA_LIMIT 0.0f',
+    '#define APP_H723_M2006_PID_DEADBAND_RPM 0.0f',
+    '#define APP_H723_M2006_PID_INTEGRAL_SEPARATION_RPM 0.0f'
+)) {
+    if ($appConfig -notmatch [regex]::Escape($line)) {
+        throw "Missing chassis PID tuning default: $line"
+    }
+}
 if ($appConfig -notmatch '#if\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+<\s+1U\)\s+\|\|\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+>\s+3U\)') {
     throw 'M2006 FDCAN selection must reject instances outside 1U..3U.'
 }
