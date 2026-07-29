@@ -21,15 +21,17 @@ CRSF 始终解析 16 个 11-bit 通道，CH3（数组索引 2）为前进/后退
 
 PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，控制量统一为 M2006 减速箱输出轴 RPM，输出统一为安培。M2006 减速比为 `36:1`，C610 电流换算为 `16384 raw = 10 A`；底盘默认目标速度上限为 `550 output RPM`，电流输出上限为 `10 A`。当前底盘与单电机调试默认参数为 `kp=0.25 A/RPM`、`ki=5 A/(RPM*s)`、`kd=0`、积分限幅 `100000 A`、每周期输出变化限幅 `0 A`、死区 `0 RPM`、积分分离阈值 `0 RPM`，这些值来自当前速度环调试配置，仍需悬空实车验证。
 
-## 单电机速度环 PID 调试
+## 单电机速度/位置环 PID 调试
 
-单电机调试由 `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 控制，默认 `0U`。设为 `1U` 后，单电机模式在现有 `chassisTask` 的 1 ms 节拍内完全接管 `0x200` 组控帧，CRSF 不再产生底盘差速目标；非选中电机的电流槽位始终为零。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 提供默认 ID（`1U..3U`），Keil Watch 中的 `g_h723_debug.single_motor.selected_id` 可以运行时覆盖它。ID 切换或 `enable` 状态切换时当前周期强制清零并复位 PID，下一周期才重新计算。
+单电机调试由 `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 控制，默认 `0U`。设为 `1U` 后，单电机模式在现有 `chassisTask` 的 1 ms 节拍内完全接管 `0x200` 组控帧，CRSF 不再产生底盘差速目标；非选中电机的电流槽位始终为零。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 提供默认 ID（`1U..3U`），Keil Watch 中的 `g_h723_debug.single_motor.selected_id` 可以运行时覆盖它。
 
-实际非零电流必须同时满足编译宏开启、`g_h723_debug.single_motor.enable=1`、选中电机反馈年龄小于 50 ms、目标输出轴速度不超过运行时 `max_target_output_speed_rpm` 且所有 PID 参数为有限的非负值。单电机调试默认目标上限为 `550 RPM`，可通过 Watch 修改。单电机模式不依赖 `APP_H723_CHASSIS_ACTUATION_ENABLE`；首次调试必须车架悬空，并先确认 `g_h723_debug.fdcan.instance`、选中 ID、反馈输出轴速度方向和反馈年龄。
+`control_mode=0U` 为速度模式：`target_output_speed_rpm` 与现有增量速度 PID 每 1 ms 生效。`control_mode=1U` 为串级位置模式：`target_position_deg` 是相对于使能后首帧有效反馈的输出轴连续角度，外环位置式 PID 每 `APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS`（默认 5 ms）输出目标输出轴 RPM，内环仍以 1 ms 速度 PID 输出电流。M2006 的单圈编码器按 8192 counts/电机转展开为多圈位置，并按减速比 `36:1` 换算为输出轴 `deg`；位置跟踪的反馈间隔超过 `APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS`（默认 1 ms）或反馈超时后，均重新建立跟踪基准。
 
-Watch 可直接修改 `target_output_speed_rpm`、`kp`、`ki`、`kd`、`output_limit`、`deadband`、`integral_output_limit`、`integral_separation_threshold`、`derivative_filter_N` 和 `output_delta_limit`，下一次 1 ms 周期直接应用；速度单位为输出轴 RPM，PID 输出及电流字段单位为 A。选中电机的反馈和控制字段位于 `g_h723_debug.single_motor`，同时保留在 `g_h723_debug.m2006[selected_id-1]` 中。`target_current_A` 是转换为 CAN raw 后实际下发的安培值，`target_current_raw` 是对应的 `int16` 电流指令；`pid_raw_output_A`、`pid_output_A` 和 P/I/D 字段均使用 A。
+Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadband`、`integral_output_limit`、`integral_separation_threshold`、`derivative_filter_N`、`output_delta_limit`，以及位置 PID 的 `position_kp`、`position_ki`、`position_kd`、`position_output_limit_rpm`、`position_deadband_deg`。位置 PID 默认增益均为 `0`，输出限幅默认 `550 RPM`。`max_target_output_speed_rpm` 是两种模式的硬性输出轴速度上限；位置目标只要求为有限浮点值，不设置角度上限。位置反馈、原点状态、外环目标 RPM、P/I/D 分量和 5 ms 周期计数均位于 `g_h723_debug.single_motor`。
 
-将 `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 设为 `1U` 可通过 UART8 以 `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS`（默认 1 ms）发送 8 通道 JustFloat。顺序固定为：
+实际非零电流必须同时满足编译宏开启、`enable=1`、选中电机反馈年龄小于 50 ms、速度/位置目标及参数有效，且位置模式已建立相对零点。ID、`enable` 或 `control_mode` 切换时当前周期强制清零并复位两级 PID；位置模式随后先建立零点，再在下一次 5 ms 外环周期开始控制。单电机模式不依赖 `APP_H723_CHASSIS_ACTUATION_ENABLE`；首次调试必须车架悬空。
+
+将 `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 设为 `1U` 可通过 UART8 以 `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS`（默认 1 ms）发送 JustFloat。速度模式为现有 8 通道：
 
 1. `target_current_A`：实际下发电流，单位 A；
 2. `feedback_current_A`：M2006 反馈电流，单位 A；
@@ -39,6 +41,8 @@ Watch 可直接修改 `target_output_speed_rpm`、`kp`、`ki`、`kd`、`output_l
 6. `pid_p_out_A`：P 项输出，单位 A；
 7. `pid_i_out_A`：I 项输出，单位 A；
 8. `pid_d_out_A`：D 项输出，单位 A。
+
+位置模式为 9 通道：`target_position_deg`、`feedback_position_deg`、`position_p_out_rpm`、`position_i_out_rpm`、`position_d_out_rpm`、`position_target_output_speed_rpm`、`feedback_output_speed_rpm`、`target_current_A`、`feedback_current_A`。遥测 DMA 忙时丢弃本帧并递增 UART8 丢帧计数；它与健康、JY901S 和灰度遥测编译期互斥。
 
 该遥测宏与健康遥测和 JY901S 十通道遥测编译期互斥，三者均默认关闭。UART8 仍使用 PE1 TX、1 Mbit/s 和 `DMA1_Stream1`；DMA 忙时丢弃本周期帧并递增 UART8 丢帧计数，不阻塞控制环。
 
@@ -51,7 +55,7 @@ Watch 可直接修改 `target_output_speed_rpm`、`kp`、`ki`、`kd`、`output_l
 
 ## Runtime Speed Limit Watch Control
 
-单电机调试模式下，Keil Watch 可修改 `g_h723_debug.single_motor.max_target_output_speed_rpm`，单位为输出轴 RPM，下一次 1 ms 周期生效。默认值为 `550 RPM`，由 `APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM` 提供；该宏只决定启动默认值，不限制运行时可调范围。设为 `0`、负数或非法浮点值时，单电机速度环进入安全清零。
+单电机调试模式下，Keil Watch 可修改 `g_h723_debug.single_motor.max_target_output_speed_rpm`，单位为输出轴 RPM，下一次 1 ms 内环周期生效。默认值为 `550 RPM`，由 `APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM` 提供；该宏只决定启动默认值，不限制运行时可调范围。设为 `0`、负数或非法浮点值时，速度和位置模式均进入安全清零。
 
 ## UART8 VOFA Health Telemetry
 

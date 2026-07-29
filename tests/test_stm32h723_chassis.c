@@ -142,11 +142,30 @@ static void test_m2006_current_conversion(void)
     assert(app_m2006_current_a_to_raw(-100.0f) == -16384);
 }
 
+static void test_m2006_position_tracker_unwraps_and_converts_output_angle(void)
+{
+    app_m2006_position_tracker_t tracker;
+
+    app_m2006_position_tracker_init(&tracker);
+    assert(!app_m2006_position_tracker_update(&tracker, 8190U));
+    assert(app_m2006_position_tracker_update(&tracker, 2U));
+    assert(app_m2006_position_tracker_motor_counts(&tracker) == 4);
+    assert(app_m2006_position_tracker_update(&tracker, 8190U));
+    assert(app_m2006_position_tracker_motor_counts(&tracker) == 0);
+
+    app_m2006_position_tracker_init(&tracker);
+    assert(!app_m2006_position_tracker_update(&tracker, 0U));
+    assert(app_m2006_position_tracker_update(&tracker, 0U));
+    tracker.motor_counts = 8192LL * 36LL;
+    assert(app_m2006_position_tracker_output_degrees(&tracker) == 360.0f);
+}
+
 int main(void)
 {
     test_crsf_manual_mix_and_switch_guard();
     test_crsf_crc_rejection();
     test_m2006_feedback_and_group_command();
     test_m2006_current_conversion();
+    test_m2006_position_tracker_unwraps_and_converts_output_angle();
     return 0;
 }

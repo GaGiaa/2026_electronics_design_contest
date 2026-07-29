@@ -126,6 +126,19 @@ if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVA
     throw 'Single-motor VOFA telemetry interval must default to 1 ms.'
 }
 foreach ($line in @(
+    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS 5U',
+    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KP 0.0f',
+    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KI 0.0f',
+    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KD 0.0f',
+    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_OUTPUT_LIMIT_RPM APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM',
+    '#define APP_H723_SINGLE_MOTOR_POSITION_PID_DEADBAND_DEG 0.0f',
+    '#define APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS 1U'
+)) {
+    if ($appConfig -notmatch [regex]::Escape($line)) {
+        throw "Missing single-motor position configuration: $line"
+    }
+}
+foreach ($line in @(
     '#define APP_H723_CHASSIS_MAX_OUTPUT_RPM 550.0f',
     '#define APP_H723_M2006_PID_KP 0.25f',
     '#define APP_H723_M2006_PID_KI 5.0f',
@@ -156,6 +169,36 @@ foreach ($line in @('return &hfdcan3;', 'void h723_chassis_on_fdcan3_rx(void)'))
 }
 if ($chassisSource -notmatch 'header.Identifier\s*<=\s*0x203U') {
     throw 'Single-motor debug must accept M2006 feedback ID 0x203.'
+}
+foreach ($token in @(
+    'app_m2006_position_tracker_update',
+    'APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS',
+    'APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS'
+)) {
+    if ($chassisSource -notmatch [regex]::Escape($token)) {
+        throw "Single-motor position mode is missing: $token"
+    }
+}
+$singleMotorSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_single_motor.c') -Raw
+if ($singleMotorSource -notmatch [regex]::Escape('PID_Position_Calc')) {
+    throw 'Single-motor position mode must calculate the PID in the pure C controller.'
+}
+
+$telemetrySource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_telemetry.c') -Raw
+foreach ($channel in @(
+    'g_h723_debug.single_motor.target_position_deg',
+    'g_h723_debug.single_motor.feedback_position_deg',
+    'g_h723_debug.single_motor.position_p_out_rpm',
+    'g_h723_debug.single_motor.position_i_out_rpm',
+    'g_h723_debug.single_motor.position_d_out_rpm',
+    'g_h723_debug.single_motor.position_target_output_speed_rpm',
+    'g_h723_debug.single_motor.feedback_output_speed_rpm',
+    'g_h723_debug.single_motor.target_current_A',
+    'g_h723_debug.single_motor.feedback_current_A'
+)) {
+    if ($telemetrySource -notmatch [regex]::Escape($channel)) {
+        throw "Single-motor position VOFA channel is missing: $channel"
+    }
 }
 
 if ($fdcanSource -notmatch 'hfdcan->Instance == FDCAN3' -or

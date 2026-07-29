@@ -2,6 +2,7 @@
 
 #include "app_config.h"
 #include "app_debug.h"
+#include "app_single_motor.h"
 #include "app_time.h"
 #include "usart.h"
 #include "vofa_justfloat.h"
@@ -10,7 +11,9 @@
 #define H723_VOFA_HEALTH_MAGIC 723.0f
 #define H723_VOFA_JY901S_CHANNEL_COUNT 10U
 #define H723_VOFA_GRAYSCALE_CHANNEL_COUNT 22U
-#define H723_VOFA_SINGLE_MOTOR_CHANNEL_COUNT 8U
+#define H723_VOFA_SINGLE_MOTOR_SPEED_CHANNEL_COUNT 8U
+#define H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT 9U
+#define H723_VOFA_SINGLE_MOTOR_MAX_CHANNEL_COUNT H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT
 
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
 static uint8_t s_health_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_HEALTH_CHANNEL_COUNT)];
@@ -28,7 +31,7 @@ static uint32_t s_last_grayscale_telemetry_ms;
 #endif
 
 #if (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE == 1U)
-static uint8_t s_single_motor_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_SINGLE_MOTOR_CHANNEL_COUNT)];
+static uint8_t s_single_motor_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_SINGLE_MOTOR_MAX_CHANNEL_COUNT)];
 static uint32_t s_last_single_motor_telemetry_ms;
 #endif
 
@@ -166,16 +169,6 @@ void h723_app_telemetry_step(void)
 
 #if (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE == 1U)
     if ((now_ms - s_last_single_motor_telemetry_ms) >= APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS) {
-        const float channels[H723_VOFA_SINGLE_MOTOR_CHANNEL_COUNT] = {
-            g_h723_debug.single_motor.target_current_A,
-            g_h723_debug.single_motor.feedback_current_A,
-            g_h723_debug.single_motor.target_output_speed_rpm,
-            g_h723_debug.single_motor.feedback_output_speed_rpm,
-            g_h723_debug.single_motor.pid_output_A,
-            g_h723_debug.single_motor.pid_p_out_A,
-            g_h723_debug.single_motor.pid_i_out_A,
-            g_h723_debug.single_motor.pid_d_out_A
-        };
         HAL_StatusTypeDef status;
 
         s_last_single_motor_telemetry_ms = now_ms;
@@ -183,9 +176,40 @@ void h723_app_telemetry_step(void)
             g_h723_debug.uart8.tx_drop_count++;
             return;
         }
-        (void)vofa_justfloat_encode(s_single_motor_frame, sizeof(s_single_motor_frame), channels,
-                                    H723_VOFA_SINGLE_MOTOR_CHANNEL_COUNT);
-        status = HAL_UART_Transmit_DMA(&huart8, s_single_motor_frame, sizeof(s_single_motor_frame));
+        if (g_h723_debug.single_motor.control_mode == APP_SINGLE_MOTOR_CONTROL_MODE_POSITION) {
+            const float channels[H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT] = {
+                g_h723_debug.single_motor.target_position_deg,
+                g_h723_debug.single_motor.feedback_position_deg,
+                g_h723_debug.single_motor.position_p_out_rpm,
+                g_h723_debug.single_motor.position_i_out_rpm,
+                g_h723_debug.single_motor.position_d_out_rpm,
+                g_h723_debug.single_motor.position_target_output_speed_rpm,
+                g_h723_debug.single_motor.feedback_output_speed_rpm,
+                g_h723_debug.single_motor.target_current_A,
+                g_h723_debug.single_motor.feedback_current_A
+            };
+            (void)vofa_justfloat_encode(s_single_motor_frame,
+                                        VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT),
+                                        channels, H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT);
+            status = HAL_UART_Transmit_DMA(&huart8, s_single_motor_frame,
+                                            VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT));
+        } else {
+            const float channels[H723_VOFA_SINGLE_MOTOR_SPEED_CHANNEL_COUNT] = {
+                g_h723_debug.single_motor.target_current_A,
+                g_h723_debug.single_motor.feedback_current_A,
+                g_h723_debug.single_motor.target_output_speed_rpm,
+                g_h723_debug.single_motor.feedback_output_speed_rpm,
+                g_h723_debug.single_motor.pid_output_A,
+                g_h723_debug.single_motor.pid_p_out_A,
+                g_h723_debug.single_motor.pid_i_out_A,
+                g_h723_debug.single_motor.pid_d_out_A
+            };
+            (void)vofa_justfloat_encode(s_single_motor_frame,
+                                        VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_SINGLE_MOTOR_SPEED_CHANNEL_COUNT),
+                                        channels, H723_VOFA_SINGLE_MOTOR_SPEED_CHANNEL_COUNT);
+            status = HAL_UART_Transmit_DMA(&huart8, s_single_motor_frame,
+                                            VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_SINGLE_MOTOR_SPEED_CHANNEL_COUNT));
+        }
         g_h723_debug.uart8.last_hal_status = (uint32_t)status;
         if (status == HAL_OK) {
             g_h723_debug.uart8.tx_in_flight = 1U;

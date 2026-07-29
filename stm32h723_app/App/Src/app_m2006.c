@@ -2,6 +2,9 @@
 #include "app_config.h"
 
 #include <math.h>
+#include <stddef.h>
+
+#define APP_M2006_ENCODER_COUNTS_PER_REVOLUTION 8192
 
 float app_m2006_raw_current_to_a(int16_t raw_current)
 {
@@ -56,4 +59,53 @@ void app_m2006_encode_group_current(int16_t left_current, int16_t right_current,
 {
     const int16_t currents[3] = {left_current, right_current, 0};
     app_m2006_encode_group_current_slots(currents, data);
+}
+
+void app_m2006_position_tracker_init(app_m2006_position_tracker_t *tracker)
+{
+    if (tracker == NULL) {
+        return;
+    }
+    tracker->initialized = false;
+    tracker->last_encoder = 0U;
+    tracker->motor_counts = 0;
+}
+
+bool app_m2006_position_tracker_update(app_m2006_position_tracker_t *tracker, uint16_t encoder)
+{
+    int32_t delta;
+
+    if (tracker == NULL || encoder >= APP_M2006_ENCODER_COUNTS_PER_REVOLUTION) {
+        return false;
+    }
+    if (!tracker->initialized) {
+        tracker->initialized = true;
+        tracker->last_encoder = encoder;
+        tracker->motor_counts = 0;
+        return false;
+    }
+
+    delta = (int32_t)encoder - (int32_t)tracker->last_encoder;
+    if (delta > (APP_M2006_ENCODER_COUNTS_PER_REVOLUTION / 2)) {
+        delta -= APP_M2006_ENCODER_COUNTS_PER_REVOLUTION;
+    } else if (delta < -(APP_M2006_ENCODER_COUNTS_PER_REVOLUTION / 2)) {
+        delta += APP_M2006_ENCODER_COUNTS_PER_REVOLUTION;
+    }
+    tracker->motor_counts += delta;
+    tracker->last_encoder = encoder;
+    return true;
+}
+
+int64_t app_m2006_position_tracker_motor_counts(const app_m2006_position_tracker_t *tracker)
+{
+    return tracker != NULL ? tracker->motor_counts : 0;
+}
+
+float app_m2006_position_tracker_output_degrees(const app_m2006_position_tracker_t *tracker)
+{
+    if (tracker == NULL) {
+        return 0.0f;
+    }
+    return ((float)tracker->motor_counts * 360.0f) /
+           ((float)APP_M2006_ENCODER_COUNTS_PER_REVOLUTION * APP_H723_M2006_GEAR_RATIO);
 }
