@@ -7,6 +7,7 @@
 #include "app_crsf.h"
 #include "app_debug.h"
 #include "app_m2006.h"
+#include "app_time.h"
 #include "fdcan.h"
 #include "usart.h"
 
@@ -153,7 +154,7 @@ static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan)
         if (header.IdType == FDCAN_STANDARD_ID && header.DataLength == FDCAN_DLC_BYTES_8 && header.Identifier >= 0x201U && header.Identifier <= 0x202U &&
             app_m2006_parse_feedback(header.Identifier, data, &s_feedback[header.Identifier - 0x201U])) {
             uint32_t index = header.Identifier - 0x201U;
-            s_feedback_time_ms[index] = HAL_GetTick();
+            s_feedback_time_ms[index] = h723_app_time_now_ms();
             s_feedback_valid[index] = true;
             ++g_h723_debug.fdcan_rx_count;
         }

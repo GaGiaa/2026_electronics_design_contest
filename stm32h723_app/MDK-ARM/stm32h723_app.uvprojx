@@ -455,6 +455,11 @@
               <FilePath>../App/Src/app_telemetry.c</FilePath>
             </File>
             <File>
+              <FileName>app_time.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_time.c</FilePath>
+            </File>
+            <File>
               <FileName>vofa_justfloat.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/vofa_justfloat.c</FilePath>

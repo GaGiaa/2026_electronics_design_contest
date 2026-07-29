@@ -29,6 +29,7 @@
 #include "app_telemetry.h"
 #include "app_chassis_service.h"
 #include "app_config.h"
+#include "app_time.h"
 
 /* USER CODE END Includes */
 
@@ -161,7 +162,7 @@ void startChassisTask(void *argument)
   (void)argument;
   h723_chassis_service_init();
   for (;;) {
-    h723_chassis_service_step(HAL_GetTick());
+    h723_chassis_service_step(h723_app_time_now_ms());
     next_wake_tick += APP_H723_CHASSIS_TASK_PERIOD_MS;
     (void)osDelayUntil(next_wake_tick);
   }

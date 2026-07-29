@@ -2,6 +2,7 @@
 
 #include "app_config.h"
 #include "app_debug.h"
+#include "app_time.h"
 #include "usart.h"
 #include "vofa_justfloat.h"
 
@@ -19,13 +20,13 @@ void h723_app_telemetry_init(void)
     g_h723_debug.telemetry_enabled = APP_VOFA_HEALTH_TELEMETRY_ENABLE;
     g_h723_debug.last_hal_status = HAL_OK;
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
-    s_last_telemetry_ms = HAL_GetTick();
+    s_last_telemetry_ms = h723_app_time_now_ms();
 #endif
 }
 
 void h723_app_telemetry_step(void)
 {
-    uint32_t now_ms = HAL_GetTick();
+    uint32_t now_ms = h723_app_time_now_ms();
 
     g_h723_debug.uptime_ms = now_ms;
     g_h723_debug.task_loop_count++;
