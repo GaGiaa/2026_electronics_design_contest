@@ -37,8 +37,10 @@ static FDCAN_HandleTypeDef *h723_m2006_fdcan(void)
     return &hfdcan1;
 #elif APP_H723_M2006_FDCAN_INSTANCE == 2U
     return &hfdcan2;
+#elif APP_H723_M2006_FDCAN_INSTANCE == 3U
+    return &hfdcan3;
 #else
-#error "APP_H723_M2006_FDCAN_INSTANCE must be 1U or 2U"
+#error "APP_H723_M2006_FDCAN_INSTANCE must be 1U, 2U, or 3U"
 #endif
 }
 
@@ -142,6 +144,13 @@ void h723_chassis_on_fdcan2_rx(void)
 {
     if (APP_H723_M2006_FDCAN_INSTANCE == 2U) {
         h723_chassis_on_fdcan_rx(&hfdcan2);
+    }
+}
+
+void h723_chassis_on_fdcan3_rx(void)
+{
+    if (APP_H723_M2006_FDCAN_INSTANCE == 3U) {
+        h723_chassis_on_fdcan_rx(&hfdcan3);
     }
 }
 

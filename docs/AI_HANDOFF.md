@@ -469,7 +469,7 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 - 使用 STM32CubeMX 6.15.0 将 UART7 恢复到 `stm32h723_app/stm32h723_app.ioc`，并由 CubeMX 重新生成 MDK-ARM 工程。配置为 `PE7` RX、`PE8` TX、420000 bit/s、DMA1 Stream0 RX、DMA 与 UART7 中断；UART8 `PE1` TX 1 Mbit/s 保持不变。用于重现生成的 CubeMX 脚本为 `stm32h723_app/cubemx_generate_crsf.txt`。
 - 新增 `App/app_crsf`、`app_m2006`、`app_chassis` 与 `app_chassis_service`。UART7 ReceiveToIdle DMA 回调只向软件环形缓冲写入数据；高优先级 `chassisTask` 以 1 ms 绝对节拍解析 CRSF、进行 CH3 前进/后退和 CH1 转向的差速混控、检查时效、计算增量速度 PID，并通过所选 FDCAN 发送 `0x200` 组控帧。
-- M2006 实物已确认使用 FDCAN1：CubeMX 引脚为 `PD0=FDCAN1_RX`、`PD1=FDCAN1_TX`。应用启动时在 FDCAN1 设置标准 ID 范围过滤 `0x201..0x202`、启动控制器并订阅 FIFO0 新消息；回调排空 FIFO 并解析两台 M2006 的 8 字节反馈。左轮 ID 1 使用电流槽 1，右轮 ID 2 使用电流槽 2，均在 FDCAN1 1 Mbit/s 总线上。`APP_H723_M2006_FDCAN_INSTANCE` 当前为 `1U`；FDCAN2 的 `PB12/PB13` 仅保留为后续可切换接口，不是当前实物接线。`g_h723_debug` 已暴露选中实例、协议错误、Bus-Off 与收发错误计数，供 Keil Watch 排查无反馈。
+- M2006 总线使用 1 Mbit/s。应用启动时在选中的 FDCAN 设置标准 ID 范围过滤 `0x201..0x202`、启动控制器并订阅 FIFO0 新消息；回调排空 FIFO 并解析两台 M2006 的 8 字节反馈。左轮 ID 1 使用电流槽 1，右轮 ID 2 使用电流槽 2。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`，当前默认值为 `2U`；若实物位于 FDCAN1，应改为 `1U` 后重新编译。`g_h723_debug` 已暴露选中实例、协议错误、Bus-Off 与收发错误计数，供 Keil Watch 排查无反馈。
 - CRSF 仅 SB 与 SC 都为中档时进入手动模式；CRSF 有效帧超时 100 ms、任一电机反馈超时 50 ms 或开关档位不满足时均复位 PID 并发送零电流。`APP_H723_CHASSIS_ACTUATION_ENABLE` 默认 `0U`，因此即使遥控和 PID 都在运行，CAN 也只能发零电流；必须显式设为 `1U` 才可输出非零电流。
 - PID 已迁移为仓库级 `shared/pid/` 纯 C 库，公共 `PID_Incremental_*` 和 `PID_Position_*` 符号保持不变。G3507 的 CCS 构建脚本、Keil 工程、源文件和主机测试均引用该路径，H723 Keil 工程也编译同一 `pid.c`。
 - `volatile g_h723_debug` 现在提供 16 个 CRSF 原始通道、协议和收发错误统计、遥控目标、CAN 状态与两台 M2006 的反馈、PID 分量和电流命令，供 Keil Watch 直接观察。

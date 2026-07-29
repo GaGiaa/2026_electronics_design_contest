@@ -357,6 +357,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t it_flags)
   if (hfdcan->Instance == FDCAN2 && (it_flags & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0U) {
     h723_chassis_on_fdcan2_rx();
   }
+  if (hfdcan->Instance == FDCAN3 && (it_flags & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0U) {
+    h723_chassis_on_fdcan3_rx();
+  }
 }
 
 /* USER CODE END 1 */

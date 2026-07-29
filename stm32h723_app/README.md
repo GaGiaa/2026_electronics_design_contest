@@ -8,7 +8,7 @@
 - HSE 25 MHz，系统时钟 550 MHz；SWD 使用 `PA13/PA14`；M7 D-Cache 关闭，避免 DMA 缓冲区一致性问题。
 - UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
 - UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
-- M2006 总线实物已确认使用 FDCAN1：`PD0` RX、`PD1` TX、1 Mbit/s，接收 ID `0x201/0x202`，每 1 ms 发送标准帧 `0x200`。FDCAN2 的 `PB12/PB13` 与 FDCAN3 仍由 CubeMX 保留；在 `App/Inc/app_config.h` 将 `APP_H723_M2006_FDCAN_INSTANCE` 改为 `2U` 可切换至 FDCAN2，但当前实物接线不使用该接口。
+- M2006 总线使用 1 Mbit/s，接收 ID `0x201/0x202`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。若实物接线位于 FDCAN1，则将该宏改为 `1U`，重新编译即可切换。
 - FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
 两台 M2006 实物位于 FDCAN1：左轮 ID 1、方向 `+1`；右轮 ID 2、方向 `-1`。ID 3 的上层平衡机构不属于本轮实现。

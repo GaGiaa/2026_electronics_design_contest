@@ -9,5 +9,6 @@ void h723_chassis_on_uart7_rx_event(uint16_t size);
 void h723_chassis_on_uart7_error(void);
 void h723_chassis_on_fdcan1_rx(void);
 void h723_chassis_on_fdcan2_rx(void);
+void h723_chassis_on_fdcan3_rx(void);
 
 #endif

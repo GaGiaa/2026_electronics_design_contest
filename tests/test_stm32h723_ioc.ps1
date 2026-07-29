@@ -83,8 +83,28 @@ if ($appConfig -notmatch '#define\s+APP_JY901S_VOFA_TELEMETRY_ENABLE\s+0U') {
 if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
     throw 'APP_H723_CHASSIS_ACTUATION_ENABLE must default to 0U.'
 }
-if ($appConfig -notmatch '#define\s+APP_H723_M2006_FDCAN_INSTANCE\s+1U') {
-    throw 'M2006 must select FDCAN1.'
+if ($appConfig -notmatch '#define\s+APP_H723_M2006_FDCAN_INSTANCE\s+2U') {
+    throw 'M2006 must default to FDCAN2.'
+}
+if ($appConfig -notmatch '#if\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+<\s+1U\)\s+\|\|\s+\(APP_H723_M2006_FDCAN_INSTANCE\s+>\s+3U\)') {
+    throw 'M2006 FDCAN selection must reject instances outside 1U..3U.'
+}
+
+$chassisHeader = Get-Content -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Inc\app_chassis_service.h') -Raw
+if ($chassisHeader -notmatch 'void\s+h723_chassis_on_fdcan3_rx\(void\);') {
+    throw 'Chassis service must expose the FDCAN3 receive callback.'
+}
+
+$chassisSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_chassis_service.c') -Raw
+foreach ($line in @('return &hfdcan3;', 'void h723_chassis_on_fdcan3_rx(void)')) {
+    if ($chassisSource -notmatch [regex]::Escape($line)) {
+        throw "Chassis service must support FDCAN3: $line"
+    }
+}
+
+if ($fdcanSource -notmatch 'hfdcan->Instance == FDCAN3' -or
+    $fdcanSource -notmatch 'h723_chassis_on_fdcan3_rx\(\);') {
+    throw 'CubeMX FDCAN callback user code must route FDCAN3 feedback.'
 }
 
 Write-Output 'STM32H723 CubeMX configuration test passed.'
