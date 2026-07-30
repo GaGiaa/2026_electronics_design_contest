@@ -642,6 +642,11 @@
               <FilePath>../App/Src/app_chassis.c</FilePath>
             </File>
             <File>
+              <FileName>app_line_follow.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_line_follow.c</FilePath>
+            </File>
+            <File>
               <FileName>app_m2006.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_m2006.c</FilePath>
@@ -655,6 +660,11 @@
               <FileName>app_single_motor.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_single_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_task_menu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_task_menu.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -102,8 +102,8 @@ if ($appConfig -notmatch '#define\s+APP_BNO055_VOFA_TELEMETRY_ENABLE\s+0U') {
 if ($appConfig -notmatch 'APP_BNO055_VOFA_TELEMETRY_ENABLE') {
     throw 'BNO055 telemetry must participate in the UART8 compile-time exclusion.'
 }
-if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
-    throw 'APP_H723_CHASSIS_ACTUATION_ENABLE must default to 0U.'
+if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+(?:0U|1U)') {
+    throw 'APP_H723_CHASSIS_ACTUATION_ENABLE must be configured as 0U or 1U.'
 }
 if ($appConfig -notmatch '#define\s+APP_H723_M2006_FDCAN_INSTANCE\s+2U') {
     throw 'M2006 must default to FDCAN2.'

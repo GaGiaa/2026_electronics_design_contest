@@ -17,6 +17,7 @@ typedef struct {
     uint8_t black_count;
     uint32_t line_strength;
     int32_t line_error;
+    float line_position;
     uint32_t sequence;
     uint32_t adc_timeout_count;
 } h723_grayscale_snapshot_t;

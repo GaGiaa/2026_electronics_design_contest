@@ -13,6 +13,7 @@ typedef struct {
     uint8_t black_count;
     uint32_t line_strength;
     int32_t line_error;
+    float line_position;
 } h723_grayscale_derived_t;
 
 void h723_grayscale_derive(

@@ -34,6 +34,7 @@ void h723_grayscale_service_step(uint32_t now_ms)
     g_h723_debug.grayscale.black_count = s_snapshot.black_count;
     g_h723_debug.grayscale.line_strength = s_snapshot.line_strength;
     g_h723_debug.grayscale.line_error = s_snapshot.line_error;
+    g_h723_debug.grayscale.line_position = s_snapshot.line_position;
     g_h723_debug.grayscale.sequence = s_snapshot.sequence;
     g_h723_debug.grayscale.adc_timeout_count = s_snapshot.adc_timeout_count;
 }

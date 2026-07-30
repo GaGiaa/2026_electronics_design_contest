@@ -33,6 +33,12 @@ $source = ($sourceFiles | ForEach-Object { Get-Content -Raw -LiteralPath $_.Full
 foreach ($path in @(
     'g_h723_debug.system.uptime_ms', 'g_h723_debug.uart8.tx_start_count',
     'g_h723_debug.crsf.channels_raw', 'g_h723_debug.chassis.left_target_output_speed_rpm',
+    'g_h723_debug.chassis.base_speed_mm_s',
+    'g_h723_debug.chassis.line_position',
+    'g_h723_debug.chassis.line_turn_correction_mm_s',
+    'g_h723_debug.chassis.line_valid',
+    'g_h723_debug.chassis.left_target_speed_mm_s',
+    'g_h723_debug.chassis.right_target_speed_mm_s',
     'g_h723_debug.fdcan.rx_count', 'g_h723_debug.jy901s.angle_deg',
     'g_h723_debug.grayscale.raw', 'g_h723_debug.grayscale.line_error',
     'g_h723_debug.single_motor.target_output_speed_rpm',

@@ -7,6 +7,7 @@
 #include "app_config.h"
 #include "app_crsf.h"
 #include "app_debug.h"
+#include "app_line_follow.h"
 #include "app_m2006.h"
 #include "app_single_motor.h"
 #include "app_time.h"
@@ -29,7 +30,9 @@ static bool s_feedback_valid[3];
 static PID_Incremental s_speed_pid[3];
 static PID_Position s_position_pid[3];
 static app_m2006_position_tracker_t s_position_tracker[3];
+#if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
 static float s_position_origin_deg[3];
+#endif
 static bool s_position_reference_valid[3];
 static uint32_t s_crsf_uart_error_count;
 static uint32_t s_crsf_ring_overrun_count;
@@ -37,7 +40,11 @@ static bool s_crsf_was_timed_out;
 static uint32_t s_single_motor_last_id;
 static uint32_t s_single_motor_last_enable;
 static uint32_t s_single_motor_last_control_mode;
+#if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
 static uint32_t s_single_motor_last_position_pid_ms;
+#endif
+static app_line_follow_state_t s_line_follow;
+static app_line_follow_output_t s_line_follow_output;
 
 static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan);
 
@@ -92,6 +99,14 @@ static const PID_Position_Param_Config s_position_pid_params = {
     .deadband = APP_H723_SINGLE_MOTOR_POSITION_PID_DEADBAND_DEG,
 };
 
+static const PID_Position_Param_Config s_line_follow_pid_params = {
+    .kp = APP_H723_LINE_FOLLOW_PID_KP,
+    .ki = APP_H723_LINE_FOLLOW_PID_KI,
+    .kd = APP_H723_LINE_FOLLOW_PID_KD,
+    .output_limit = APP_H723_LINE_FOLLOW_MAX_TURN_SPEED_MM_S,
+    .deadband = APP_H723_LINE_FOLLOW_PID_DEADBAND,
+};
+
 static float h723_clamp_current(float value)
 {
     if (value > APP_H723_M2006_CURRENT_LIMIT_A) { return APP_H723_M2006_CURRENT_LIMIT_A; }
@@ -124,6 +139,9 @@ void h723_chassis_service_init(void)
                           (float)APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS / 1000.0f);
         app_m2006_position_tracker_init(&s_position_tracker[index]);
     }
+    app_line_follow_init(&s_line_follow, &s_line_follow_pid_params,
+                         (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
+    (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
     g_h723_debug.single_motor.default_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.selected_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.enable = 0U;
@@ -428,10 +446,15 @@ void h723_chassis_service_step(uint32_t now_ms)
         if (!s_crsf_was_timed_out) { ++g_h723_debug.crsf.timeout_count; }
         s_crsf_was_timed_out = true;
     } else { s_crsf_was_timed_out = false; }
-    g_h723_debug.chassis.mode = s_command.manual_active ? 1U : 0U;
+    g_h723_debug.chassis.mode = (uint32_t)s_command.mode;
     g_h723_debug.chassis.actuation_enabled = APP_H723_CHASSIS_ACTUATION_ENABLE;
     g_h723_debug.chassis.forward_normalized = s_command.forward_normalized;
     g_h723_debug.chassis.turn_normalized = s_command.turn_normalized;
+    g_h723_debug.chassis.base_speed_mm_s = s_command.base_speed_mm_s;
+    g_h723_debug.chassis.line_position = g_h723_debug.grayscale.line_position;
+    g_h723_debug.chassis.line_strength = g_h723_debug.grayscale.line_strength;
+    g_h723_debug.chassis.line_valid = 0U;
+    g_h723_debug.chassis.line_turn_correction_mm_s = 0.0f;
     g_h723_debug.chassis.left_target_output_speed_rpm = s_command.left_target_rpm;
     g_h723_debug.chassis.right_target_output_speed_rpm = s_command.right_target_rpm;
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
@@ -443,6 +466,32 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.chassis.right_target_output_speed_rpm = 0.0f;
     h723_single_motor_service_step(now_ms, output_current_A);
 #else
+    if (s_command.mode == APP_CHASSIS_MODE_LINE_FOLLOW && s_command.manual_active) {
+        const app_line_follow_input_t line_input = {
+            .line_position = g_h723_debug.grayscale.line_position,
+            .line_strength = g_h723_debug.grayscale.line_strength,
+            .adc_timeout_mask = g_h723_debug.grayscale.adc_timeout_mask,
+            .sequence = g_h723_debug.grayscale.sequence,
+            .base_speed_mm_s = s_command.base_speed_mm_s,
+            .black_count = g_h723_debug.grayscale.black_count,
+        };
+
+        app_line_follow_step(&s_line_follow, &line_input, &s_line_follow_output);
+        if (s_line_follow_output.active) {
+            s_command.left_target_rpm = s_line_follow_output.left_target_rpm;
+            s_command.right_target_rpm = s_line_follow_output.right_target_rpm;
+            g_h723_debug.chassis.line_valid = 1U;
+            g_h723_debug.chassis.line_turn_correction_mm_s =
+                s_line_follow_output.turn_correction_mm_s;
+        } else {
+            s_command.left_target_rpm = 0.0f;
+            s_command.right_target_rpm = 0.0f;
+        }
+    } else {
+        app_line_follow_reset(&s_line_follow);
+        (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
+    }
+
     for (index = 0U; index < 3U; ++index) {
         float target = index == 0U ? s_command.left_target_rpm : s_command.right_target_rpm;
         bool feedback_fresh = h723_m2006_feedback_is_fresh(index, now_ms);
@@ -450,7 +499,9 @@ void h723_chassis_service_step(uint32_t now_ms)
         if (index == 2U) { target = 0.0f; }
         h723_update_m2006_debug(index, now_ms, target);
         debug->target_output_speed_rpm = target;
-        if (index == 2U || !s_command.manual_active || !feedback_fresh) {
+        if (index == 2U || !s_command.manual_active ||
+            (s_command.mode == APP_CHASSIS_MODE_LINE_FOLLOW &&
+             !s_line_follow_output.active) || !feedback_fresh) {
             PID_Incremental_Reset(&s_speed_pid[index]);
             output_current_A[index] = 0.0f;
         } else {
@@ -463,6 +514,12 @@ void h723_chassis_service_step(uint32_t now_ms)
         output_current_A[index] = debug->commanded_current_A;
     }
 #endif
+    g_h723_debug.chassis.left_target_output_speed_rpm = s_command.left_target_rpm;
+    g_h723_debug.chassis.right_target_output_speed_rpm = s_command.right_target_rpm;
+    g_h723_debug.chassis.left_target_speed_mm_s =
+        s_command.left_target_rpm * APP_H723_OUTPUT_RPM_TO_MM_S;
+    g_h723_debug.chassis.right_target_speed_mm_s =
+        s_command.right_target_rpm * APP_H723_OUTPUT_RPM_TO_MM_S;
     for (index = 0U; index < 3U; ++index) {
         output_raw[index] = app_m2006_current_a_to_raw(output_current_A[index]);
     }

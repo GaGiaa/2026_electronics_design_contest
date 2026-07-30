@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <math.h>
 #include <stdint.h>
 
 #include "app_grayscale_math.h"
@@ -24,6 +25,7 @@ static void test_normalization_and_hysteresis(void)
     assert(derived.black_count == 5U);
     assert(derived.line_strength == 17745U);
     assert(derived.line_error == -192);
+    assert(fabsf(derived.line_position + 0.192f) < 0.001f);
 }
 
 static void test_hysteresis_preserves_state_between_thresholds(void)

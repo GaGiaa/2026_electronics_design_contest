@@ -6,6 +6,10 @@ static const int32_t s_line_weights[H723_GRAYSCALE_CHANNEL_COUNT] = {
     -3500, -2500, -1500, -500, 500, 1500, 2500, 3500
 };
 
+static const float s_line_positions[H723_GRAYSCALE_CHANNEL_COUNT] = {
+    -3.5f, -2.5f, -1.5f, -0.5f, 0.5f, 1.5f, 2.5f, 3.5f
+};
+
 static uint16_t normalize(uint16_t value, uint16_t white, uint16_t black)
 {
     uint32_t scaled;
@@ -33,6 +37,7 @@ void h723_grayscale_derive(
     uint32_t channel;
     int32_t weighted_sum = 0;
     uint32_t line_strength = 0U;
+    float weighted_position_sum = 0.0f;
 
     if (raw == NULL || white == NULL || black == NULL || derived == NULL) {
         return;
@@ -63,6 +68,7 @@ void h723_grayscale_derive(
                         derived->normalized[channel];
             line_strength += blackness;
             weighted_sum += (int32_t)blackness * s_line_weights[channel];
+            weighted_position_sum += (float)blackness * s_line_positions[channel];
         }
     }
 
@@ -76,4 +82,6 @@ void h723_grayscale_derive(
     derived->line_strength = line_strength;
     derived->line_error = line_strength != 0U ?
         weighted_sum / (int32_t)line_strength : previous_line_error;
+    derived->line_position = line_strength != 0U ?
+        weighted_position_sum / (float)line_strength : 0.0f;
 }
