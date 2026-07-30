@@ -485,13 +485,16 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 - `volatile g_h723_debug` 现在提供 16 个 CRSF 原始通道、协议和收发错误统计、遥控目标、CAN 状态、三台 M2006 的反馈、PID 分量和电流命令，供 Keil Watch 直接观察。
 - 已通过 H723 的 chassis、单电机、VOFA、CubeMX 与 Keil 工程静态测试，以及 G3507 PID、线控、航向、循迹和分层静态回归。`tools\build-mspm0g3507-app.ps1`、`tools\build-keil-mspm0g3507-app.ps1` 和 H723 Keil 构建均通过；H723 生成 `stm32h723_app.axf`，本轮构建日志为 `0 Error(s), 3 Warning(s)`，警告来自 CubeMX 生成的 FreeRTOS 未使用参数。未执行 Flash、烧录、探针连接、GDB/SWD、CRSF 实物收发、CAN 总线或电机实物测试。首次通电前必须车架悬空，确认左右方向、CAN 收发器、ID、反馈频率与 PID 参数。
 
-## STM32H723 单个 M2006 速度环 PID 调试
+## STM32H723 单个 M2006 速度/位置环 PID 调试
 
-`APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 默认 `0U`。设为 `1U` 后，现有 1 ms `chassisTask` 完全接管 `0x200` 组控帧，Watch 输入位于 `g_h723_debug.single_motor`，包括 `enable`、`selected_id`、输出轴 `target_output_speed_rpm`、运行时 `max_target_output_speed_rpm` 和全部增量 PID 参数。M2006 的速度环统一使用输出轴 RPM，减速比为 `36:1`；运行时目标上限默认 `550 RPM`，`APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM` 只提供初始化默认值，不限制 Watch 的运行时调节范围。当前默认 PID 参数为 `kp=0.25`、`ki=5`、`kd=0`、输出限幅 `10 A`、积分限幅 `100000 A`、死区 `0`、积分分离阈值 `0`、输出变化限幅 `0`。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 默认 `1U`，运行时可由 Watch 覆盖为 1/2/3；ID 或 enable 切换时当前周期清零并复位 PID。非选中槽位始终为零，反馈超时 50 ms、非法目标/限速、非法参数或未使能时也会复位并清零。
+最后更新：2026-07-30
 
-`APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 默认 `0U`，开启后 UART8 每 1 ms 尝试发送 8 通道 JustFloat：目标电流 A、反馈电流 A、目标输出轴 RPM、反馈输出轴 RPM、PID 总输出 A、P 项 A、I 项 A、D 项 A。C610 电流换算为 `16384 raw = 10 A`，CAN 帧仍使用原始 `int16` 电流值；Watch 调试快照同时提供 raw 与物理量字段。遥测 DMA 忙时丢弃本帧并记录 UART8 丢帧计数；它与健康/JY901S 遥测编译期互斥。
+- `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 默认 `0U`。开启后 `control_mode=0U` 保持现有 1 ms 输出轴 RPM 速度环；`control_mode=1U` 启用 5 ms 基础位置式 PID 外环，其输出受 `max_target_output_speed_rpm` 和 `position_output_limit_rpm` 双重限幅后送入同一速度内环。位置目标与反馈单位均为减速后输出轴连续 `deg`。
+- `app_m2006` 新增 8192 counts/转多圈展开器，FDCAN 反馈连续时累计位置；位置跟踪反馈间隔超过 `APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS`（默认 1 ms）或超过 50 ms 反馈超时后，会重置跟踪器并使位置零点失效，避免高速丢帧时的错误展开。位置模式在 ID、enable 或模式变更后先发送零电流并复位两级 PID，收到新的有效反馈后把当前位置设为相对零点，再等待下一个 5 ms 周期控制。未使能、反馈超时、无效参数/目标、无效模式、未建立零点或位置 PID 状态非有限时三个 `0x200` 电流槽位均为零。
+- Watch 的位置输入为 `target_position_deg` 和 `position_kp/ki/kd/output_limit_rpm/deadband_deg`；默认参数为 `Kp=2`、`Ki=0`、`Kd=0`、输出限幅 `550 RPM`、死区 `0 deg`。`feedback_position_deg`、`position_reference_valid`、外环速度目标、P/I/D、总输出和 `position_cycle_count` 用于观察。速度环参数及电流字段保留原有含义，当前默认死区为 `0.1 RPM`。
+- `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 默认 `0U`，默认发送周期为 1 ms。速度模式继续发送原有 8 通道；位置模式发送 9 通道：目标/反馈位置、位置 P/I/D、外环速度目标、内环速度反馈、目标电流和反馈电流。DMA 忙时丢帧，且与其他 UART8 遥测编译期互斥。
 
-本轮单电机功能只完成软件主机测试、静态检查和 Keil 构建，未执行 Flash、烧录、SWD、CAN 总线、电机实物或 VOFA+ 实物验收。实物调参前必须车架悬空，先确认当前默认 FDCAN2 与实际接线一致，必要时修改 `APP_H723_M2006_FDCAN_INSTANCE` 并重新构建。
+- 已通过 M2006 多圈跟踪/位置换算、单电机串级调度、VOFA、debug/IOC/Keil 静态检查，以及默认与启用单电机调试宏的 Keil 纯构建。未执行 Flash、烧录、SWD、CAN 总线、电机或 VOFA+ 实物验收。实物调参前必须车架悬空，确认实际 FDCAN 实例、ID、反馈方向、编码器连续性与低增益响应。
 
 ## 任务完成清单
 

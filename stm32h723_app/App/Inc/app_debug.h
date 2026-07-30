@@ -78,6 +78,7 @@ typedef struct {
 typedef struct {
     /* Watch inputs. Set enable to 1 only with the chassis lifted safely. */
     uint32_t enable;
+    uint32_t control_mode;
     uint32_t selected_id;
     uint32_t default_id;
     float target_output_speed_rpm;
@@ -92,11 +93,19 @@ typedef struct {
     float integral_separation_threshold;
     float derivative_filter_N;
     float output_delta_limit;
+    float target_position_deg;
+    float position_kp;
+    float position_ki;
+    float position_kd;
+    float position_output_limit_rpm;
+    float position_deadband_deg;
     /* Program outputs and selected-motor feedback. */
     uint32_t active;
     uint32_t reset_pid;
     uint32_t safety_reason;
     uint32_t cycle_count;
+    uint32_t position_cycle_count;
+    uint32_t position_reference_valid;
     uint16_t feedback_encoder;
     int16_t rotor_speed_rpm;
     int16_t feedback_current_raw;
@@ -104,6 +113,12 @@ typedef struct {
     float feedback_current_A;
     uint8_t feedback_temperature_celsius;
     uint32_t feedback_age_ms;
+    float feedback_position_deg;
+    float position_target_output_speed_rpm;
+    float position_p_out_rpm;
+    float position_i_out_rpm;
+    float position_d_out_rpm;
+    float position_output_rpm;
     int16_t target_current_raw;
     float target_current_A;
     float pid_raw_output_A;

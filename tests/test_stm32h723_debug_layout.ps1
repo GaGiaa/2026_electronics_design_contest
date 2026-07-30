@@ -35,7 +35,12 @@ foreach ($path in @(
     'g_h723_debug.fdcan.rx_count', 'g_h723_debug.jy901s.angle_deg',
     'g_h723_debug.grayscale.raw', 'g_h723_debug.grayscale.line_error',
     'g_h723_debug.single_motor.target_output_speed_rpm',
-    'g_h723_debug.single_motor.max_target_output_speed_rpm'
+    'g_h723_debug.single_motor.max_target_output_speed_rpm',
+    'g_h723_debug.single_motor.control_mode',
+    'g_h723_debug.single_motor.target_position_deg',
+    'g_h723_debug.single_motor.feedback_position_deg',
+    'g_h723_debug.single_motor.position_target_output_speed_rpm',
+    'g_h723_debug.single_motor.position_p_out_rpm'
 )) {
     if ($source -notmatch [regex]::Escape($path)) { throw "Missing grouped debug access: $path" }
 }
