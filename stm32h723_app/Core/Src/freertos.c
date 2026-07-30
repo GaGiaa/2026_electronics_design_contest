@@ -29,6 +29,7 @@
 #include "app_telemetry.h"
 #include "app_chassis_service.h"
 #include "app_config.h"
+#include "app_bno055_service.h"
 #include "app_jy901s_service.h"
 #include "app_grayscale_service.h"
 #include "app_time.h"
@@ -74,6 +75,13 @@ static const osThreadAttr_t grayscaleTask_attributes = {
   .priority = (osPriority_t)osPriorityAboveNormal,
 };
 
+static osThreadId_t bno055TaskHandle;
+static const osThreadAttr_t bno055Task_attributes = {
+  .name = "bno055Task",
+  .stack_size = 1024 * 2,
+  .priority = (osPriority_t)osPriorityAboveNormal,
+};
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -89,6 +97,7 @@ const osThreadAttr_t defaultTask_attributes = {
 void startChassisTask(void *argument);
 void startJy901sTask(void *argument);
 void startGrayscaleTask(void *argument);
+void startBno055Task(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -102,6 +111,8 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
 /* USER CODE BEGIN 4 */
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
 {
+   (void)xTask;
+   (void)pcTaskName;
    /* Run time stack overflow checking is performed if
    configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
    called if a stack overflow is detected. */
@@ -145,6 +156,8 @@ void MX_FREERTOS_Init(void) {
   configASSERT(jy901sTaskHandle != NULL);
   grayscaleTaskHandle = osThreadNew(startGrayscaleTask, NULL, &grayscaleTask_attributes);
   configASSERT(grayscaleTaskHandle != NULL);
+  bno055TaskHandle = osThreadNew(startBno055Task, NULL, &bno055Task_attributes);
+  configASSERT(bno055TaskHandle != NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -164,6 +177,7 @@ void MX_FREERTOS_Init(void) {
 __weak void startDefaultTask(void *argument)
 {
   /* USER CODE BEGIN startDefaultTask */
+  (void)argument;
   h723_app_telemetry_init();
   /* Infinite loop */
   for(;;)
@@ -212,6 +226,19 @@ void startGrayscaleTask(void *argument)
   for (;;) {
     h723_grayscale_service_step(h723_app_time_now_ms());
     next_wake_tick += APP_GRAYSCALE_TASK_PERIOD_MS;
+    (void)osDelayUntil(next_wake_tick);
+  }
+}
+
+void startBno055Task(void *argument)
+{
+  uint32_t next_wake_tick = osKernelGetTickCount();
+
+  (void)argument;
+  h723_bno055_service_init();
+  for (;;) {
+    h723_bno055_service_step(h723_app_time_now_ms());
+    next_wake_tick += APP_BNO055_TASK_PERIOD_MS;
     (void)osDelayUntil(next_wake_tick);
   }
 }

@@ -164,6 +164,36 @@ typedef struct {
 } h723_debug_grayscale_t;
 
 typedef struct {
+    int16_t acceleration_raw[3];
+    int16_t angular_rate_raw[3];
+    int16_t angle_raw[3];
+    int16_t temperature_raw;
+    float acceleration_g[3];
+    float angular_rate_dps[3];
+    float angle_deg[3];
+    float temperature_celsius;
+    uint32_t calibration_sys;
+    uint32_t calibration_gyro;
+    uint32_t calibration_acc;
+    uint32_t calibration_mag;
+    uint32_t sys_status;
+    uint32_t sys_err;
+    uint32_t complete_sample_count;
+    uint32_t start_attempt_count;
+    uint32_t uart_error_count;
+    int32_t last_error;
+    uint32_t last_stage;
+    uint32_t last_detail;
+    int32_t transport_status;
+    uint32_t hal_error_code;
+    uint32_t last_rx0;
+    uint32_t last_rx1;
+    uint32_t sample_age_ms;
+    uint32_t sample_valid;
+    uint32_t online;
+} h723_debug_bno055_t;
+
+typedef struct {
     h723_debug_system_t system;
     h723_debug_uart8_t uart8;
     h723_debug_crsf_t crsf;
@@ -174,6 +204,7 @@ typedef struct {
     h723_debug_single_motor_t single_motor;
     h723_debug_jy901s_t jy901s;
     h723_debug_grayscale_t grayscale;
+    h723_debug_bno055_t bno055;
 } h723_debug_t;
 
 extern volatile h723_debug_t g_h723_debug;

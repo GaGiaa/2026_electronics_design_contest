@@ -7,7 +7,14 @@
 - `g_h723_debug` 是 H723 唯一的 Keil Watch 调试入口，按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]` 和 `jy901s` 分组。它只用于观察，不得作为业务输入；任务与中断可独立更新字段，跨字段组合不保证原子一致。`APP_JY901S_VOFA_TELEMETRY_ENABLE=0U` 默认关闭，开启后 UART8 发送 `Ax, Ay, Az, Gx, Gy, Gz, Roll, Pitch, Yaw, TemperatureC` 十通道 JustFloat；它与健康遥测编译期互斥。
 - 未执行烧录、探针/SWD/GDB、JY901S 或 VOFA 实物测试。详细接线、单位和验收条件见 [`docs/STM32H723_JY901S.md`](STM32H723_JY901S.md)。
 
-最后更新：2026-07-28
+## H723 BNO055 USART1 IMU
+
+- STM32CubeMX 已配置并生成 USART1：`PB6=USART1_TX`、`PB7=USART1_RX`、115200 bit/s、8-N-1；不使用 DMA 或 USART1 中断，接收 FIFO 已启用。BNO055 服务在通信错误后会清除 UART PE/FE/NE/ORE 标志并排空接收残留。BNO055 原生 UART 接线为 `PB6 -> BNO055 RX`、`PB7 <- BNO055 TX`，两端共地且 UART IO 必须为 3.3 V 兼容。
+- `App/app_bno055` 是可主机测试的 BNO055 UART 寄存器协议核心。每次启动和通信恢复均先读取 `CHIP_ID=0xA0`，再按 `CONFIG -> PWR_MODE=NORMAL -> UNIT_SEL=0 -> IMU` 顺序写入并等待模式切换；每笔写入必须收到 `EE 01`，直接写 `OPR_MODE=IMU` 可能收到 `EE 03`。每笔 UART 事务超时为 20 ms，`bno055Task` 每 5 ms 执行一个请求应答步骤；`SYS_STATUS(0x39)` 与 `SYS_ERR(0x3A)` 分别读取，避免设备对跨寄存器状态读取返回 `EE 07`。错误会置 `g_h723_debug.bno055.online/sample_valid=0`，服务每 1000 ms 重试初始化。
+- `g_h723_debug` 新增 `bno055` 分组，包含十项原始/换算量、校准状态、系统诊断、样本年龄和 UART/HAL 错误。`APP_BNO055_VOFA_TELEMETRY_ENABLE=0U` 默认关闭；启用后 UART8 以 20 ms 间隔发送 `Ax, Ay, Az, Gx, Gy, Gz, Roll, Pitch, Yaw, TemperatureC` 十通道 JustFloat。健康、JY901S 和 BNO055 三种 UART8 遥测编译期互斥。
+- 已通过 `tests/test_stm32h723_bno055.ps1`、H723 CubeMX/调试快照/Keil 工程/RTOS 静态检查，以及 Keil 构建日志中的 `0 Error(s)`。未执行 Flash、探针/SWD/GDB、BNO055 或 VOFA 实物测试。详细接线、单位和验收条件见 [`docs/STM32H723_BNO055.md`](STM32H723_BNO055.md)。
+
+最后更新：2026-07-30
 
 ## H723 74HC4051 灰度传感器
 
