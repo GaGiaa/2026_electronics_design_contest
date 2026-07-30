@@ -1,5 +1,39 @@
 # MSPM0 核心板工程交接索引
 
+## H723 ID 3 平衡机构机械零点校准（2026-07-31）
+
+- 新增 `App/app_balance`，独占 M2006 ID 3 的 `0x200` 第三个电流槽位；ID 1/2
+  仍由原底盘或单电机调试路径控制。即使启用了单电机调试，Watch 选择 ID 3 也会
+  回退到该调试通道的默认 ID，防止与平衡控制器竞争电流命令。
+- 上电自动等待 ID 3 的连续反馈，随后以输出轴右手系负方向、即
+  `APP_H723_BALANCE_HOME_SEARCH_OUTPUT_SPEED_RPM=-8.0f` 反转搜索机械限位。归零
+  采用速度闭环和独立电流上限：搜索及确认阶段的命令电流绝不会超过
+  `APP_H723_BALANCE_HOME_CURRENT_LIMIT_A=1.0f`。
+- 只有输出轴速度绝对值不大于 `1 RPM`、反馈电流绝对值达到限值的 `80%`，并持续
+  `300 ms`，才把当前连续多圈输出轴角度记录为软件零点。此后位置反馈为原始角度减
+  该偏移；Watch 的 `g_h723_debug.balance.target_position_deg` 仅接受从零点向正方向
+  的目标。`APP_H723_BALANCE_POSITION_MIN_DEG` 必须保持包含 `0 deg`，以允许建立软件零点；
+  归零后的正常运行安全下限由 `APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG` 单独定义，Watch
+  请求低于该值时会被限幅并在 `active_target_position_deg` 中显示。当前配置为软件零点 `0 deg`、
+  正常运行下限 `5 deg`、上限 `275 deg`；其余速度和电流参数以 `app_config.h` 为准。
+- `g_h723_debug.balance` 暴露 `state`、`fault`、`zero_valid`、`zero_offset_deg`、实际
+  位置/速度/电流、请求与生效目标、限幅标志和命令电流；同时镜像平衡速度内环的
+  PID 参数、采样周期、误差、积分状态以及 P/I/D、原始和最终输出，供 Keil Watch 排查。
+  归零未完成、反馈中断、搜索
+  超时或非有限位置目标都会立即清零电流并进入故障锁定；在 Watch 写入
+  `rehome_request=1` 会被一次性消费，然后下一周期重新等待反馈并启动归零。
+- 所有初始值均是 `app_config.h` 中可覆写、受 Git 管理的宏，不写入片内 Flash。新建
+  `tests/test_stm32h723_balance.ps1` 覆盖等待反馈、负向搜限、双条件确认、零点建立、
+  目标夹紧、非有限目标、超时、反馈丢失和手动重试。
+- 共享 `PID_Incremental` 保留积分输出限幅、积分分离和输出饱和后的积分冻结。总输出
+  `output_limit` 与可选 `output_delta_limit` 仍然生效；调参时可通过对应 PID 参数配置积分
+  限幅和积分分离阈值。
+- 已执行全部 `tests/test_stm32h723_*.ps1` 主机/静态测试、Keil 工程静态检查和
+  `D:\Keil_v5\UV4\UV4.exe -r .\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx -j0`
+  纯软件重建；构建日志为 `0 Error(s), 0 Warning(s)`。本轮尚未执行 Flash、烧录、
+  SWD/GDB、CAN 实车、电机、机械限位、3D 打印件受力或导轨平衡验收。首次通电必须让
+  车辆悬空、可随时断电，并先确认实际“反转”确实朝向机械限位。
+
 ## VS Code 一键打开 H723 Keil 工程（2026-07-31）
 
 - `.vscode/tasks.json` 新增 `STM32H723 App: Open Keil Project`，调用

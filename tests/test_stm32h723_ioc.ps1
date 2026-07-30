@@ -158,10 +158,8 @@ foreach ($line in @(
     '#define APP_H723_M2006_PID_KP 0.25f',
     '#define APP_H723_M2006_PID_KI 5.0f',
     '#define APP_H723_M2006_PID_KD 0.0f',
-    '#define APP_H723_M2006_PID_INTEGRAL_LIMIT 100000.0f',
     '#define APP_H723_M2006_PID_OUTPUT_DELTA_LIMIT 0.0f',
-    '#define APP_H723_M2006_PID_DEADBAND_RPM 0.1f',
-    '#define APP_H723_M2006_PID_INTEGRAL_SEPARATION_RPM 0.0f'
+    '#define APP_H723_M2006_PID_DEADBAND_RPM 0.1f'
 )) {
     if ($appConfig -notmatch [regex]::Escape($line)) {
         throw "Missing chassis PID tuning default: $line"
