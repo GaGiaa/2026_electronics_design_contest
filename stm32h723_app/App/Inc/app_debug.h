@@ -164,6 +164,15 @@ typedef struct {
 } h723_debug_grayscale_t;
 
 typedef struct {
+    uint32_t enabled;
+    uint32_t initialized;
+    uint32_t init_attempt_count;
+    uint32_t last_hal_status;
+    uint32_t update_count;
+    uint32_t error_count;
+} h723_debug_oled_t;
+
+typedef struct {
     h723_debug_system_t system;
     h723_debug_uart8_t uart8;
     h723_debug_crsf_t crsf;
@@ -174,6 +183,7 @@ typedef struct {
     h723_debug_single_motor_t single_motor;
     h723_debug_jy901s_t jy901s;
     h723_debug_grayscale_t grayscale;
+    h723_debug_oled_t oled;
 } h723_debug_t;
 
 extern volatile h723_debug_t g_h723_debug;

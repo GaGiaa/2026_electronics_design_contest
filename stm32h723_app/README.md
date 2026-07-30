@@ -53,6 +53,19 @@ Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadb
 3. 本轮配置由 CubeMX 6.15.0 重新生成。可用 `cubemx_generate_crsf.txt` 通过 CubeMX 命令行重现生成；该脚本加载相同 `.ioc` 后执行 `project generate`。
 4. 重新生成后检查 Keil 工程仍包含 `App/Src/app_debug.c`、`app_telemetry.c`、`app_crsf.c`、`app_m2006.c`、`app_chassis.c`、`app_chassis_service.c` 与 `../../shared/pid/pid.c`，并具有 `App/Inc` 与 `shared/pid` include 路径。
 
+## I2C4 OLED 测试页
+
+首版 OLED 使用 0.96 寸 128x64 SSD1306 四针 I2C 模块，接线固定为：
+
+- `PD12` -> `I2C4_SCL`
+- `PD13` -> `I2C4_SDA`
+- 7-bit 地址 `0x3C`
+- CubeMX I2C4 时序 `0x00B03FDB`，对应 400 kHz 快速模式
+
+OLED 必须使用 3.3 V 供电，SCL/SDA 上拉电压不能高于 3.3 V；模块没有合适上拉时，外接约 4.7 kOhm 上拉到 3.3 V。`oledTask` 为低优先级、默认 1000 ms 周期，使用阻塞式 HAL I2C 传输和 50 ms 超时。屏幕未连接时只累计 OLED 错误并按周期重试，不会改变 FDCAN2、电机控制或 UART8 任务。
+
+默认测试页显示 `H723 OLED TEST`、`I2C4 PD12/PD13`、`SSD1306 128X64` 和递增计数。Keil Watch 可观察 `g_h723_debug.oled` 中的初始化状态、最后 HAL 状态、初始化尝试次数、刷新次数和错误次数。该版本不读取电机实时数据。
+
 ## Runtime Speed Limit Watch Control
 
 单电机调试模式下，Keil Watch 可修改 `g_h723_debug.single_motor.max_target_output_speed_rpm`，单位为输出轴 RPM，下一次 1 ms 内环周期生效。默认值为 `550 RPM`，由 `APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM` 提供；该宏只决定启动默认值，不限制运行时可调范围。设为 `0`、负数或非法浮点值时，速度和位置模式均进入安全清零。

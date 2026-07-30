@@ -22,6 +22,7 @@
 #include "adc.h"
 #include "dma.h"
 #include "fdcan.h"
+#include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -108,6 +109,7 @@ int main(void)
   MX_UART8_Init();
   MX_UART9_Init();
   MX_ADC1_Init();
+  MX_I2C4_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

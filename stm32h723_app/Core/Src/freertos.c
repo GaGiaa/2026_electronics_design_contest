@@ -31,6 +31,7 @@
 #include "app_config.h"
 #include "app_jy901s_service.h"
 #include "app_grayscale_service.h"
+#include "app_oled.h"
 #include "app_time.h"
 
 /* USER CODE END Includes */
@@ -74,6 +75,13 @@ static const osThreadAttr_t grayscaleTask_attributes = {
   .priority = (osPriority_t)osPriorityAboveNormal,
 };
 
+static osThreadId_t oledTaskHandle;
+static const osThreadAttr_t oledTask_attributes = {
+  .name = "oledTask",
+  .stack_size = 1024 * 2,
+  .priority = (osPriority_t)osPriorityLow,
+};
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -89,6 +97,7 @@ const osThreadAttr_t defaultTask_attributes = {
 void startChassisTask(void *argument);
 void startJy901sTask(void *argument);
 void startGrayscaleTask(void *argument);
+void startOledTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -145,6 +154,8 @@ void MX_FREERTOS_Init(void) {
   configASSERT(jy901sTaskHandle != NULL);
   grayscaleTaskHandle = osThreadNew(startGrayscaleTask, NULL, &grayscaleTask_attributes);
   configASSERT(grayscaleTaskHandle != NULL);
+  oledTaskHandle = osThreadNew(startOledTask, NULL, &oledTask_attributes);
+  configASSERT(oledTaskHandle != NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -212,6 +223,19 @@ void startGrayscaleTask(void *argument)
   for (;;) {
     h723_grayscale_service_step(h723_app_time_now_ms());
     next_wake_tick += APP_GRAYSCALE_TASK_PERIOD_MS;
+    (void)osDelayUntil(next_wake_tick);
+  }
+}
+
+void startOledTask(void *argument)
+{
+  uint32_t next_wake_tick = osKernelGetTickCount();
+
+  (void)argument;
+  h723_oled_service_init();
+  for (;;) {
+    h723_oled_service_step(h723_app_time_now_ms());
+    next_wake_tick += APP_H723_OLED_TASK_PERIOD_MS;
     (void)osDelayUntil(next_wake_tick);
   }
 }
