@@ -613,3 +613,24 @@ build generated `stm32h723_app.axf` with `0 Error(s), 1 Warning(s)` in
 `stm32h723_app\\MDK-ARM\\stm32h723_app\\stm32h723_app.build_log.htm`.
 No Flash, SWD/GDB, CAN, UART/VOFA hardware, motor, grayscale sensor, OLED, or
 other physical acceptance operation was performed.
+
+## H723 Passive Buzzer Test (2026-07-31)
+
+The H723 application now contains an optional passive buzzer hardware test.
+`PA3` is configured as `TIM2_CH4` PWM. The CubeMX source of truth is
+`stm32h723_app/stm32h723_app.ioc`; the checked-in `Core/Inc/tim.h` and
+`Core/Src/tim.c` implement the same CubeMX HAL initialization shape because
+the local CubeMX command-line generator did not emit the newly added TIM2
+files during this change.
+
+The test is disabled by default with
+`APP_H723_BUZZER_TEST_ENABLE=0U`. Define it as `1U` for a 2 kHz, 50% PWM test
+that is on for 200 ms and off for 1800 ms. The default timer setup uses a 1 MHz
+counter (`TIM2.Prescaler=274`, `TIM2.Period=499`). The service is called from
+the existing default task and does not create another RTOS task.
+
+Connect the passive buzzer signal to `PA3` and its return to board ground only
+after checking the buzzer current. Use a transistor or MOSFET driver when the
+load exceeds the STM32 GPIO rating. Static checks and software-only Keil builds
+were run; Flash, SWD, oscilloscope, audible buzzer, and other physical
+acceptance tests remain outstanding.

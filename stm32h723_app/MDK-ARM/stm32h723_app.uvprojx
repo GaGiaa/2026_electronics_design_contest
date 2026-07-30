@@ -537,6 +537,11 @@
               <FilePath>../Core/Src/usart.c</FilePath>
             </File>
             <File>
+              <FileName>tim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/tim.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32h7xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/stm32h7xx_it.c</FilePath>
@@ -556,6 +561,11 @@
         <Group>
           <GroupName>Application/User/App</GroupName>
           <Files>
+            <File>
+              <FileName>app_buzzer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_buzzer.c</FilePath>
+            </File>
             <File>
               <FileName>app_debug.c</FileName>
               <FileType>1</FileType>

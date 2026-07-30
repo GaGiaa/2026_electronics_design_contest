@@ -150,6 +150,23 @@ Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 
 
 详见 [JY901S 接入说明](../docs/STM32H723_JY901S.md) 和 [BNO055 接入说明](../docs/STM32H723_BNO055.md)。
 
+## Passive Buzzer Test
+
+The optional passive buzzer test uses `PA3` as `TIM2_CH4` PWM. The default
+configuration is silent:
+
+```c
+#define APP_H723_BUZZER_TEST_ENABLE 0U
+```
+
+Build with `APP_H723_BUZZER_TEST_ENABLE=1U` to enable a 2 kHz, 50% PWM output.
+The application drives the output for 200 ms and stops it for 1800 ms in a
+loop. The timer counter is 1 MHz (`TIM2.Prescaler=274`, default period 499).
+Connect a passive buzzer between `PA3` and board ground only when the buzzer
+current is within the MCU GPIO rating. Use a transistor or MOSFET driver for
+any higher-current load. This software change has not been Flash-programmed or
+accepted with a scope or physical buzzer.
+
 ## Build And Checks
 
 Build only; this does not program the board:
@@ -169,6 +186,7 @@ Expected artifact: `MDK-ARM\stm32h723_app\stm32h723_app.axf`.
 .\tests\test_stm32h723_single_motor.ps1
 .\tests\test_stm32h723_debug_layout.ps1
 .\tests\test_stm32h723_ioc.ps1
+.\tests\test_stm32h723_buzzer.ps1
 .\tests\test_stm32h723_keil_project.ps1
 ```
 

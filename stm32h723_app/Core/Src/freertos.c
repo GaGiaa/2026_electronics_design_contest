@@ -35,6 +35,7 @@
 #include "app_grayscale_service.h"
 #include "app_oled.h"
 #include "app_time.h"
+#include "app_buzzer.h"
 
 /* USER CODE END Includes */
 
@@ -206,10 +207,12 @@ __weak void startDefaultTask(void *argument)
   /* USER CODE BEGIN startDefaultTask */
   (void)argument;
   h723_app_telemetry_init();
+  h723_buzzer_service_init();
   /* Infinite loop */
   for(;;)
   {
     h723_app_telemetry_step();
+    h723_buzzer_service_step(h723_app_time_now_ms());
     osDelay(1);
   }
   /* USER CODE END startDefaultTask */
