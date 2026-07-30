@@ -214,6 +214,7 @@ void app_bno055_reset(app_bno055_t *imu)
     complete_sample_count = imu->snapshot.complete_sample_count;
     imu->initialized = 0;
     imu->poll_step = 0U;
+    imu->diagnostic_step = 0U;
     memset(imu->sensor_data, 0, sizeof(imu->sensor_data));
     memset(imu->temperature_calibration, 0, sizeof(imu->temperature_calibration));
     memset(imu->system_status, 0, sizeof(imu->system_status));
@@ -302,6 +303,7 @@ int app_bno055_start(app_bno055_t *imu)
     app_bno055_delay(imu, 10U);
     imu->initialized = 1;
     imu->poll_step = 0U;
+    imu->diagnostic_step = 0U;
     imu->snapshot.online = 1;
     imu->snapshot.valid = 0;
     app_bno055_clear_error(imu);
@@ -333,20 +335,19 @@ int app_bno055_poll_step(app_bno055_t *imu)
             app_bno055_set_error(imu, result, APP_BNO055_STAGE_TEMPERATURE_CALIBRATION);
             return result;
         }
-        imu->poll_step = 2U;
-        return APP_BNO055_STEP_IN_PROGRESS;
-    }
-    result = app_bno055_read_registers(imu, APP_BNO055_REG_SYS_STATUS,
-                                       &imu->system_status[0], 1U);
-    if (result != APP_BNO055_OK) {
-        app_bno055_set_error(imu, result, APP_BNO055_STAGE_SYSTEM_STATUS);
-        return result;
-    }
-    result = app_bno055_read_registers(imu, APP_BNO055_REG_SYS_STATUS + 1U,
-                                       &imu->system_status[1], 1U);
-    if (result != APP_BNO055_OK) {
-        app_bno055_set_error(imu, result, APP_BNO055_STAGE_SYSTEM_STATUS);
-        return result;
+
+        if (imu->diagnostic_step == 0U) {
+            result = app_bno055_read_registers(imu, APP_BNO055_REG_SYS_STATUS,
+                                               &imu->system_status[0], 1U);
+        } else {
+            result = app_bno055_read_registers(imu, APP_BNO055_REG_SYS_STATUS + 1U,
+                                               &imu->system_status[1], 1U);
+        }
+        if (result != APP_BNO055_OK) {
+            app_bno055_set_error(imu, result, APP_BNO055_STAGE_SYSTEM_STATUS);
+            return result;
+        }
+        imu->diagnostic_step ^= 1U;
     }
     result = app_bno055_parse_sample(imu);
     if (result != APP_BNO055_OK) {
