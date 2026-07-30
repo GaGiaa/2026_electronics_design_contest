@@ -106,3 +106,13 @@ bool app_task_menu_execution_requested(void)
 {
     return s_execution_requested;
 }
+
+bool app_task_menu_take_execution_request(uint32_t *task_id)
+{
+    if (task_id == NULL || !s_execution_requested) {
+        return false;
+    }
+    *task_id = s_selected_task;
+    s_execution_requested = false;
+    return true;
+}

@@ -51,6 +51,18 @@ typedef struct {
 } h723_debug_chassis_t;
 
 typedef struct {
+    uint32_t mode;
+    uint32_t remote_takeover;
+    uint32_t buttons_enabled;
+    uint32_t se_pressed;
+    uint32_t sb_state;
+    uint32_t sc_state;
+    uint32_t button_stable_high_mask;
+    uint32_t selected_task;
+    uint32_t task_request_available;
+} h723_debug_control_t;
+
+typedef struct {
     uint32_t rx_count;
     uint32_t tx_count;
     uint32_t tx_error_count;
@@ -232,6 +244,7 @@ typedef struct {
     h723_debug_system_t system;
     h723_debug_uart8_t uart8;
     h723_debug_crsf_t crsf;
+    h723_debug_control_t control;
     h723_debug_chassis_t chassis;
     h723_debug_fdcan_t fdcan;
     /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */

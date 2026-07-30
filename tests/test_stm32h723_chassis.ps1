@@ -19,7 +19,9 @@ $output = Join-Path $env:TEMP 'stm32h723_chassis_test.exe'
 try {
     & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' "-I$ProjectRoot\stm32h723_app\App\Inc" "-I$ProjectRoot\shared\pid" `
         "$ProjectRoot\shared\pid\pid.c" "$ProjectRoot\stm32h723_app\App\Src\app_crsf.c" `
-        "$ProjectRoot\stm32h723_app\App\Src\app_chassis.c" "$ProjectRoot\stm32h723_app\App\Src\app_m2006.c" `
+        "$ProjectRoot\stm32h723_app\App\Src\app_chassis.c" `
+        "$ProjectRoot\stm32h723_app\App\Src\app_task_menu.c" `
+        "$ProjectRoot\stm32h723_app\App\Src\app_m2006.c" `
         "$PSScriptRoot\test_stm32h723_chassis.c" '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) { throw 'STM32H723 chassis test build failed.' }
     & $output

@@ -81,12 +81,14 @@ foreach ($line in @(
 }
 
 foreach ($line in @(
-    '#define APP_H723_OLED_ENABLE 1U',
     '#define APP_H723_OLED_I2C_ADDRESS 0x3CU',
-    '#define APP_H723_OLED_TASK_PERIOD_MS 1000U',
+    '#define APP_H723_OLED_TASK_PERIOD_MS 100U',
     '#define APP_H723_OLED_I2C_TIMEOUT_MS'
 )) {
     Require-Text $appConfig ([regex]::Escape($line)) "Missing OLED configuration: $line"
+}
+if ($appConfig -match 'APP_H723_OLED_ENABLE|APP_H723_OLED_DEBUG_MODE_ENABLE') {
+    throw 'OLED must not be gated by compile-time enable/debug macros.'
 }
 
 foreach ($line in @(
@@ -103,6 +105,7 @@ foreach ($line in @(
 
 foreach ($line in @(
     'h723_debug_oled_t',
+    'h723_debug_control_t',
     'oled;',
     'initialized',
     'last_hal_status',
@@ -124,6 +127,10 @@ foreach ($line in @(
     '0xAEU',
     '0xAFU',
     'board_oled_write_string',
+    'render_runtime_page',
+    'REMOTE CONTROL',
+    'TASK MENU',
+    'g_h723_debug.control',
     'g_h723_debug.oled.error_count\+\+',
     's_service_initialized = false'
 )) {

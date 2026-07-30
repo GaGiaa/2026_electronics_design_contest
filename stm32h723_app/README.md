@@ -17,11 +17,21 @@
 
 ## CRSF 与安全状态机
 
-CRSF 始终解析 16 个 11-bit 通道，CH3（数组索引 2）为前进/后退，CH1（索引 0）为左右转向。有效范围为 `172/992/1811`，归一化死区为 `0.2`。仅 SB（索引 6）和 SC（索引 7）均处于中档时进入手动差速；任一低档或高档、CRSF 超过 100 ms 未收到有效帧、任一电机反馈超过 50 ms 时都复位 PID 并下发零电流。
+CRSF 始终解析 16 个 11-bit 通道。CH3（数组索引 2）为左摇杆前后，CH1（索引 0）为右摇杆左右；有效范围为 `172/992/1811`，归一化死区为 `0.2`。SE 使用索引 4，`raw >= 1300` 表示按下；SB 使用索引 6，SC 使用索引 7。
+
+SE 未按下时进入任务菜单，CRSF 不接管车辆，三个电机均输出零电流。SE 按下后屏蔽按键并进入遥控接管：SB 低档为三电机零电流；SB 中档、SC 低档为手动底盘；SB 中档、SC 中档为灰度循迹；其余挡位均为三电机零电流。CRSF 超过 100 ms 未收到有效帧、任一电机反馈超过 50 ms 或安全挡位不满足时都会复位 PID 并下发零电流。
+
+底盘控制状态机位于 `App/app_chassis` 纯 C 模块。`chassisTask` 消费 CRSF 和按键稳定状态，OLED 任务只读取 `g_h723_debug.control` 和 `g_h723_debug.chassis` 显示状态，不参与电机决策。
 
 当前 `App/Inc/app_config.h` 显式将 `APP_H723_CHASSIS_ACTUATION_ENABLE` 设为 `1U`。因此，满足全部运行安全条件时，选中的 FDCAN 总线可以发送非零电流。首次实车前必须将车架悬空，核对 CAN 收发器、反馈 ID、左右方向宏和 PID 参数。将该宏设为 `0U` 时，CRSF、混控、PID 和 Watch 调试量仍会更新，但 `0x200` 只允许发送四个零电流槽位。无反馈排查时，在 Keil Watch 观察 `g_h723_debug.fdcan.instance`、`g_h723_debug.fdcan.rx_count`、`g_h723_debug.fdcan.last_status`、`g_h723_debug.fdcan.protocol_last_error`、`g_h723_debug.fdcan.protocol_bus_off`、`g_h723_debug.fdcan.tx_error_counter` 与 `g_h723_debug.fdcan.rx_error_counter`。
 
 PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，控制量统一为 M2006 减速箱输出轴 RPM，输出统一为安培。M2006 减速比为 `36:1`，C610 电流换算为 `16384 raw = 10 A`；底盘默认目标速度上限为 `550 output RPM`，电流输出上限为 `10 A`。当前底盘与单电机调试默认速度环参数为 `kp=0.25 A/RPM`、`ki=5 A/(RPM*s)`、`kd=0`、积分限幅 `100000 A`、每周期输出变化限幅 `0 A`、死区 `0.1 RPM`、积分分离阈值 `0 RPM`，这些值来自当前速度环调试配置，仍需悬空实车验证。
+
+## 三按键任务菜单
+
+按键 1（PC5）为确认，按键 2（PC4）为上移，按键 3（PA6）为下移。按键任务每 5 ms 采样，连续两次一致后发布稳定电平；底盘任务只处理稳定电平的上升沿。菜单显示任务 2~6，确认后锁定并发布一次性任务请求，可通过 `app_task_menu_take_execution_request()` 取走任务号。具体任务执行器尚未接入。
+
+SE 按下时按键完全屏蔽；SE 从按下释放后菜单重置到任务 2 并重新开放按键。任务菜单和 CRSF 接管不能同时控制车辆。
 
 ## 单电机速度/位置环 PID 调试
 
@@ -76,7 +86,7 @@ K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使
 3. 本轮配置由 CubeMX 6.15.0 重新生成。可用 `cubemx_generate_crsf.txt` 或 `cubemx_generate_k230_uart2.txt` 通过 CubeMX 命令行重现生成；脚本加载相同 `.ioc` 后执行 `project generate`。
 4. 重新生成后检查 Keil 工程仍包含 `App/Src/app_debug.c`、`app_telemetry.c`、`app_jy901s.c`、`app_jy901s_service.c`、`app_bno055.c`、`app_bno055_service.c`、`app_k230.c`、`app_k230_service.c`、`app_crsf.c`、`app_m2006.c`、`app_chassis.c`、`app_chassis_service.c` 与 `../../shared/pid/pid.c`，并具有 `App/Inc` 与 `shared/pid` include 路径。
 
-## I2C4 OLED 测试页
+## I2C4 OLED 运行页面
 
 首版 OLED 使用 0.96 寸 128x64 SSD1306 四针 I2C 模块，接线固定为：
 
@@ -85,9 +95,9 @@ K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使
 - 7-bit 地址 `0x3C`
 - CubeMX I2C4 时序 `0x00B03FDB`，对应 400 kHz 快速模式
 
-OLED 必须使用 3.3 V 供电，SCL/SDA 上拉电压不能高于 3.3 V；模块没有合适上拉时，外接约 4.7 kOhm 上拉到 3.3 V。`oledTask` 为低优先级、默认 1000 ms 周期，使用阻塞式 HAL I2C 传输和 50 ms 超时。屏幕未连接时只累计 OLED 错误并按周期重试，不会改变 FDCAN2、电机控制或 UART8 任务。
+OLED 必须使用 3.3 V 供电，SCL/SDA 上拉电压不能高于 3.3 V；模块没有合适上拉时，外接约 4.7 kOhm 上拉到 3.3 V。`oledTask` 为低优先级、默认 100 ms 周期，使用阻塞式 HAL I2C 传输和 50 ms 超时。屏幕未连接时只累计 OLED 错误并按周期重试，不会改变 FDCAN2、电机控制或 UART8 任务。OLED 始终作为应用服务运行，不使用 OLED enable 或 debug 编译宏。
 
-默认测试页显示 `H723 OLED TEST`、`I2C4 PD12/PD13`、`SSD1306 128X64` 和递增计数。Keil Watch 可观察 `g_h723_debug.oled` 中的初始化状态、最后 HAL 状态、初始化尝试次数、刷新次数和错误次数。该版本不读取电机实时数据。
+任务菜单页面显示 `TASK MENU`、当前任务号以及按键提示；SE 接管时显示 `REMOTE CONTROL`、`IDLE`、`MANUAL` 或 `LINE FOLLOW`，并显示 SB/SC 档位和 CRSF 帧年龄。详细诊断数据仍通过 `g_h723_debug` 提供给 Keil Watch，不通过 OLED 宏切换页面。
 
 ## Runtime Speed Limit Watch Control
 
@@ -202,6 +212,7 @@ Expected artifact: `MDK-ARM\stm32h723_app\stm32h723_app.axf`.
 .\tests\test_stm32h723_vofa_justfloat.ps1
 .\tests\test_stm32h723_buttons.ps1
 .\tests\test_stm32h723_buttons_static.ps1
+.\tests\test_stm32h723_control.ps1
 .\tests\test_stm32h723_bno055.ps1
 .\tests\test_stm32h723_chassis.ps1
 .\tests\test_stm32h723_single_motor.ps1
@@ -221,11 +232,13 @@ The partner-only additions are integrated as independent application modules;
 the existing BNO055, K230 UART2, I2C4 OLED, M2006 position loop, and safety
 behavior remain in place.
 
-Chassis switch mapping is:
+Chassis switch mapping in the current control state machine is:
 
-- SB middle and SC middle: existing manual chassis mode.
-- SB high and SC middle: gray line-follow mode.
-- All other switch combinations: stop.
+- SE not pressed: task menu and three motor outputs at zero current.
+- SE pressed, SB low: remote idle and three motor outputs at zero current.
+- SE pressed, SB middle and SC low: manual chassis mode.
+- SE pressed, SB middle and SC middle: gray line-follow mode.
+- All other switch combinations: remote idle and three motor outputs at zero current.
 
 Line follow uses the 65 mm wheel diameter, a 225 mm/s base speed, +/-300 mm/s
 stick adjustment, and a 525 mm/s target-speed cap. A line-strength value below
@@ -241,10 +254,10 @@ safety gate is satisfied. Optional chassis VOFA telemetry is controlled by
 included in the UART8 telemetry mutual-exclusion check.
 
 `app_task_menu` is a standalone task-2-to-task-6 selection state machine. It
-provides page wraparound, 120 ms key debounce, confirm locking, reset, and a
-callback-based display adapter. It is deliberately not bound to OLED pins,
-buttons, or task execution until those hardware and behavior contracts are
-defined.
+provides page wraparound, 120 ms key debounce, confirm locking, reset, a
+one-shot execution-request API, and a callback-based display adapter. The H723
+chassis control state machine binds it to the three debounced buttons and the
+SE takeover switch. OLED rendering reads the published control/debug snapshot.
 
 The merge was verified with all 18 `tests\\test_stm32h723_*.ps1` scripts,
 `git diff --check`, and a Keil software-only build. The build log reports
