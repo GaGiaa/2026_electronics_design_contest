@@ -1,5 +1,16 @@
 # MSPM0 核心板工程交接索引
 
+## VS Code 一键打开 H723 Keil 工程（2026-07-31）
+
+- `.vscode/tasks.json` 新增 `STM32H723 App: Open Keil Project`，调用
+  `tools/open-keil-stm32h723-app.ps1` 打开
+  `stm32h723_app/MDK-ARM/stm32h723_app.uvprojx`。
+- 启动脚本优先读取 `KEIL_ROOT` 并使用其下的 `UV4/UV4.exe`；环境变量未配置或
+  对应文件不存在时回退到 `D:\Keil_v5\UV4\UV4.exe`。工程文件或 Keil 可执行文件
+  缺失时会直接报错，不会静默执行其他操作。
+- 本次仅新增开发入口和文档，没有执行 Keil 构建、Flash 擦除/烧录、探针枚举、
+  GDB/SWD、UART、CAN、电机或其他硬件验收操作。
+
 ## H723 三按键输入与 VOFA 测试
 
 - `stm32h723_app` 已新增三个高电平有效按键：`PC5`、`PC4`、`PA6`。`PA4` 配置为低速推挽输出并在 GPIO
