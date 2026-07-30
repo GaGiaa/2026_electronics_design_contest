@@ -91,6 +91,11 @@ powershell -ExecutionPolicy Bypass -File tools\build-mspm0g3507-app.ps1
 仓库根目录。构建任务调用 PowerShell 脚本；调试任务需要先启动 pyOCD GDB
 服务器，并正确配置 `ARM_GDB_PATH`。
 
+在 VS Code 的“运行任务”中执行 `STM32H723 App: Open Keil Project` 可直接打开
+`stm32h723_app\MDK-ARM\stm32h723_app.uvprojx`。该任务优先使用
+`$env:KEIL_ROOT\UV4\UV4.exe`；如果环境变量未配置或对应文件不存在，则回退到
+`D:\Keil_v5\UV4\UV4.exe`。任务只启动 Keil，不会自动构建、烧录或连接 SWD/GDB。
+
 仓库根目录的 `.vscode/settings.json` 已配置四套工程的源码、`Debug` 生成目录、SDK
 FreeRTOS、CMSIS 和 TI Arm Clang Cortex-M0+ 参数，默认 IntelliSense 目标为当前主线的
 `mspm0g3507_app`。由于 L1306 与 G3507 需要不同的芯片宏，单独检查 L1306 源码时不要

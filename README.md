@@ -64,3 +64,10 @@ H723 差速底盘工程现已包含 JY901S UART9 IMU 基础接入：`PG0/PG1`、
 
 详细版本基线和构建命令分别见 [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) 与
 [`docs/SETUP.md`](docs/SETUP.md)。
+
+## VS Code 任务
+
+在“运行任务”中执行 `STM32H723 App: Open Keil Project` 可直接打开
+`stm32h723_app/MDK-ARM/stm32h723_app.uvprojx`。脚本优先使用
+`KEIL_ROOT/UV4/UV4.exe`；未找到时回退到 `D:\Keil_v5\UV4\UV4.exe`。
+该任务只启动 Keil 工程，不执行构建、烧录或 SWD/GDB 操作。

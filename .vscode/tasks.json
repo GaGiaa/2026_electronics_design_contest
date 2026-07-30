@@ -53,6 +53,21 @@
       "problemMatcher": []
     },
     {
+      "label": "STM32H723 App: Open Keil Project",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\open-keil-stm32h723-app.ps1",
+        "-ProjectRoot",
+        "${workspaceFolder}"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "MSPM0G3507: Install pyOCD tools",
       "type": "shell",
       "command": "powershell",
