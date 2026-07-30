@@ -9,7 +9,8 @@
 - UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
 - UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
 - USART1：`PB6` TX、`PB7` RX、8-N-1、115200 bit/s，不使用 DMA；用于 BNO055 原生 UART 请求应答。
-- M2006 总线使用 1 Mbit/s，接收 ID `0x201..0x203`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。硬件必须接到对应的 FDCAN2 引脚；若实际接线位于 FDCAN1 或 FDCAN3，必须同步修改该宏并重新编译。
+- USART2：`PD5` TX、`PD6` RX、8-N-1、234000 bit/s，RX 使用 `DMA1_Stream3` 的 ReceiveToIdle DMA，供默认关闭的 K230 钢珠位置测试链路使用。
+- M2006 总线使用 1 Mbit/s，接收 ID `0x201..0x203`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。硬件必须接到所选实例对应的引脚；若实际接线位于 FDCAN1 或 FDCAN3，需同步修改该宏并重新编译。
 - FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
 两台 M2006 的 CAN 实例由 `APP_H723_M2006_FDCAN_INSTANCE` 选择，当前默认使用 FDCAN2；左轮 ID 1、方向 `+1`，右轮 ID 2、方向 `-1`。ID 3 的上层平衡机构不属于本轮实现。
@@ -47,12 +48,33 @@ Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadb
 
 该遥测宏与健康遥测和 JY901S 十通道遥测编译期互斥，三者均默认关闭。UART8 仍使用 PE1 TX、1 Mbit/s 和 `DMA1_Stream1`；DMA 忙时丢弃本周期帧并递增 UART8 丢帧计数，不阻塞控制环。
 
+## K230 UART2 Position Test
+
+`APP_H723_K230_UART2_TEST_ENABLE` 默认是 `0U`。设为 `1U` 后，`k230Task` 每 5 ms
+解析 USART2 ReceiveToIdle DMA 接收的字节；K230 应以约 50 Hz 连续发送固定 9 字节帧：
+
+| 偏移 | 长度 | 字段 |
+| --- | --- | --- |
+| 0 | 2 | 包头 `A5 5A` |
+| 2 | 1 | `valid`：`0x01` 为有效距离，`0x00` 为位置丢失 |
+| 3 | 4 | 小端 IEEE-754 `float32 distance_mm`，相对零点的有符号 mm |
+| 7 | 2 | 小端 `CRC-16/CCITT-FALSE`，覆盖偏移 `0..6` |
+
+`valid=0` 时 STM32 发布 `distance_mm=0.0f`；CRC 或格式错误帧不会覆盖最后一帧合法数据。
+K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使用 3.3 V TTL 电平。
+
+测试宏开启时 UART8 每 `APP_H723_K230_UART2_TEST_VOFA_INTERVAL_MS`（默认 20 ms）发送
+三通道 VOFA+ JustFloat：`distance_mm`、`valid`（`0.0f` 或 `1.0f`）、`frame_age_ms`。该模式与健康、JY901S、
+灰度及单电机 UART8 遥测编译期互斥；UART8 保持 `PE1` TX、1 Mbit/s。Keil Watch 可观察
+`g_h723_debug.ball_vision` 的距离、帧年龄、DMA 状态和 CRC/格式/UART/环形缓冲错误计数。
+
 ## CubeMX Regeneration
 
 1. 在 STM32CubeMX 中打开 `stm32h723_app.ioc`，修改外设或时钟后生成到当前目录，工程目标保持 `MDK-ARM`。
 2. 保留生成代码的 `USER CODE` 区域；应用逻辑只能放在 `App/` 或这些区域。
 3. 本轮配置由 CubeMX 6.15.0 重新生成。可用 `cubemx_generate_crsf.txt` 通过 CubeMX 命令行重现生成；该脚本加载相同 `.ioc` 后执行 `project generate`。
-4. 重新生成后检查 Keil 工程仍包含 `App/Src/app_debug.c`、`app_telemetry.c`、`app_jy901s.c`、`app_jy901s_service.c`、`app_bno055.c`、`app_bno055_service.c`、`app_crsf.c`、`app_m2006.c`、`app_chassis.c`、`app_chassis_service.c` 与 `../../shared/pid/pid.c`，并具有 `App/Inc` 与 `shared/pid` include 路径。
+3. 本轮配置由 CubeMX 6.15.0 重新生成。可用 `cubemx_generate_crsf.txt` 或 `cubemx_generate_k230_uart2.txt` 通过 CubeMX 命令行重现生成；脚本加载相同 `.ioc` 后执行 `project generate`。
+4. 重新生成后检查 Keil 工程仍包含 `App/Src/app_debug.c`、`app_telemetry.c`、`app_jy901s.c`、`app_jy901s_service.c`、`app_bno055.c`、`app_bno055_service.c`、`app_k230.c`、`app_k230_service.c`、`app_crsf.c`、`app_m2006.c`、`app_chassis.c`、`app_chassis_service.c` 与 `../../shared/pid/pid.c`，并具有 `App/Inc` 与 `shared/pid` include 路径。
 
 ## Runtime Speed Limit Watch Control
 
