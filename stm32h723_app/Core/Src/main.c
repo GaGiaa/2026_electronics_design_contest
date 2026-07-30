@@ -106,6 +106,7 @@ int main(void)
   MX_UART7_Init();
   MX_UART8_Init();
   MX_UART9_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -293,6 +294,8 @@ void Error_Handler(void)
   */
 void assert_failed(uint8_t *file, uint32_t line)
 {
+  (void)file;
+  (void)line;
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */

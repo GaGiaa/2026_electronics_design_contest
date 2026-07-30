@@ -465,6 +465,16 @@
               <FilePath>../App/Src/app_jy901s_service.c</FilePath>
             </File>
             <File>
+              <FileName>app_bno055.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_bno055.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_bno055_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_bno055_service.c</FilePath>
+            </File>
+            <File>
               <FileName>app_time.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_time.c</FilePath>

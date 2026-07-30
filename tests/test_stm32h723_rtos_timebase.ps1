@@ -19,6 +19,13 @@ if ($source -notmatch 'osKernelGetTickCount\s*\(\s*\)') {
     throw 'RTOS time implementation must read osKernelGetTickCount().'
 }
 
+$freertosSource = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\Core\Src\freertos.c')
+foreach ($required in @('h723_bno055_service_init\(\)', 'h723_bno055_service_step\(h723_app_time_now_ms\(\)\)')) {
+    if ($freertosSource -notmatch $required) {
+        throw "BNO055 task integration is missing: $required"
+    }
+}
+
 $applicationSources = @(
     Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App') -Recurse -File -Filter '*.c'
     Get-Item -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\Core\Src\freertos.c')

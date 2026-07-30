@@ -8,6 +8,7 @@
 - HSE 25 MHz，系统时钟 550 MHz；SWD 使用 `PA13/PA14`；M7 D-Cache 关闭，避免 DMA 缓冲区一致性问题。
 - UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
 - UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
+- USART1：`PB6` TX、`PB7` RX、8-N-1、115200 bit/s，不使用 DMA；用于 BNO055 原生 UART 请求应答。
 - M2006 总线使用 1 Mbit/s，接收 ID `0x201/0x202`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。若实物接线位于 FDCAN1，则将该宏改为 `1U`，重新编译即可切换。
 - FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
@@ -26,7 +27,7 @@ PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，初始参数为 1 ms�
 1. 在 STM32CubeMX 中打开 `stm32h723_app.ioc`，修改外设或时钟后生成到当前目录，工程目标保持 `MDK-ARM`。
 2. 保留生成代码的 `USER CODE` 区域；应用逻辑只能放在 `App/` 或这些区域。
 3. 本轮配置由 CubeMX 6.15.0 重新生成。可用 `cubemx_generate_crsf.txt` 通过 CubeMX 命令行重现生成；该脚本加载相同 `.ioc` 后执行 `project generate`。
-4. 重新生成后检查 Keil 工程仍包含 `App/Src/app_debug.c`、`app_telemetry.c`、`app_crsf.c`、`app_m2006.c`、`app_chassis.c`、`app_chassis_service.c` 与 `../../shared/pid/pid.c`，并具有 `App/Inc` 与 `shared/pid` include 路径。
+4. 重新生成后检查 Keil 工程仍包含 `App/Src/app_debug.c`、`app_telemetry.c`、`app_jy901s.c`、`app_jy901s_service.c`、`app_bno055.c`、`app_bno055_service.c`、`app_crsf.c`、`app_m2006.c`、`app_chassis.c`、`app_chassis_service.c` 与 `../../shared/pid/pid.c`，并具有 `App/Inc` 与 `shared/pid` include 路径。
 
 ## UART8 VOFA Health Telemetry
 
@@ -49,9 +50,9 @@ Connect the USB-UART adapter GND to board GND and adapter RX to `PE1` (UART8 TX)
 
 ## SWD 调试快照
 
-Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。它按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]` 与 `jy901s` 分组；例如 `g_h723_debug.crsf.channels_raw[0]`、`g_h723_debug.chassis.left_target_rpm`、`g_h723_debug.m2006[0].feedback_speed_rpm`、`g_h723_debug.jy901s.angle_deg[2]`。`m2006` 的索引 `0/1/2` 固定对应 CAN ID `1/2/3`，当前仅更新前两项，第三项为上层平衡机构预留。快照包含 16 个 CRSF 原始通道、遥控和 CAN 诊断、左右目标 RPM、两台 M2006 的反馈/PID/电流命令，以及 JY901S 原始与换算数据。不要从调试器写入；由于任务和中断可独立更新字段，跨字段组合不保证为同一时刻的原子快照。
+Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。它按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]`、`jy901s` 与 `bno055` 分组；例如 `g_h723_debug.crsf.channels_raw[0]`、`g_h723_debug.chassis.left_target_rpm`、`g_h723_debug.m2006[0].feedback_speed_rpm`、`g_h723_debug.jy901s.angle_deg[2]` 与 `g_h723_debug.bno055.angle_deg[2]`。`m2006` 的索引 `0/1/2` 固定对应 CAN ID `1/2/3`，当前仅更新前两项，第三项为上层平衡机构预留。快照包含 16 个 CRSF 原始通道、遥控和 CAN 诊断、左右目标 RPM、两台 M2006 的反馈/PID/电流命令，以及两款 IMU 的原始、换算和通信诊断数据。不要从调试器写入；由于任务和中断可独立更新字段，跨字段组合不保证为同一时刻的原子快照。
 
-详见 [JY901S 接入说明](../docs/STM32H723_JY901S.md)。
+详见 [JY901S 接入说明](../docs/STM32H723_JY901S.md) 和 [BNO055 接入说明](../docs/STM32H723_BNO055.md)。
 
 ## Build And Checks
 
@@ -67,6 +68,7 @@ Expected artifact: `MDK-ARM\stm32h723_app\stm32h723_app.axf`.
 
 ```powershell
 .\tests\test_stm32h723_vofa_justfloat.ps1
+.\tests\test_stm32h723_bno055.ps1
 .\tests\test_stm32h723_chassis.ps1
 .\tests\test_stm32h723_debug_layout.ps1
 .\tests\test_stm32h723_ioc.ps1

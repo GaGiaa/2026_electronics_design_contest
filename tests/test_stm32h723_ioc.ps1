@@ -26,12 +26,15 @@ $requiredLines = @(
     'Mcu.Name=STM32H723ZGTx',
     'UART8.BaudRate=1000000',
     'UART8.Mode=MODE_TX',
+    'USART1.BaudRate=115200',
     'Dma.UART7_RX.0.Instance=DMA1_Stream0',
     'Dma.UART8_TX.1.Instance=DMA1_Stream1',
     'UART7.BaudRate=420000',
     'UART9.BaudRate=234000',
     'PE7.Signal=UART7_RX',
     'PE8.Signal=UART7_TX',
+    'PB6.Signal=USART1_TX',
+    'PB7.Signal=USART1_RX',
     'PG0.Signal=UART9_RX',
     'PG1.Signal=UART9_TX',
     'NVIC.DMA1_Stream0_IRQn=true',
@@ -79,6 +82,18 @@ if ($appConfig -notmatch '#define\s+APP_VOFA_HEALTH_TELEMETRY_ENABLE\s+0U') {
 }
 if ($appConfig -notmatch '#define\s+APP_JY901S_VOFA_TELEMETRY_ENABLE\s+0U') {
     throw 'APP_JY901S_VOFA_TELEMETRY_ENABLE must default to 0U.'
+}
+
+foreach ($removedLine in @('USART6.', 'PC6.Signal=USART6_TX', 'PC7.Signal=USART6_RX')) {
+    if ($ioc -match [regex]::Escape($removedLine)) {
+        throw "Unexpected retained BNO055 USART6 configuration: $removedLine"
+    }
+}
+if ($appConfig -notmatch '#define\s+APP_BNO055_VOFA_TELEMETRY_ENABLE\s+0U') {
+    throw 'APP_BNO055_VOFA_TELEMETRY_ENABLE must default to 0U.'
+}
+if ($appConfig -notmatch 'APP_BNO055_VOFA_TELEMETRY_ENABLE') {
+    throw 'BNO055 telemetry must participate in the UART8 compile-time exclusion.'
 }
 if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
     throw 'APP_H723_CHASSIS_ACTUATION_ENABLE must default to 0U.'

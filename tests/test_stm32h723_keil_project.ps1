@@ -25,6 +25,8 @@ foreach ($line in @(
     '<FilePath>../App/Src/app_telemetry.c</FilePath>',
     '<FilePath>../App/Src/app_jy901s.c</FilePath>',
     '<FilePath>../App/Src/app_jy901s_service.c</FilePath>',
+    '<FilePath>../App/Src/app_bno055.c</FilePath>',
+    '<FilePath>../App/Src/app_bno055_service.c</FilePath>',
     '<FilePath>../App/Src/vofa_justfloat.c</FilePath>',
     '<FilePath>../App/Src/app_crsf.c</FilePath>',
     '<FilePath>../App/Src/app_m2006.c</FilePath>',
