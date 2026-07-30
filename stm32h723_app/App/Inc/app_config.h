@@ -25,6 +25,19 @@
 #define APP_H723_K230_UART2_TEST_VOFA_INTERVAL_MS 20U
 #endif
 
+#ifndef APP_H723_OLED_ENABLE
+#define APP_H723_OLED_ENABLE 1U
+#endif
+#ifndef APP_H723_OLED_I2C_ADDRESS
+#define APP_H723_OLED_I2C_ADDRESS 0x3CU
+#endif
+#ifndef APP_H723_OLED_TASK_PERIOD_MS
+#define APP_H723_OLED_TASK_PERIOD_MS 1000U
+#endif
+#ifndef APP_H723_OLED_I2C_TIMEOUT_MS
+#define APP_H723_OLED_I2C_TIMEOUT_MS 50U
+#endif
+
 #ifndef APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE
 #define APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE 1U
 #endif
@@ -48,6 +61,17 @@
      (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE == 1U) + \
      (APP_H723_K230_UART2_TEST_ENABLE == 1U)) > 1U
 #error "UART8 VOFA telemetry modes are mutually exclusive"
+#endif
+
+#if (APP_H723_OLED_ENABLE > 1U)
+#error "APP_H723_OLED_ENABLE must be 0U or 1U"
+#endif
+#if (APP_H723_OLED_I2C_ADDRESS > 0x7FU)
+#error "APP_H723_OLED_I2C_ADDRESS must be a 7-bit address"
+#endif
+#if (APP_H723_OLED_TASK_PERIOD_MS == 0U) || \
+    (APP_H723_OLED_I2C_TIMEOUT_MS == 0U)
+#error "OLED task period and I2C timeout must be nonzero"
 #endif
 
 #if (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE == 1U) && \

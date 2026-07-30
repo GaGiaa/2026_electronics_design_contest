@@ -33,6 +33,7 @@
 #include "app_jy901s_service.h"
 #include "app_k230_service.h"
 #include "app_grayscale_service.h"
+#include "app_oled.h"
 #include "app_time.h"
 
 /* USER CODE END Includes */
@@ -91,6 +92,13 @@ static const osThreadAttr_t k230Task_attributes = {
 };
 #endif
 
+static osThreadId_t oledTaskHandle;
+static const osThreadAttr_t oledTask_attributes = {
+  .name = "oledTask",
+  .stack_size = 1024 * 2,
+  .priority = (osPriority_t)osPriorityLow,
+};
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -110,6 +118,7 @@ void startBno055Task(void *argument);
 #if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
 void startK230Task(void *argument);
 #endif
+void startOledTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -174,6 +183,8 @@ void MX_FREERTOS_Init(void) {
   k230TaskHandle = osThreadNew(startK230Task, NULL, &k230Task_attributes);
   configASSERT(k230TaskHandle != NULL);
 #endif
+  oledTaskHandle = osThreadNew(startOledTask, NULL, &oledTask_attributes);
+  configASSERT(oledTaskHandle != NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -273,6 +284,19 @@ void startK230Task(void *argument)
   }
 }
 #endif
+
+void startOledTask(void *argument)
+{
+  uint32_t next_wake_tick = osKernelGetTickCount();
+
+  (void)argument;
+  h723_oled_service_init();
+  for (;;) {
+    h723_oled_service_step(h723_app_time_now_ms());
+    next_wake_tick += APP_H723_OLED_TASK_PERIOD_MS;
+    (void)osDelayUntil(next_wake_tick);
+  }
+}
 
 /* USER CODE END Application */
 
