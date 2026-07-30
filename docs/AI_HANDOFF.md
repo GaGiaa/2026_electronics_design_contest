@@ -487,7 +487,7 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 - 使用 STM32CubeMX 6.15.0 将 UART7 恢复到 `stm32h723_app/stm32h723_app.ioc`，并由 CubeMX 重新生成 MDK-ARM 工程。配置为 `PE7` RX、`PE8` TX、420000 bit/s、DMA1 Stream0 RX、DMA 与 UART7 中断；UART8 `PE1` TX 1 Mbit/s 保持不变。用于重现生成的 CubeMX 脚本为 `stm32h723_app/cubemx_generate_crsf.txt`。
 - 新增 `App/app_crsf`、`app_m2006`、`app_chassis` 与 `app_chassis_service`。UART7 ReceiveToIdle DMA 回调只向软件环形缓冲写入数据；高优先级 `chassisTask` 以 1 ms 绝对节拍解析 CRSF、进行 CH3 前进/后退和 CH1 转向的差速混控、检查时效、计算增量速度 PID，并通过所选 FDCAN 发送 `0x200` 组控帧。
-- M2006 总线使用 1 Mbit/s。应用启动时在选中的 FDCAN 设置标准 ID 范围过滤 `0x201..0x203`、启动控制器并订阅 FIFO0 新消息；回调排空 FIFO 并解析三台 M2006 的 8 字节反馈。左轮 ID 1 使用电流槽 1，右轮 ID 2 使用电流槽 2，ID 3 预留给上层机构。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`，当前默认值为 `2U`；若实物位于 FDCAN1，应改为 `1U` 后重新编译。`g_h723_debug` 已暴露选中实例、协议错误、Bus-Off 与收发错误计数，供 Keil Watch 排查无反馈。
+- M2006 总线使用 1 Mbit/s。应用启动时在选中的 FDCAN 设置标准 ID 范围过滤 `0x201..0x203`、启动控制器并订阅 FIFO0 新消息；回调排空 FIFO 并解析三台 M2006 的 8 字节反馈。左轮 ID 1 使用电流槽 1，右轮 ID 2 使用电流槽 2，ID 3 预留给上层机构。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`，当前默认值按用户指定为 `2U`；硬件接线必须与该实例一致，若更换实例必须同步修改宏并重新编译。`g_h723_debug` 已暴露选中实例、协议错误、Bus-Off 与收发错误计数，供 Keil Watch 排查无反馈。
 - CRSF 仅 SB 与 SC 都为中档时进入手动模式；CRSF 有效帧超时 100 ms、任一电机反馈超时 50 ms 或开关档位不满足时均复位 PID 并发送零电流。`APP_H723_CHASSIS_ACTUATION_ENABLE` 默认 `0U`，因此即使遥控和 PID 都在运行，CAN 也只能发零电流；必须显式设为 `1U` 才可输出非零电流。
 - PID 已迁移为仓库级 `shared/pid/` 纯 C 库，公共 `PID_Incremental_*` 和 `PID_Position_*` 符号保持不变。G3507 的 CCS 构建脚本、Keil 工程、源文件和主机测试均引用该路径，H723 Keil 工程也编译同一 `pid.c`。
 - `volatile g_h723_debug` 现在提供 16 个 CRSF 原始通道、协议和收发错误统计、遥控目标、CAN 状态、三台 M2006 的反馈、PID 分量和电流命令，供 Keil Watch 直接观察。
@@ -497,10 +497,14 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 最后更新：2026-07-30
 
-- `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 默认 `0U`。开启后 `control_mode=0U` 保持现有 1 ms 输出轴 RPM 速度环；`control_mode=1U` 启用 5 ms 基础位置式 PID 外环，其输出受 `max_target_output_speed_rpm` 和 `position_output_limit_rpm` 双重限幅后送入同一速度内环。位置目标与反馈单位均为减速后输出轴连续 `deg`。
-- `app_m2006` 新增 8192 counts/转多圈展开器，FDCAN 反馈连续时累计位置；位置跟踪反馈间隔超过 `APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS`（默认 1 ms）或超过 50 ms 反馈超时后，会重置跟踪器并使位置零点失效，避免高速丢帧时的错误展开。位置模式在 ID、enable 或模式变更后先发送零电流并复位两级 PID，收到新的有效反馈后把当前位置设为相对零点，再等待下一个 5 ms 周期控制。未使能、反馈超时、无效参数/目标、无效模式、未建立零点或位置 PID 状态非有限时三个 `0x200` 电流槽位均为零。
+- `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 的发布配置建议为 `0U`；当前工作区为直接调试位置闭环已配置为 `1U`。开启后 `control_mode=0U` 保持现有 1 ms 输出轴 RPM 速度环；`control_mode=1U` 启用 5 ms 基础位置式 PID 外环，其输出受 `max_target_output_speed_rpm` 和 `position_output_limit_rpm` 双重限幅后送入同一速度内环。位置目标与反馈单位均为减速后输出轴连续 `deg`。
+- `app_m2006` 新增 8192 counts/转多圈展开器，FDCAN 反馈连续时累计位置；位置跟踪与 `APP_H723_M2006_FEEDBACK_TIMEOUT_MS` 共用 `50 ms` 有效窗口，只有反馈间隔达到该窗口时才重置跟踪器并使位置零点失效，避免有效但较慢的反馈帧被误判为断流。位置模式在 ID、enable 或模式变更后先发送零电流并复位两级 PID，收到新的有效反馈后把当前位置设为相对零点，再等待下一个 5 ms 周期控制。未使能、反馈超时、无效参数/目标、无效模式、未建立零点或位置 PID 状态非有限时三个 `0x200` 电流槽位均为零。
 - Watch 的位置输入为 `target_position_deg` 和 `position_kp/ki/kd/output_limit_rpm/deadband_deg`；默认参数为 `Kp=2`、`Ki=0`、`Kd=0`、输出限幅 `550 RPM`、死区 `0 deg`。`feedback_position_deg`、`position_reference_valid`、外环速度目标、P/I/D、总输出和 `position_cycle_count` 用于观察。速度环参数及电流字段保留原有含义，当前默认死区为 `0.1 RPM`。
-- `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 默认 `0U`，默认发送周期为 1 ms。速度模式继续发送原有 8 通道；位置模式发送 9 通道：目标/反馈位置、位置 P/I/D、外环速度目标、内环速度反馈、目标电流和反馈电流。DMA 忙时丢帧，且与其他 UART8 遥测编译期互斥。
+- `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 的发布配置建议为 `0U`；当前工作区已配置为 `1U`，默认发送周期为 1 ms。速度模式继续发送原有 8 通道；位置模式发送 9 通道：目标/反馈位置、位置 P/I/D、外环速度目标、内环速度反馈、目标电流和反馈电流。DMA 忙时丢帧，且与其他 UART8 遥测编译期互斥。
+
+- 本轮深度仿真进一步复现：即使反馈间隔为 `10 ms` 且 `feedback_age_ms=0`，原 `5 ms` 位置跟踪门限仍会每帧重置跟踪器，导致 `feedback_position_deg` 持续为 `0 deg`。现已让 `APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS` 直接复用 `APP_H723_M2006_FEEDBACK_TIMEOUT_MS`，并使用严格小于比较；超过 `50 ms` 的断流仍会重建零点。当前工作区为便于本次调试显式设置了 `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE=1U` 和 `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE=1U`，该本地配置改动保留未回退。
+- 本轮按用户要求将默认 `APP_H723_M2006_FDCAN_INSTANCE` 保持为 `2U`，并同步端到端仿真使用 `FDCAN2` 接收回调；硬件接线必须确认位于 FDCAN2。`tests\test_stm32h723_position_service.ps1` 覆盖 FDCAN2 接收回调、10 ms 有效慢反馈的位置累计和超过 50 ms 后的安全重建。
+- 本轮验证：H723 相关单元测试、FDCAN2 位置服务集成测试、IOC/Keil/debug/VOFA/RTOS 时基检查和文档检查均通过；IOC 检查已允许单电机调试与 VOFA 宏按当前调试配置取 `0U` 或 `1U`。
 
 - 已通过 M2006 多圈跟踪/位置换算、单电机串级调度、VOFA、debug/IOC/Keil 静态检查，以及默认与启用单电机调试宏的 Keil 纯构建。未执行 Flash、烧录、SWD、CAN 总线、电机或 VOFA+ 实物验收。实物调参前必须车架悬空，确认实际 FDCAN 实例、ID、反馈方向、编码器连续性与低增益响应。
 

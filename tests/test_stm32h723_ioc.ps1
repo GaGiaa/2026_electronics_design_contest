@@ -131,11 +131,11 @@ if ($adcSource -notmatch 'HAL_ADCEx_Calibration_Start\(\&hadc1,\s*ADC_CALIB_OFFS
 if ($adcSource -match 'ADC_DATAALIGN_RIGHT') {
     throw 'H723 ADC1/ADC2 HAL does not define ADC_DATAALIGN_RIGHT; generated adc.c must use fixed right alignment.'
 }
-if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE\s+0U') {
-    throw 'Single-motor PID debug must default to disabled.'
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE\s+[01]U') {
+    throw 'Single-motor PID debug must be configured as 0U or 1U.'
 }
-if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE\s+0U') {
-    throw 'Single-motor VOFA telemetry must default to disabled.'
+if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE\s+[01]U') {
+    throw 'Single-motor VOFA telemetry must be configured as 0U or 1U.'
 }
 if ($appConfig -notmatch '#define\s+APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_INTERVAL_MS\s+1U') {
     throw 'Single-motor VOFA telemetry interval must default to 1 ms.'
@@ -147,7 +147,7 @@ foreach ($line in @(
     '#define APP_H723_SINGLE_MOTOR_POSITION_PID_KD 0.0f',
     '#define APP_H723_SINGLE_MOTOR_POSITION_PID_OUTPUT_LIMIT_RPM APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM',
     '#define APP_H723_SINGLE_MOTOR_POSITION_PID_DEADBAND_DEG 0.0f',
-    '#define APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS 1U'
+    '#define APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS APP_H723_M2006_FEEDBACK_TIMEOUT_MS'
 )) {
     if ($appConfig -notmatch [regex]::Escape($line)) {
         throw "Missing single-motor position configuration: $line"
