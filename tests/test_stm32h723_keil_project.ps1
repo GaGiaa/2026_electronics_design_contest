@@ -22,6 +22,7 @@ foreach ($line in @(
     '<PackID>Keil.STM32H7xx_DFP.4.1.2</PackID>',
     '<PackURL>https://www.keil.com/pack/</PackURL>',
     '<FilePath>../App/Src/app_debug.c</FilePath>',
+    '<FilePath>../App/Src/app_buttons.c</FilePath>',
     '<FilePath>../App/Src/app_grayscale_math.c</FilePath>',
     '<FilePath>../App/Src/app_grayscale.c</FilePath>',
     '<FilePath>../App/Src/app_grayscale_service.c</FilePath>',

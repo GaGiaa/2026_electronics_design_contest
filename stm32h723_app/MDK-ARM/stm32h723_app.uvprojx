@@ -572,6 +572,11 @@
               <FilePath>../App/Src/app_debug.c</FilePath>
             </File>
             <File>
+              <FileName>app_buttons.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_buttons.c</FilePath>
+            </File>
+            <File>
               <FileName>app_oled.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_oled.c</FilePath>

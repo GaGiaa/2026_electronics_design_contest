@@ -1,6 +1,7 @@
 #include "app_telemetry.h"
 
 #include "app_config.h"
+#include "app_buttons.h"
 #include "app_debug.h"
 #include "app_single_motor.h"
 #include "app_time.h"
@@ -17,6 +18,7 @@
 #define H723_VOFA_BNO055_CHANNEL_COUNT 10U
 #define H723_VOFA_K230_CHANNEL_COUNT 3U
 #define H723_VOFA_CHASSIS_CHANNEL_COUNT 5U
+#define H723_VOFA_BUTTON_CHANNEL_COUNT 3U
 
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
 static uint8_t s_health_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_HEALTH_CHANNEL_COUNT)];
@@ -53,6 +55,11 @@ static uint8_t s_chassis_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_CHASSIS_CHANN
 static uint32_t s_last_chassis_telemetry_ms;
 #endif
 
+#if (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U)
+static uint8_t s_button_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_BUTTON_CHANNEL_COUNT)];
+static uint32_t s_last_button_telemetry_ms;
+#endif
+
 void h723_app_telemetry_init(void)
 {
     g_h723_debug.system.boot_count++;
@@ -61,7 +68,8 @@ void h723_app_telemetry_init(void)
         (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE << 1U) |
         (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE << 2U) |
         (APP_H723_K230_UART2_TEST_ENABLE << 3U) |
-        (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE << 4U);
+        (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE << 4U) |
+        (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE << 4U);
     g_h723_debug.uart8.last_hal_status = HAL_OK;
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
     s_last_telemetry_ms = h723_app_time_now_ms();
@@ -84,6 +92,9 @@ void h723_app_telemetry_init(void)
 #endif
 #if (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_chassis_telemetry_ms = h723_app_time_now_ms();
+#endif
+#if (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U)
+    s_last_button_telemetry_ms = h723_app_time_now_ms();
 #endif
 }
 
@@ -333,6 +344,38 @@ void h723_app_telemetry_step(void)
         (void)vofa_justfloat_encode(s_chassis_frame, sizeof(s_chassis_frame), channels,
                                     H723_VOFA_CHASSIS_CHANNEL_COUNT);
         status = HAL_UART_Transmit_DMA(&huart8, s_chassis_frame, sizeof(s_chassis_frame));
+        g_h723_debug.uart8.last_hal_status = (uint32_t)status;
+        if (status == HAL_OK) {
+            g_h723_debug.uart8.tx_in_flight = 1U;
+            g_h723_debug.uart8.tx_start_count++;
+        } else {
+            g_h723_debug.uart8.tx_drop_count++;
+        }
+    }
+#endif
+
+#if (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U)
+    if ((now_ms - s_last_button_telemetry_ms) >= APP_H723_BUTTON_VOFA_TELEMETRY_INTERVAL_MS) {
+        h723_app_buttons_snapshot_t snapshot;
+        float channels[H723_VOFA_BUTTON_CHANNEL_COUNT];
+        HAL_StatusTypeDef status;
+
+        s_last_button_telemetry_ms = now_ms;
+        h723_app_buttons_snapshot_copy(&snapshot);
+        channels[0U] = ((snapshot.stable_high_mask &
+                        (1U << H723_APP_BUTTON_PC5)) != 0U) ? 1.0f : 0.0f;
+        channels[1U] = ((snapshot.stable_high_mask &
+                        (1U << H723_APP_BUTTON_PC4)) != 0U) ? 1.0f : 0.0f;
+        channels[2U] = ((snapshot.stable_high_mask &
+                        (1U << H723_APP_BUTTON_PA6)) != 0U) ? 1.0f : 0.0f;
+        if (g_h723_debug.uart8.tx_in_flight != 0U) {
+            g_h723_debug.uart8.tx_drop_count++;
+            return;
+        }
+        (void)vofa_justfloat_encode(s_button_frame, sizeof(s_button_frame),
+                                    channels, H723_VOFA_BUTTON_CHANNEL_COUNT);
+        status = HAL_UART_Transmit_DMA(&huart8, s_button_frame,
+                                       sizeof(s_button_frame));
         g_h723_debug.uart8.last_hal_status = (uint32_t)status;
         if (status == HAL_OK) {
             g_h723_debug.uart8.tx_in_flight = 1U;
