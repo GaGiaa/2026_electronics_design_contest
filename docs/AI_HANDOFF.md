@@ -66,6 +66,7 @@
 | `mspm0g3507_freertos/` | G3507 FreeRTOS 静态分配基线 | `tools/build-mspm0g3507-freertos.ps1` |
 | `mspm0g3507_app/` | G3507 分层应用 | `tools/build-mspm0g3507-app.ps1` |
 | `keil/mspm0g3507_app/` | G3507 应用 Keil MDK 工程 | `tools/build-keil-mspm0g3507-app.ps1` |
+| `k230_app/` | 01Studio CanMV K230 CanMV IDE MicroPython 钢珠视觉检测 | `k230_app/main.py` |
 
 工具版本和完整源码依赖见 `docs/DEPENDENCIES.md`。跨电脑安装和构建步骤见
 `docs/SETUP.md`。G3507 应用的功能、接线、遥测和接口说明见
@@ -474,6 +475,14 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 - PID 已迁移为仓库级 `shared/pid/` 纯 C 库，公共 `PID_Incremental_*` 和 `PID_Position_*` 符号保持不变。G3507 的 CCS 构建脚本、Keil 工程、源文件和主机测试均引用该路径，H723 Keil 工程也编译同一 `pid.c`。
 - `volatile g_h723_debug` 现在提供 16 个 CRSF 原始通道、协议和收发错误统计、遥控目标、CAN 状态与两台 M2006 的反馈、PID 分量和电流命令，供 Keil Watch 直接观察。
 - 已通过 H723 的 chassis、VOFA、CubeMX 与 Keil 工程静态测试，以及 G3507 PID、线控、航向、循迹和分层静态回归。`tools\build-mspm0g3507-app.ps1`、`tools\build-keil-mspm0g3507-app.ps1` 和 H723 Keil 构建均通过；H723 生成 `stm32h723_app.axf`，最终为 `0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、探针连接、GDB/SWD、CRSF 实物收发、CAN 总线或电机实物测试。首次通电前必须车架悬空，确认左右方向、CAN 收发器、ID、反馈频率与 PID 参数。
+
+## 01Studio CanMV K230 钢珠视觉检测
+
+- 新增独立目录 `k230_app/`，使用 CanMV IDE 运行 `main.py`；固件有 `cv_lite` 时通过官方 RGB888 示例的 `Display.ST7701(..., to_ide=True)` 路径显示到 IDE，没有时通过 `Display.VIRT` 显示；不使用外接屏幕、UART 或 G3507 控制逻辑。
+- `main.py` 默认初始化 `Sensor(id=2)`，自动优先使用 `cv_lite.rgb888_find_circles` 的 `RGB888/320x240` 高速路径，并按官方 RGB888 示例使用 `Display.ST7701(..., to_ide=True)`；固件没有 `cv_lite` 时降级为 `RGB565/320x240` 的 `image.find_circles` 和 `Display.VIRT`。`config.py` 集中保存相机 ID、两种采集尺寸、圆检测半径范围、霍夫参数和连续帧确认参数。`main.py` 内置同一套默认配置和检测器回退逻辑，因此 CanMV IDE 只运行单个 `main.py` 也不会因缺少 `config.py` 报错。
+- `ball_detector.py` 将圆候选统一为 `x/y/radius/score`，默认在最近 5 帧中至少 3 次匹配后报告 `FOUND`，连续丢失达到配置阈值后报告 `LOST`。首版目标是找到单个银色钢珠，不对真实 `10 mm` 直径做物理计量。
+- 已通过 `python -m unittest tests.test_k230_ball_detector -v`，9 项主机侧检测逻辑测试通过；已通过 K230 Python 语法解析检查。尚未连接 K230 执行 CanMV IDE 画面、实际 FPS、相机 ID、光照、半径参数或钢珠识别验收；也未执行 Flash、烧录、探针/GDB/SWD 或任何电机调试。
+- 实物验证前应固定摄像头并尽量垂直白纸，使用漫射光；根据实际镜头视场和安装高度调整 `MIN_RADIUS`、`MAX_RADIUS` 和 `HOUGH_THRESHOLD`。当前 `CAMERA_ID=2` 是 01Studio 板载 CSI2 摄像头的默认假设。
 
 ## 任务完成清单
 

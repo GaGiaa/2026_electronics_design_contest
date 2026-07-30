@@ -3,7 +3,7 @@
 H723 差速底盘工程现已包含 JY901S UART9 IMU 基础接入：`PG0/PG1`、234000 bit/s、200 Hz 接收、Keil Watch 调试快照和可选 UART8 十通道 VOFA。接线、数据单位与宏开关见 [`docs/STM32H723_JY901S.md`](docs/STM32H723_JY901S.md)。
 
 本仓库包含 MSPM0L1306、MSPM0G3507 的 bring-up 工程、FreeRTOS 基线工程、G3507
-应用工程和 Keil MDK 工程。根目录 README 只负责项目导航和 AI 接手流程；工程细节、
+应用工程、Keil MDK 工程和独立的 CanMV K230 MicroPython 视觉工程。根目录 README 只负责项目导航和 AI 接手流程；工程细节、
 依赖版本和实时验证状态分别维护在对应文档中。
 
 ## 工程地图
@@ -16,6 +16,7 @@ H723 差速底盘工程现已包含 JY901S UART9 IMU 基础接入：`PG0/PG1`、
 | `mspm0g3507_app/` | 分层的 G3507 电机、传感器、协议和应用组合工程 | [`README.md`](mspm0g3507_app/README.md) |
 | `keil/mspm0g3507_app/` | G3507 应用的 Keil MDK 构建和调试工程 | [`README.md`](keil/mspm0g3507_app/README.md) |
 | `stm32h723_app/` | STM32H723ZGT6 的 CubeMX、FreeRTOS、UART7 CRSF、FDCAN1 双 M2006 差速底盘、UART8 VOFA 与共享 PID 工程 | [`README.md`](stm32h723_app/README.md) |
+| `k230_app/` | 01Studio CanMV K230 的 CanMV IDE MicroPython 钢珠视觉检测 | [`README.md`](k230_app/README.md) |
 | `shared/pid/` | 供 MSPM0G3507 与 STM32H723 共用的纯 C 增量式/位置式 PID 库 | [`ORIGIN.md`](shared/pid/ORIGIN.md) |
 
 ## 文档地图

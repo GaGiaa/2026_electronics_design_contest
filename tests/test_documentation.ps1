@@ -33,6 +33,7 @@ $markdownFiles = @(
     'docs/DEPENDENCIES.md',
     'docs/SETUP.md',
     'docs/CODING_STYLE.md',
+    'k230_app/README.md',
     'mspm0g3507_app/README.md',
     'mspm0g3507_freertos/README.md',
     'mspm0g3507_bringup/README.md',
