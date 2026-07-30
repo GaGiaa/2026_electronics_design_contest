@@ -61,6 +61,7 @@ typedef struct {
     uint32_t timeout_ms;
     int initialized;
     uint8_t poll_step;
+    uint8_t diagnostic_step;
     uint8_t sensor_data[24];
     uint8_t temperature_calibration[2];
     uint8_t system_status[2];

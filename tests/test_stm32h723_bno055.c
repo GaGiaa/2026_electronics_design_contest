@@ -152,8 +152,9 @@ static void test_poll_publishes_jy_compatible_ten_channel_sample(void)
     assert(app_bno055_start(&imu) == APP_BNO055_OK);
 
     assert(app_bno055_poll_step(&imu) == APP_BNO055_STEP_IN_PROGRESS);
-    assert(app_bno055_poll_step(&imu) == APP_BNO055_STEP_IN_PROGRESS);
     assert(app_bno055_poll_step(&imu) == APP_BNO055_OK);
+    assert(imu.snapshot.complete_sample_count == 1U);
+    assert(mock.read_index == 13U);
     assert(imu.snapshot.valid != 0);
     assert(fabsf(imu.snapshot.acceleration_g[0] - 1.00034f) < 0.001f);
     assert(fabsf(imu.snapshot.acceleration_g[1] + 0.49966f) < 0.001f);

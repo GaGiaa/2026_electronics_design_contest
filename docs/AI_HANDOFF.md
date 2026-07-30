@@ -60,11 +60,11 @@
 ## H723 BNO055 USART1 IMU
 
 - STM32CubeMX 已配置并生成 USART1：`PB6=USART1_TX`、`PB7=USART1_RX`、115200 bit/s、8-N-1；不使用 DMA 或 USART1 中断，接收 FIFO 已启用。BNO055 服务在通信错误后会清除 UART PE/FE/NE/ORE 标志并排空接收残留。BNO055 原生 UART 接线为 `PB6 -> BNO055 RX`、`PB7 <- BNO055 TX`，两端共地且 UART IO 必须为 3.3 V 兼容。
-- `App/app_bno055` 是可主机测试的 BNO055 UART 寄存器协议核心。每次启动和通信恢复均先读取 `CHIP_ID=0xA0`，再按 `CONFIG -> PWR_MODE=NORMAL -> UNIT_SEL=0 -> IMU` 顺序写入并等待模式切换；每笔写入必须收到 `EE 01`，直接写 `OPR_MODE=IMU` 可能收到 `EE 03`。每笔 UART 事务超时为 20 ms，`bno055Task` 每 5 ms 执行一个请求应答步骤；`SYS_STATUS(0x39)` 与 `SYS_ERR(0x3A)` 分别读取，避免设备对跨寄存器状态读取返回 `EE 07`。错误会置 `g_h723_debug.bno055.online/sample_valid=0`，服务每 1000 ms 重试初始化。
+- `App/app_bno055` 是可主机测试的 BNO055 UART 寄存器协议核心。每次启动和通信恢复均先读取 `CHIP_ID=0xA0`，再按 `CONFIG -> PWR_MODE=NORMAL -> UNIT_SEL=0 -> IMU` 顺序写入并等待模式切换；每笔写入必须收到 `EE 01`，直接写 `OPR_MODE=IMU` 可能收到 `EE 03`。每笔 UART 事务超时为 20 ms，`bno055Task` 每 5 ms 执行一个请求应答步骤；当前每两个步骤完成一个样本，第一步读取 24 字节传感器块，第二步读取温度/校准并在两个系统诊断寄存器之间交替读取一个寄存器，理想完整样本周期约 10 ms（100 Hz），每个诊断寄存器约 20 ms 更新一次。这样避免在单个 5 ms 片段连续发送三次请求。错误会置 `g_h723_debug.bno055.online/sample_valid=0`，服务每 1000 ms 重试初始化。
 - `g_h723_debug` 新增 `bno055` 分组，包含十项原始/换算量、校准状态、系统诊断、样本年龄和 UART/HAL 错误。`APP_BNO055_VOFA_TELEMETRY_ENABLE=0U` 默认关闭；启用后 UART8 以 20 ms 间隔发送 `Ax, Ay, Az, Gx, Gy, Gz, Roll, Pitch, Yaw, TemperatureC` 十通道 JustFloat。健康、JY901S 和 BNO055 三种 UART8 遥测编译期互斥。
-- 已通过 `tests/test_stm32h723_bno055.ps1`、H723 CubeMX/调试快照/Keil 工程/RTOS 静态检查，以及 Keil 构建日志中的 `0 Error(s)`。未执行 Flash、探针/SWD/GDB、BNO055 或 VOFA 实物测试。详细接线、单位和验收条件见 [`docs/STM32H723_BNO055.md`](STM32H723_BNO055.md)。
+- 已通过 `tests/test_stm32h723_bno055.ps1`、H723 CubeMX/调试快照/Keil 工程/RTOS 静态检查，以及 Keil 构建日志中的 `0 Error(s)`。本次实物验证已确认 BNO055 正常读取，完整样本频率接近 100 Hz；Flash、探针/SWD/GDB 和 VOFA 实物测试仍未执行。详细接线、单位和验收条件见 [`docs/STM32H723_BNO055.md`](STM32H723_BNO055.md)。
 
-最后更新：2026-07-30
+最后更新：2026-07-31
 
 ## H723 74HC4051 灰度传感器
 
