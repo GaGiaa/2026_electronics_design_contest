@@ -8,10 +8,10 @@
 - HSE 25 MHz，系统时钟 550 MHz；SWD 使用 `PA13/PA14`；M7 D-Cache 关闭，避免 DMA 缓冲区一致性问题。
 - UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
 - UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
-- M2006 总线使用 1 Mbit/s，接收 ID `0x201..0x203`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。若实物接线位于 FDCAN1，则将该宏改为 `1U`，重新编译即可切换。
+- M2006 总线使用 1 Mbit/s，接收 ID `0x201..0x203`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为用户指定的 `2U`。硬件必须接到对应的 FDCAN2 引脚；若实际接线位于 FDCAN1 或 FDCAN3，必须同步修改该宏并重新编译。
 - FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
-两台 M2006 实物位于 FDCAN1：左轮 ID 1、方向 `+1`；右轮 ID 2、方向 `-1`。ID 3 的上层平衡机构不属于本轮实现。
+两台 M2006 的 CAN 实例由 `APP_H723_M2006_FDCAN_INSTANCE` 选择，当前默认使用 FDCAN2；左轮 ID 1、方向 `+1`，右轮 ID 2、方向 `-1`。ID 3 的上层平衡机构不属于本轮实现。
 
 ## CRSF 与安全状态机
 
@@ -23,9 +23,9 @@ PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，控制量统一为 M20
 
 ## 单电机速度/位置环 PID 调试
 
-单电机调试由 `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 控制，默认 `0U`。设为 `1U` 后，单电机模式在现有 `chassisTask` 的 1 ms 节拍内完全接管 `0x200` 组控帧，CRSF 不再产生底盘差速目标；非选中电机的电流槽位始终为零。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 提供默认 ID（`1U..3U`），Keil Watch 中的 `g_h723_debug.single_motor.selected_id` 可以运行时覆盖它。
+单电机调试由 `APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE` 控制，发布配置建议为 `0U`。当前工作区为直接调试位置闭环已配置为 `1U`；启用后，单电机模式在现有 `chassisTask` 的 1 ms 节拍内完全接管 `0x200` 组控帧，CRSF 不再产生底盘差速目标；非选中电机的电流槽位始终为零。`APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID` 提供默认 ID（`1U..3U`），Keil Watch 中的 `g_h723_debug.single_motor.selected_id` 可以运行时覆盖它。
 
-`control_mode=0U` 为速度模式：`target_output_speed_rpm` 与现有增量速度 PID 每 1 ms 生效。`control_mode=1U` 为串级位置模式：`target_position_deg` 是相对于使能后首帧有效反馈的输出轴连续角度，外环位置式 PID 每 `APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS`（默认 5 ms）输出目标输出轴 RPM，内环仍以 1 ms 速度 PID 输出电流。M2006 的单圈编码器按 8192 counts/电机转展开为多圈位置，并按减速比 `36:1` 换算为输出轴 `deg`；位置跟踪的反馈间隔超过 `APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS`（默认 1 ms）或反馈超时后，均重新建立跟踪基准。
+`control_mode=0U` 为速度模式：`target_output_speed_rpm` 与现有增量速度 PID 每 1 ms 生效。`control_mode=1U` 为串级位置模式：`target_position_deg` 是相对于使能后首帧有效反馈的输出轴连续角度，外环位置式 PID 每 `APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS`（默认 5 ms）输出目标输出轴 RPM，内环仍以 1 ms 速度 PID 输出电流。M2006 的单圈编码器按 8192 counts/电机转展开为多圈位置，并按减速比 `36:1` 换算为输出轴 `deg`；位置跟踪与 `APP_H723_M2006_FEEDBACK_TIMEOUT_MS` 共用 `50 ms` 反馈有效窗口，只有达到该窗口才重新建立跟踪基准。这样可以容纳 CAN 反馈调度和 FreeRTOS tick 量化抖动，避免有效但较慢的反馈帧被误判为断流并把相对位置清零。
 
 Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadband`、`integral_output_limit`、`integral_separation_threshold`、`derivative_filter_N`、`output_delta_limit`，以及位置 PID 的 `position_kp`、`position_ki`、`position_kd`、`position_output_limit_rpm`、`position_deadband_deg`。位置 PID 默认参数为 `Kp=2`、`Ki=0`、`Kd=0`、输出限幅 `550 RPM`、死区 `0 deg`。`max_target_output_speed_rpm` 是两种模式的硬性输出轴速度上限；位置目标只要求为有限浮点值，不设置角度上限。位置反馈、原点状态、外环目标 RPM、P/I/D 分量和 5 ms 周期计数均位于 `g_h723_debug.single_motor`。
 

@@ -212,7 +212,7 @@ static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan)
             uint32_t index = header.Identifier - 0x201U;
             uint32_t now_ms = h723_app_time_now_ms();
             bool continuity_valid = s_feedback_valid[index] &&
-                                    (uint32_t)(now_ms - s_feedback_time_ms[index]) <=
+                                    (uint32_t)(now_ms - s_feedback_time_ms[index]) <
                                         APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS;
             if (!continuity_valid) {
                 app_m2006_position_tracker_init(&s_position_tracker[index]);
