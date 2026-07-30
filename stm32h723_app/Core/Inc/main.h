@@ -63,6 +63,14 @@ void Error_Handler(void);
 #define GRAY_AD1_GPIO_Port GPIOG
 #define GRAY_AD2_Pin GPIO_PIN_5
 #define GRAY_AD2_GPIO_Port GPIOG
+#define BUTTON_PC4_Pin GPIO_PIN_4
+#define BUTTON_PC4_GPIO_Port GPIOC
+#define BUTTON_PC5_Pin GPIO_PIN_5
+#define BUTTON_PC5_GPIO_Port GPIOC
+#define BUTTON_PA6_Pin GPIO_PIN_6
+#define BUTTON_PA6_GPIO_Port GPIOA
+#define BUTTON_LOGIC_HIGH_Pin GPIO_PIN_4
+#define BUTTON_LOGIC_HIGH_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

@@ -112,6 +112,25 @@ The default is off, so UART8 transmits nothing. Set the macro to `1U` to transmi
 
 Connect the USB-UART adapter GND to board GND and adapter RX to `PE1` (UART8 TX), respecting the board voltage level. Configure VOFA+ for JustFloat at 1,000,000 bit/s.
 
+## 三按键输入与 VOFA 测试
+
+三个按键使用高电平有效输入，接线和 GPIO 分配如下：
+
+| 按键 | STM32 引脚 | 电气连接 |
+| --- | --- | --- |
+| 按键 1 | `PC5` | GPIO 外部下拉，按键另一端接 `PA4` |
+| 按键 2 | `PC4` | GPIO 外部下拉，按键另一端接 `PA4` |
+| 按键 3 | `PA6` | GPIO 外部下拉，按键另一端接 `PA4` |
+
+`PA4` 配置为低速 `GPIO_MODE_OUTPUT_PP`，初始化后输出 3.3 V，作为三个按键共用的逻辑高电平源；每个
+按键输入端仍需外部下拉电阻。GPIO 输入使用 `GPIO_MODE_INPUT` 和 `GPIO_NOPULL`。`PA2` 已用于灰度 ADC，
+`PA5` 和 `PA7` 按板级约定保留，均不用于本按键功能。`buttonTask` 每 5 ms 采样一次，连续两次采样一致后更新稳定状态。
+
+将 `APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE` 设为 `1U` 可通过 UART8 以 20 ms 周期发送
+3 通道 VOFA+ JustFloat。通道顺序固定为 `PC5`、`PC4`、`PA6`，按下输出 `1.0f`，释放输出 `0.0f`。
+该宏与健康、JY901S、BNO055、灰度、单电机和 K230 UART8 遥测编译期互斥；启用按键测试前，必须
+关闭其他 UART8 VOFA 模式。UART8 仍使用 `PE1` TX、1 Mbit/s 和 DMA。
+
 ## 74HC4051 Grayscale Sensor
 
 The independent grayscale sampler uses `PG3=AD0`, `PG4=AD1`, `PG5=AD2` and
@@ -146,7 +165,7 @@ voltage range, calibration and VOFA output with the target board.
 
 ## SWD 调试快照
 
-Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。它按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]`、`single_motor`、`jy901s`、`grayscale` 与 `bno055` 分组；例如 `g_h723_debug.crsf.channels_raw[0]`、`g_h723_debug.chassis.left_target_output_speed_rpm`、`g_h723_debug.m2006[0].feedback_output_speed_rpm`、`g_h723_debug.single_motor.pid_output_A`、`g_h723_debug.jy901s.angle_deg[2]`、`g_h723_debug.grayscale.line_error` 与 `g_h723_debug.bno055.angle_deg[2]`。`m2006` 的索引 `0/1/2` 固定对应 CAN ID `1/2/3`。快照包含底盘、单电机、灰度传感器和两款 IMU 的原始、换算及通信诊断数据；由于任务和中断可独立更新字段，跨字段组合不保证为同一时刻的原子快照。
+Keil Watch 可直接观察 `App/Inc/app_debug.h` 中的只读约定全局变量 `volatile g_h723_debug`。它按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]`、`single_motor`、`jy901s`、`grayscale`、`buttons` 与 `bno055` 分组；例如 `g_h723_debug.crsf.channels_raw[0]`、`g_h723_debug.chassis.left_target_output_speed_rpm`、`g_h723_debug.m2006[0].feedback_output_speed_rpm`、`g_h723_debug.single_motor.pid_output_A`、`g_h723_debug.jy901s.angle_deg[2]`、`g_h723_debug.grayscale.line_error`、`g_h723_debug.buttons.stable_high_mask` 与 `g_h723_debug.bno055.angle_deg[2]`。`m2006` 的索引 `0/1/2` 固定对应 CAN ID `1/2/3`。快照包含底盘、单电机、灰度传感器、按键和两款 IMU 的原始、换算及通信诊断数据；由于任务和中断可独立更新字段，跨字段组合不保证为同一时刻的原子快照。
 
 详见 [JY901S 接入说明](../docs/STM32H723_JY901S.md) 和 [BNO055 接入说明](../docs/STM32H723_BNO055.md)。
 
@@ -164,6 +183,8 @@ Expected artifact: `MDK-ARM\stm32h723_app\stm32h723_app.axf`.
 
 ```powershell
 .\tests\test_stm32h723_vofa_justfloat.ps1
+.\tests\test_stm32h723_buttons.ps1
+.\tests\test_stm32h723_buttons_static.ps1
 .\tests\test_stm32h723_bno055.ps1
 .\tests\test_stm32h723_chassis.ps1
 .\tests\test_stm32h723_single_motor.ps1

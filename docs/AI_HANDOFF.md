@@ -1,5 +1,25 @@
 # MSPM0 核心板工程交接索引
 
+## H723 三按键输入与 VOFA 测试
+
+- `stm32h723_app` 已新增三个高电平有效按键：`PC5`、`PC4`、`PA6`。`PA4` 配置为低速推挽输出并在 GPIO
+  初始化后置高，作为三个按键共用的 3.3 V 逻辑电平源；三个输入使用外部下拉电阻和 `GPIO_NOPULL`，按键
+  另一端接 `PA4`。`PA2` 继续用于灰度 ADC，
+  `PA5` 和 `PA7` 按板级约定保留，未被本功能占用。
+- `App/app_buttons` 提供按键初始化、5 ms 采样和两次一致消抖；`buttonTask` 发布原始掩码、稳定掩码和
+  采样序号到 `g_h723_debug.buttons`。位 bit 0/1/2 分别对应 `PC5/PC4/PA6`，上电当前电平作为初始稳定状态。
+- 新增 `APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE=0U`、20 ms 发送周期和按键消抖配置。启用后 UART8
+  发送 3 通道 JustFloat，顺序为 `PC5`、`PC4`、`PA6`，值为稳定状态 `0.0f/1.0f`；该模式加入现有 UART8
+  遥测编译期互斥检查。
+- 已通过 `tests/test_stm32h723_buttons.ps1`、`tests/test_stm32h723_buttons_static.ps1`、
+  `tests/test_stm32h723_vofa_justfloat.ps1`、`tests/test_stm32h723_ioc.ps1` 和
+  `tests/test_stm32h723_keil_project.ps1`。默认配置 Keil 纯软件构建和临时开启按键 VOFA、关闭单电机 VOFA
+  的 Keil 纯软件构建均返回退出码 0。由于当前环境未发现 CubeMX 命令行入口，`.ioc` 与生成 GPIO 文件按现有
+  CubeMX 生成格式同步修改，并由静态检查验证一致性。
+- 未执行 Flash、烧录、探针枚举、GDB/SWD、按键实物电平、UART8/VOFA+ 实物接收或其他硬件验收。
+
+最后更新：2026-07-31
+
 ## H723 K230 UART2 钢珠位置测试
 
 - `stm32h723_app` 新增默认关闭的 `APP_H723_K230_UART2_TEST_ENABLE=0U`。启用后，USART2 使用

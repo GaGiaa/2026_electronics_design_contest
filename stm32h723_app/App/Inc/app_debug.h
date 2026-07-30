@@ -164,6 +164,12 @@ typedef struct {
 } h723_debug_grayscale_t;
 
 typedef struct {
+    uint32_t raw_high_mask;
+    uint32_t stable_high_mask;
+    uint32_t sample_sequence;
+} h723_debug_buttons_t;
+
+typedef struct {
     int16_t acceleration_raw[3];
     int16_t angular_rate_raw[3];
     int16_t angle_raw[3];
@@ -225,6 +231,7 @@ typedef struct {
     h723_debug_single_motor_t single_motor;
     h723_debug_jy901s_t jy901s;
     h723_debug_grayscale_t grayscale;
+    h723_debug_buttons_t buttons;
     h723_debug_bno055_t bno055;
     h723_debug_ball_vision_t ball_vision;
     h723_debug_oled_t oled;

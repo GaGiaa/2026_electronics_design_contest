@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 
 #include "app_telemetry.h"
+#include "app_buttons.h"
+#include "app_debug.h"
 #include "app_chassis_service.h"
 #include "app_config.h"
 #include "app_bno055_service.h"
@@ -99,6 +101,13 @@ static const osThreadAttr_t oledTask_attributes = {
   .priority = (osPriority_t)osPriorityLow,
 };
 
+static osThreadId_t buttonTaskHandle;
+static const osThreadAttr_t buttonTask_attributes = {
+  .name = "buttonTask",
+  .stack_size = 1024 * 2,
+  .priority = (osPriority_t)osPriorityNormal,
+};
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -119,6 +128,7 @@ void startBno055Task(void *argument);
 void startK230Task(void *argument);
 #endif
 void startOledTask(void *argument);
+void startButtonTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -185,6 +195,8 @@ void MX_FREERTOS_Init(void) {
 #endif
   oledTaskHandle = osThreadNew(startOledTask, NULL, &oledTask_attributes);
   configASSERT(oledTaskHandle != NULL);
+  buttonTaskHandle = osThreadNew(startButtonTask, NULL, &buttonTask_attributes);
+  configASSERT(buttonTaskHandle != NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -227,6 +239,29 @@ void startChassisTask(void *argument)
   for (;;) {
     h723_chassis_service_step(h723_app_time_now_ms());
     next_wake_tick += APP_H723_CHASSIS_TASK_PERIOD_MS;
+    (void)osDelayUntil(next_wake_tick);
+  }
+}
+
+void startButtonTask(void *argument)
+{
+  uint32_t next_wake_tick = osKernelGetTickCount();
+  h723_app_buttons_snapshot_t snapshot;
+
+  (void)argument;
+  h723_app_buttons_init();
+  h723_app_buttons_snapshot_copy(&snapshot);
+  g_h723_debug.buttons.raw_high_mask = snapshot.raw_high_mask;
+  g_h723_debug.buttons.stable_high_mask = snapshot.stable_high_mask;
+  g_h723_debug.buttons.sample_sequence = snapshot.sample_sequence;
+
+  for (;;) {
+    h723_app_buttons_step();
+    h723_app_buttons_snapshot_copy(&snapshot);
+    g_h723_debug.buttons.raw_high_mask = snapshot.raw_high_mask;
+    g_h723_debug.buttons.stable_high_mask = snapshot.stable_high_mask;
+    g_h723_debug.buttons.sample_sequence = snapshot.sample_sequence;
+    next_wake_tick += APP_H723_BUTTON_TASK_PERIOD_MS;
     (void)osDelayUntil(next_wake_tick);
   }
 }
