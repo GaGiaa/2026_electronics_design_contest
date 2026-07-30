@@ -5,9 +5,9 @@
 #include "app_grayscale.h"
 
 static const uint16_t s_grayscale_white[H723_GRAYSCALE_CHANNEL_COUNT] =
-    {1239U, 2393U, 803U, 709U, 2596U, 2254U, 3040U, 829U};
+    {580U, 1730U, 730U, 370U, 2100U, 1580U, 3100U, 500U};
 static const uint16_t s_grayscale_black[H723_GRAYSCALE_CHANNEL_COUNT] =
-    {72U, 64U, 67U, 81U, 97U, 76U, 410U, 76U};
+    {470U, 690U, 400U, 285U, 750U, 390U, 1300U, 300U};
 static h723_grayscale_snapshot_t s_snapshot;
 
 void h723_grayscale_service_init(void)

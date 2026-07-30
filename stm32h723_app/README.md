@@ -92,8 +92,9 @@ calibration call is in CubeMX's retained `USER CODE` block.
 
 The grayscale task runs every 10 ms and publishes raw values, normalized
 values, hysteresis digital state, black mask, line strength, line error and
-ADC timeout diagnostics in `g_h723_debug.grayscale`. Default white/black
-calibration values are migrated from the G3507 application. Grayscale VOFA
+ADC timeout diagnostics in `g_h723_debug.grayscale`. The current H723
+white/black calibration values are `white={580,1730,730,370,2100,1580,3100,500}`
+and `black={470,690,400,285,750,390,1300,300}`. Grayscale VOFA
 telemetry is disabled by default; enabling
 `APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE` emits the same 22-channel JustFloat
 layout used by the G3507 application and is mutually exclusive with the
