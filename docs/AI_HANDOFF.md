@@ -579,3 +579,37 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 用户明确要求执行 `git commit` 时，提交信息必须使用详细中文，说明改动目的、主要内容
 和验证结果；不得只使用笼统的英文标题或过于简短的提交说明。
+
+## H723 Selective Merge After 805ad2a
+
+The current H723 tree is the primary implementation after
+`805ad2a9e8a39d510be543c99df854589952b152`. The partner tree had no Git
+metadata, so only its core gray-line-follow and task-menu behavior was
+transferred. Existing BNO055, K230 UART2, I2C4 OLED, M2006 position-loop, and
+CubeMX/Keil project content were retained.
+
+The chassis mode table is SB middle + SC middle for the existing manual mode,
+SB high + SC middle for line follow, and stop for every other switch state.
+Line follow uses a 65 mm wheel, 225 mm/s base speed, +/-300 mm/s stick range,
+and a 525 mm/s cap. It requires line strength >= 800 and no ADC timeout; four
+black channels latch a stop. The gray sequence prevents repeated PID updates,
+and mode exit/reset clears the latch. The chassis debug snapshot includes the
+line-follow mode, base speed, line position, validity, correction, and final
+left/right RPM targets.
+
+The current checkout explicitly sets `APP_H723_CHASSIS_ACTUATION_ENABLE=1U`.
+Nonzero current commands therefore remain subject to the CRSF, switch, and
+M2006 feedback safety gates. Optional five-channel chassis VOFA telemetry is
+off by default via
+`APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE=0U`, runs at 20 ms when enabled, and is
+part of the UART8 telemetry mutual exclusion guard. `app_task_menu` is an
+independent task-2-to-task-6 state machine with wraparound, 120 ms debounce,
+confirm lock, reset, and display callbacks only; it has no OLED, key GPIO, or
+task execution binding.
+
+Final verification for this merge: all 18 `tests\\test_stm32h723_*.ps1`
+PowerShell scripts passed; `git diff --check` passed; and the Keil software-only
+build generated `stm32h723_app.axf` with `0 Error(s), 1 Warning(s)` in
+`stm32h723_app\\MDK-ARM\\stm32h723_app\\stm32h723_app.build_log.htm`.
+No Flash, SWD/GDB, CAN, UART/VOFA hardware, motor, grayscale sensor, OLED, or
+other physical acceptance operation was performed.

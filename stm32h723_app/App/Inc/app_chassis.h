@@ -8,10 +8,18 @@
 #include "app_config.h"
 #include "pid.h"
 
+typedef enum {
+    APP_CHASSIS_MODE_STOP = 0U,
+    APP_CHASSIS_MODE_MANUAL = 1U,
+    APP_CHASSIS_MODE_LINE_FOLLOW = 2U
+} app_chassis_mode_t;
+
 typedef struct {
     bool manual_active;
+    app_chassis_mode_t mode;
     float forward_normalized;
     float turn_normalized;
+    float base_speed_mm_s;
     float left_target_rpm;
     float right_target_rpm;
 } app_chassis_command_t;

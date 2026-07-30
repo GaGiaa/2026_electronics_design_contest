@@ -19,7 +19,7 @@
 
 CRSF 始终解析 16 个 11-bit 通道，CH3（数组索引 2）为前进/后退，CH1（索引 0）为左右转向。有效范围为 `172/992/1811`，归一化死区为 `0.2`。仅 SB（索引 6）和 SC（索引 7）均处于中档时进入手动差速；任一低档或高档、CRSF 超过 100 ms 未收到有效帧、任一电机反馈超过 50 ms 时都复位 PID 并下发零电流。
 
-`App/Inc/app_config.h` 中的 `APP_H723_CHASSIS_ACTUATION_ENABLE` 默认是 `0U`。该状态下 CRSF、混控、PID 和 Watch 调试量仍会更新，但选中的 FDCAN 总线的 `0x200` 只允许发送四个零电流槽位。只有显式改为 `1U` 才会发送非零电流，首次实车前必须将车架悬空，核对 CAN 收发器、反馈 ID、左右方向宏和 PID 参数。无反馈排查时，在 Keil Watch 观察 `g_h723_debug.fdcan.instance`、`g_h723_debug.fdcan.rx_count`、`g_h723_debug.fdcan.last_status`、`g_h723_debug.fdcan.protocol_last_error`、`g_h723_debug.fdcan.protocol_bus_off`、`g_h723_debug.fdcan.tx_error_counter` 与 `g_h723_debug.fdcan.rx_error_counter`。
+当前 `App/Inc/app_config.h` 显式将 `APP_H723_CHASSIS_ACTUATION_ENABLE` 设为 `1U`。因此，满足全部运行安全条件时，选中的 FDCAN 总线可以发送非零电流。首次实车前必须将车架悬空，核对 CAN 收发器、反馈 ID、左右方向宏和 PID 参数。将该宏设为 `0U` 时，CRSF、混控、PID 和 Watch 调试量仍会更新，但 `0x200` 只允许发送四个零电流槽位。无反馈排查时，在 Keil Watch 观察 `g_h723_debug.fdcan.instance`、`g_h723_debug.fdcan.rx_count`、`g_h723_debug.fdcan.last_status`、`g_h723_debug.fdcan.protocol_last_error`、`g_h723_debug.fdcan.protocol_bus_off`、`g_h723_debug.fdcan.tx_error_counter` 与 `g_h723_debug.fdcan.rx_error_counter`。
 
 PID 使用仓库级 `shared/pid/` 纯 C 增量式实现，控制量统一为 M2006 减速箱输出轴 RPM，输出统一为安培。M2006 减速比为 `36:1`，C610 电流换算为 `16384 raw = 10 A`；底盘默认目标速度上限为 `550 output RPM`，电流输出上限为 `10 A`。当前底盘与单电机调试默认速度环参数为 `kp=0.25 A/RPM`、`ki=5 A/(RPM*s)`、`kd=0`、积分限幅 `100000 A`、每周期输出变化限幅 `0 A`、死区 `0.1 RPM`、积分分离阈值 `0 RPM`，这些值来自当前速度环调试配置，仍需悬空实车验证。
 
@@ -173,3 +173,42 @@ Expected artifact: `MDK-ARM\stm32h723_app\stm32h723_app.axf`.
 ```
 
 上述命令不执行 Flash、烧录、探针连接、SWD 会话、CRSF 实物收发、CAN 总线或电机测试。实物验收仍需在车架悬空条件下进行。
+
+## Selective Merge: Gray Line Follow And Task Menu
+
+This checkout keeps the H723 implementation after baseline commit
+`805ad2a9e8a39d510be543c99df854589952b152` as the primary implementation.
+The partner-only additions are integrated as independent application modules;
+the existing BNO055, K230 UART2, I2C4 OLED, M2006 position loop, and safety
+behavior remain in place.
+
+Chassis switch mapping is:
+
+- SB middle and SC middle: existing manual chassis mode.
+- SB high and SC middle: gray line-follow mode.
+- All other switch combinations: stop.
+
+Line follow uses the 65 mm wheel diameter, a 225 mm/s base speed, +/-300 mm/s
+stick adjustment, and a 525 mm/s target-speed cap. A line-strength value below
+800, any ADC timeout, or a missing gray sample stops the output. Four black
+channels latch a stop until the line-follow state is reset or exited. The
+line-follow debug snapshot exposes mode, base speed, line position, validity,
+turn correction, and final left/right target RPM values.
+
+This checkout explicitly sets `APP_H723_CHASSIS_ACTUATION_ENABLE=1U`; nonzero
+current commands are therefore possible once every CRSF, switch, and feedback
+safety gate is satisfied. Optional chassis VOFA telemetry is controlled by
+`APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE=0U`, uses five channels at 20 ms, and is
+included in the UART8 telemetry mutual-exclusion check.
+
+`app_task_menu` is a standalone task-2-to-task-6 selection state machine. It
+provides page wraparound, 120 ms key debounce, confirm locking, reset, and a
+callback-based display adapter. It is deliberately not bound to OLED pins,
+buttons, or task execution until those hardware and behavior contracts are
+defined.
+
+The merge was verified with all 18 `tests\\test_stm32h723_*.ps1` scripts,
+`git diff --check`, and a Keil software-only build. The build log reports
+`stm32h723_app.axf` with `0 Error(s), 1 Warning(s)`. No Flash programming,
+SWD/GDB session, CAN, UART/VOFA hardware, motor, grayscale sensor, OLED, or
+other physical acceptance test was performed.

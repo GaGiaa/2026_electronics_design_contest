@@ -39,6 +39,13 @@ typedef struct {
     uint32_t actuation_enabled;
     float forward_normalized;
     float turn_normalized;
+    float base_speed_mm_s;
+    float line_position;
+    float line_turn_correction_mm_s;
+    uint32_t line_valid;
+    uint32_t line_strength;
+    float left_target_speed_mm_s;
+    float right_target_speed_mm_s;
     float left_target_output_speed_rpm;
     float right_target_output_speed_rpm;
 } h723_debug_chassis_t;
@@ -159,6 +166,7 @@ typedef struct {
     uint8_t black_count;
     uint32_t line_strength;
     int32_t line_error;
+    float line_position;
     uint32_t sequence;
     uint32_t adc_timeout_count;
 } h723_debug_grayscale_t;

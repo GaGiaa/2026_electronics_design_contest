@@ -97,6 +97,7 @@ bool h723_grayscale_sample(h723_grayscale_snapshot_t *snapshot)
     snapshot->black_count = derived.black_count;
     snapshot->line_strength = derived.line_strength;
     snapshot->line_error = derived.line_error;
+    snapshot->line_position = derived.line_position;
     snapshot->sequence = ++s_sequence;
     snapshot->adc_timeout_count = s_adc_timeout_count;
     s_digital = derived.digital;

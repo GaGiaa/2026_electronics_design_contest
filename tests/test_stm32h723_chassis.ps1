@@ -6,8 +6,12 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 
 $appConfig = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Inc\app_config.h')
-if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+0U') {
-    throw 'Chassis actuation must default to disabled.'
+$service = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_chassis_service.c')
+if ($appConfig -notmatch '#define\s+APP_H723_CHASSIS_ACTUATION_ENABLE\s+(?:0U|1U)') {
+    throw 'Chassis actuation must be configured as 0U or 1U.'
+}
+if ($service -notmatch '(?s)if\s*\(APP_H723_CHASSIS_ACTUATION_ENABLE\s*==\s*0U\)\s*\{\s*output_current_A\[index\]\s*=\s*0\.0f;') {
+    throw 'Disabled chassis actuation must force zero motor current.'
 }
 
 $gcc = (Get-Command gcc -ErrorAction Stop).Source

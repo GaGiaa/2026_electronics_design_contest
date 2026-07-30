@@ -10,9 +10,10 @@ $output = Join-Path $env:TEMP 'stm32h723_position_service_test.exe'
 $support = Join-Path $ProjectRoot 'tests\test_support\stm32h723_service'
 $appDir = Join-Path $ProjectRoot 'stm32h723_app'
 try {
-    & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' '-Wno-unused-function' "-I$support" "-I$appDir\App\Inc" "-I$ProjectRoot\shared\pid" `
+    & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' '-Wno-unused-function' '-DAPP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE=1U' "-I$support" "-I$appDir\App\Inc" "-I$ProjectRoot\shared\pid" `
         "$ProjectRoot\shared\pid\pid.c" "$appDir\App\Src\app_crsf.c" `
         "$appDir\App\Src\app_chassis.c" "$appDir\App\Src\app_m2006.c" `
+        "$appDir\App\Src\app_line_follow.c" `
         "$appDir\App\Src\app_single_motor.c" "$appDir\App\Src\app_chassis_service.c" `
         "$PSScriptRoot\test_stm32h723_position_service.c" '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) { throw 'STM32H723 position service test build failed.' }
