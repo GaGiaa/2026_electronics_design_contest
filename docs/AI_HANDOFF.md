@@ -52,9 +52,10 @@
 
 ## 当前 Git 状态
 
-当前工作区分支为 `develop`，远端跟踪分支为 `origin/develop`。本次巡线默认参数修订基于
-提交 `12c4258`，实际提交状态、HEAD 和远端领先关系仍应以执行时的 `git status` 与
-`git log` 输出为准。
+当前工作区分支为 `develop`，远端跟踪分支为 `origin/develop`。本轮以合并前的
+`HEAD=e0e895d` 为基线，完成两次非快进合并后的最终合并提交为 `aedacae`；随后仅
+新增本交接文档记录提交。当前分支的实际 HEAD、工作区状态和远端领先关系仍应以执行时的
+`git status` 与 `git log` 输出为准。本轮巡线默认参数修订基于 `12c4258` 的历史说明保持不变。
 
 此前的功能合并基线按以下顺序完成：
 
@@ -495,6 +496,28 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 - `APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE` 默认 `0U`，默认发送周期为 1 ms。速度模式继续发送原有 8 通道；位置模式发送 9 通道：目标/反馈位置、位置 P/I/D、外环速度目标、内环速度反馈、目标电流和反馈电流。DMA 忙时丢帧，且与其他 UART8 遥测编译期互斥。
 
 - 已通过 M2006 多圈跟踪/位置换算、单电机串级调度、VOFA、debug/IOC/Keil 静态检查，以及默认与启用单电机调试宏的 Keil 纯构建。未执行 Flash、烧录、SWD、CAN 总线、电机或 VOFA+ 实物验收。实物调参前必须车架悬空，确认实际 FDCAN 实例、ID、反馈方向、编码器连续性与低增益响应。
+
+### 本轮指定提交合并（2026-07-30）
+
+- 以合并前 `develop` 的 `e0e895d` 为共同基线，先以 `ort` 策略非快进合并
+  `11300d8b098087c8849d91d4bf60c01bc9becd4d`，生成合并提交 `b4a7368`。该合并更新
+  H723 74HC4051 八路灰度传感器白场/黑场 ADC 标定数组，并同步应用代码、工程 README
+  和本交接文档；未改变 ADC 通道、采样时序、归一化或底盘控制逻辑。
+- 随后以 `ort` 策略非快进合并
+  `721e925be9b7a2dce472f696244b69cdf72bbfcb`，生成合并提交 `aedacae`。该提交同时
+  带入其父提交 `bdc5dfd` 的 H723 M2006 单电机位置环 Watch 调试基础，并保存速度环
+  `deadband=0.1 RPM`、位置环 `Kp=2.0` 及对应的限幅、积分和死区参数，覆盖底盘服务、
+  单电机控制、调试快照、VOFA 遥测、IOC 检查、Keil 工程静态检查和主机测试。
+- 合并后已执行以下 10 个脚本，全部退出码为 0：`test_stm32h723_chassis.ps1`、
+  `test_stm32h723_debug_layout.ps1`、`test_stm32h723_grayscale_math.ps1`、
+  `test_stm32h723_ioc.ps1`、`test_stm32h723_jy901s.ps1`、`test_stm32h723_keil_project.ps1`、
+  `test_stm32h723_rtos_timebase.ps1`、`test_stm32h723_single_motor.ps1`、
+  `test_stm32h723_vofa_justfloat.ps1` 和 `test_documentation.ps1`；`git diff --check`
+  无输出。另以 `D:\Keil_v5\UV4\UV4.exe -r .\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx -j0`
+  完成 H723 Keil 纯软件重建，退出码为 0，并生成 `stm32h723_app.axf`。
+- 本轮未执行 Flash 擦除、烧录、探针枚举、GDB/SWD 连接、CAN 总线实物测试、电机调试、
+  示波器/逻辑分析仪测量、VOFA+ 实物收发或灰度传感器验收。灰度标定准确性、M2006
+  反馈方向、位置环增益和底盘联动仍需在车架悬空及电流输出受控的条件下复核。
 
 ## 任务完成清单
 
