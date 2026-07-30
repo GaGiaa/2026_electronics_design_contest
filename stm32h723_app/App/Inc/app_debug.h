@@ -164,6 +164,18 @@ typedef struct {
 } h723_debug_grayscale_t;
 
 typedef struct {
+    float distance_mm;
+    uint32_t valid;
+    uint32_t valid_frame_count;
+    uint32_t crc_error_count;
+    uint32_t format_error_count;
+    uint32_t uart_error_count;
+    uint32_t ring_overrun_count;
+    uint32_t frame_age_ms;
+    uint32_t dma_active;
+} h723_debug_ball_vision_t;
+
+typedef struct {
     h723_debug_system_t system;
     h723_debug_uart8_t uart8;
     h723_debug_crsf_t crsf;
@@ -174,6 +186,7 @@ typedef struct {
     h723_debug_single_motor_t single_motor;
     h723_debug_jy901s_t jy901s;
     h723_debug_grayscale_t grayscale;
+    h723_debug_ball_vision_t ball_vision;
 } h723_debug_t;
 
 extern volatile h723_debug_t g_h723_debug;

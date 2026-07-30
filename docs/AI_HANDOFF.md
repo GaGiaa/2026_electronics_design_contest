@@ -1,5 +1,24 @@
 # MSPM0 核心板工程交接索引
 
+## H723 K230 UART2 钢珠位置测试
+
+- `stm32h723_app` 新增默认关闭的 `APP_H723_K230_UART2_TEST_ENABLE=0U`。启用后，USART2 使用
+  `PD5=TX`、`PD6=RX`、234000 bit/s、8-N-1、DMA1 Stream3 RX 和 ReceiveToIdle DMA；K230 TX 接 PD6，
+  两端必须共地并确认 3.3 V TTL 电平。`k230Task` 以 5 ms 周期从软件环形缓冲解析数据，不阻塞 UART 中断。
+- K230 帧固定为 9 字节：`A5 5A`、`valid`（0 或 1）、小端 `float32 distance_mm`、小端
+  `CRC-16/CCITT-FALSE`。CRC 覆盖前 7 字节。合法无效帧发布 `distance_mm=0.0f` 和 `valid=0`；CRC 或格式错误帧
+  保留既有测量快照并递增错误计数。当前只提供测量测试，不接入水管倾角执行器或位置 PID。
+- 测试宏同时开启 UART8 三通道 JustFloat，每 20 ms 输出 `distance_mm`、`valid`、`frame_age_ms`；它与健康、JY901S、
+  灰度和单电机 UART8 遥测编译期互斥。`g_h723_debug.ball_vision` 供 Keil Watch 观察距离、帧年龄、DMA 状态与
+  CRC/格式/UART/环形缓冲错误计数。
+- 已通过 `tests\test_stm32h723_*.ps1` 全部 11 个 H723 主机与静态脚本，以及默认配置和临时
+  `APP_H723_K230_UART2_TEST_ENABLE=1U` 的 Keil 纯软件构建。CubeMX 无界面生成命令
+  `stm32h723_app\cubemx_generate_k230_uart2.txt` 已以退出码 0 验证 `.ioc`；后续在 CubeMX 图形界面重新生成时，
+  应确认 USART2、DMA1 Stream3 和 NVIC 配置仍保留。
+- 未执行 Flash、烧录、探针枚举、GDB/SWD、UART 实物收发、VOFA+ 实物接收、K230 识别或水管/电机硬件验收。
+
+最后更新：2026-07-30
+
 ## H723 JY901S UART9 IMU
 
 - STM32CubeMX 已配置并生成 UART9：`PG0=UART9_RX`、`PG1=UART9_TX`、234000 bit/s、DMA1 Stream2 RX 与 DMA/UART9 中断。

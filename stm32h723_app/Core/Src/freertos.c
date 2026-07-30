@@ -30,6 +30,7 @@
 #include "app_chassis_service.h"
 #include "app_config.h"
 #include "app_jy901s_service.h"
+#include "app_k230_service.h"
 #include "app_grayscale_service.h"
 #include "app_time.h"
 
@@ -74,6 +75,15 @@ static const osThreadAttr_t grayscaleTask_attributes = {
   .priority = (osPriority_t)osPriorityAboveNormal,
 };
 
+#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+static osThreadId_t k230TaskHandle;
+static const osThreadAttr_t k230Task_attributes = {
+  .name = "k230Task",
+  .stack_size = 1024 * 2,
+  .priority = (osPriority_t)osPriorityAboveNormal,
+};
+#endif
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -89,6 +99,9 @@ const osThreadAttr_t defaultTask_attributes = {
 void startChassisTask(void *argument);
 void startJy901sTask(void *argument);
 void startGrayscaleTask(void *argument);
+#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+void startK230Task(void *argument);
+#endif
 
 /* USER CODE END FunctionPrototypes */
 
@@ -145,6 +158,10 @@ void MX_FREERTOS_Init(void) {
   configASSERT(jy901sTaskHandle != NULL);
   grayscaleTaskHandle = osThreadNew(startGrayscaleTask, NULL, &grayscaleTask_attributes);
   configASSERT(grayscaleTaskHandle != NULL);
+#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+  k230TaskHandle = osThreadNew(startK230Task, NULL, &k230Task_attributes);
+  configASSERT(k230TaskHandle != NULL);
+#endif
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -215,6 +232,21 @@ void startGrayscaleTask(void *argument)
     (void)osDelayUntil(next_wake_tick);
   }
 }
+
+#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+void startK230Task(void *argument)
+{
+  uint32_t next_wake_tick = osKernelGetTickCount();
+
+  (void)argument;
+  h723_k230_service_init();
+  for (;;) {
+    h723_k230_service_step(h723_app_time_now_ms());
+    next_wake_tick += 5U;
+    (void)osDelayUntil(next_wake_tick);
+  }
+}
+#endif
 
 /* USER CODE END Application */
 
