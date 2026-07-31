@@ -87,9 +87,10 @@
 ## H723 JY901S UART9 IMU
 
 - STM32CubeMX 已配置并生成 UART9：`PG0=UART9_RX`、`PG1=UART9_TX`、234000 bit/s、DMA1 Stream2 RX 与 DMA/UART9 中断。
-- `App/app_jy901s` 解析标准 `0x55 0x51/0x52/0x53` 帧及温度；`jy901sTask` 用 FreeRTOS 5 ms 时基通过 ReceiveToIdle DMA 环形缓冲发布数据。
-- `g_h723_debug` 是 H723 唯一的 Keil Watch 调试入口，按 `system`、`uart8`、`crsf`、`chassis`、`fdcan`、`m2006[3]` 和 `jy901s` 分组。它只用于观察，不得作为业务输入；任务与中断可独立更新字段，跨字段组合不保证原子一致。`APP_JY901S_VOFA_TELEMETRY_ENABLE=0U` 默认关闭，开启后 UART8 发送 `Ax, Ay, Az, Gx, Gy, Gz, Roll, Pitch, Yaw, TemperatureC` 十通道 JustFloat；它与健康遥测编译期互斥。
-- 未执行烧录、探针/SWD/GDB、JY901S 或 VOFA 实物测试。详细接线、单位和验收条件见 [`docs/STM32H723_JY901S.md`](STM32H723_JY901S.md)。
+- `App/app_jy901s` 解析标准 `0x55 0x51/0x52/0x53` 帧及温度；新增纯 C `app_jy901s_calibration` 层，按车体右手系 `X=前、Y=左、Z=上` 执行正交轴映射、姿态角偏置和启动陀螺零偏校准。`jy901sTask` 只在收到新的完整样本时更新校准状态，避免重复累计同一个样本。
+- 默认启动校准累计 200 个连续静止完整样本，静止门限为 `0.85~1.15 g` 和 `3 deg/s`，总超时 `5000 ms`；零偏仅保存在 RAM。`g_h723_debug.jy901s` 同时暴露原始量、`vehicle_*` 车体量、`gyro_bias_dps`、校准状态、失败原因和样本计数。安装轴索引、符号和姿态偏置位于 `stm32h723_app/App/Inc/app_config.h`。
+- 当前工作区 `APP_JY901S_VOFA_TELEMETRY_ENABLE=1U`、`APP_JY901S_VOFA_CALIBRATED_ENABLE=1U`；前者开启原有十通道，后者切换为车体校准结果，设为 `0U` 可恢复原始数据。UART8 遥测互斥关系保持不变；当前校准结果未接入底盘 PID。
+- 已通过 JY901S 原始解析单元测试、校准模块单元测试、校准静态集成检查、debug 布局检查和 Keil 工程源文件检查。未执行 Keil 构建、烧录、探针/SWD/GDB、JY901S/VOFA 实物测试；硬件验收仍需确认实际安装轴向、静止零偏、`vehicle_acceleration_g[2]` 的重力符号以及三轴旋转方向。详细接线、单位和验收条件见 [`docs/STM32H723_JY901S.md`](STM32H723_JY901S.md)。
 
 ## H723 BNO055 USART1 IMU
 
@@ -709,3 +710,49 @@ after checking the buzzer current. Use a transistor or MOSFET driver when the
 load exceeds the STM32 GPIO rating. Static checks and software-only Keil builds
 were run; Flash, SWD, oscilloscope, audible buzzer, and other physical
 acceptance tests remain outstanding.
+
+## H723 巡线位置式 PID Watch 与 VOFA 调试（2026-07-31）
+
+本轮新增 `g_h723_debug.line_follow` 运行时调试接口，服务于 SE 按下、SB
+中档、SC 中档的灰度巡线模式。灰度任务周期为 `10 ms`，底盘任务周期为
+`1 ms`；巡线位置式 PID 只在灰度 `sequence` 变化时调用，因此实际 PID
+计算频率约为 `100 Hz`，初始化 `dt_s=0.010 s`。重复灰度快照沿用上一次
+转向修正；ADC 超时、线强度低于 `800` 或快照无效时复位 PID 并输出零目标。
+
+Keil Watch 可直接修改以下字段，并在下一次 PID 计算前生效：
+
+- `pid_kp`、`pid_ki`、`pid_kd`
+- `pid_output_limit_mm_s`
+- `pid_deadband`
+- `reset_pid_request`，写入 `1` 后清除 PID 状态并自动恢复为 `0`
+
+默认参数为 `Kp=35.0`、`Ki=0`、`Kd=0`、输出限幅
+`APP_H723_LINE_FOLLOW_MAX_TURN_SPEED_MM_S`、死区 `0`。非有限参数、负增益、
+负死区或非正输出限幅会被拒绝，上一组合法参数继续使用；`params_valid` 和
+`params_rejected_count` 用于观察校验结果。快照还提供 `line_position`、
+`error`、`integral`、`p_out`、`i_out`、`d_out`、`raw_output`、`pid_output`、
+`turn_correction_mm_s`、基础速度、左右轮目标速度、`line_strength`、
+`sequence` 和 `pid_update_count`。
+
+新增 `APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE=0U`，周期为 `10 ms`。
+启用后 UART8 发送 13 通道 JustFloat，顺序为：
+
+1. `line_position`
+2. `error`
+3. `p_out`
+4. `i_out`
+5. `d_out`
+6. `raw_output`
+7. `pid_output`
+8. `turn_correction_mm_s`
+9. `base_speed_mm_s`
+10. `left_target_speed_mm_s`
+11. `right_target_speed_mm_s`
+12. `line_strength`
+13. `sequence`
+
+该遥测已加入 UART8 遥测互斥编译检查，只用于调试观察，不改变 CRSF
+安全门、M2006 速度环或 CAN 输出。本轮已通过巡线 PID 静态检查、底盘遥测、
+VOFA JustFloat、debug layout 检查和 Keil 纯软件构建；构建日志为
+`0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、UART/VOFA 实物、
+CAN、电机或灰度传感器硬件验收。

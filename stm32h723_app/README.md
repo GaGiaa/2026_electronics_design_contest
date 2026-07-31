@@ -58,6 +58,22 @@ Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadb
 
 该遥测宏与健康遥测和 JY901S 十通道遥测编译期互斥，三者均默认关闭。UART8 仍使用 PE1 TX、1 Mbit/s 和 `DMA1_Stream1`；DMA 忙时丢弃本周期帧并递增 UART8 丢帧计数，不阻塞控制环。
 
+## JY901S 安装姿态与校准
+
+JY901S 使用 UART9：`PG0=RX`、`PG1=TX`、`234000 bit/s`，接收采用 DMA1 Stream2
+ReceiveToIdle。车体坐标约定为 `X=前、Y=左、Z=上`。`App/Src/app_jy901s_calibration.c`
+在原始解析后执行正交轴映射、角度偏置和启动陀螺零偏校准；原始数据与车体坐标数据同时发布到
+`g_h723_debug.jy901s`。
+
+当前配置已开启启动校准，需要车辆连续静止约 2~3 秒，累计 200 个完整样本；静止门限为加速度模长
+`0.85~1.15 g`、角速度绝对值不超过 `3 deg/s`，总超时 `5000 ms`。安装方向通过
+`App/Inc/app_config.h` 的 `APP_JY901S_VEHICLE_*_SENSOR_AXIS/SIGN` 配置，Roll/Pitch/Yaw
+固定偏置通过 `APP_JY901S_*_OFFSET_DEG` 配置。校准只保存在 RAM，不写 Flash。
+
+当前 `APP_JY901S_VOFA_CALIBRATED_ENABLE` 为 `1U`，现有 JY901S 十通道 VOFA 输出切换到车体坐标和校准结果；
+设为 `0U` 时恢复原始数据。详细操作和验收步骤见
+[`docs/STM32H723_JY901S.md`](../docs/STM32H723_JY901S.md)。当前校准结果尚未接入底盘 PID。
+
 ## K230 UART2 Position Test
 
 `APP_H723_K230_UART2_TEST_ENABLE` 默认是 `0U`。设为 `1U` 后，`k230Task` 每 5 ms
@@ -265,3 +281,13 @@ The merge was verified with all 18 `tests\\test_stm32h723_*.ps1` scripts,
 `stm32h723_app.axf` with `0 Error(s), 1 Warning(s)`. No Flash programming,
 SWD/GDB session, CAN, UART/VOFA hardware, motor, grayscale sensor, OLED, or
 other physical acceptance test was performed.
+
+## 巡线位置式 PID Watch 与 VOFA 调试
+
+SB 中档、SC 中档时进入灰度巡线模式。灰度任务每 `10 ms` 发布一次新快照，底盘任务虽然每 `1 ms` 运行，但巡线位置式 PID 只在灰度 `sequence` 变化时计算，因此实际 PID 计算频率约为 `100 Hz`，PID `dt_s` 为 `0.010 s`。灰度序号未变化时沿用上一次转向修正；ADC 超时、线强度小于 `800` 或快照无效时复位 PID 并输出零目标。
+
+`g_h723_debug.line_follow` 提供运行时调参。Keil Watch 可直接修改 `pid_kp`、`pid_ki`、`pid_kd`、`pid_output_limit_mm_s` 和 `pid_deadband`，下一次 PID 计算前生效。当前默认值为 `35.0f`、`0.0f`、`0.0f`、`APP_H723_LINE_FOLLOW_MAX_TURN_SPEED_MM_S` 和 `0.0f`。参数无效时保留上一组合法参数，并通过 `params_valid`、`params_rejected_count` 报告；写入 `reset_pid_request=1` 可清除积分和历史误差，程序随后自动清零该请求。
+
+该调试快照还提供 `line_position`、`error`、`integral`、`p_out`、`i_out`、`d_out`、`raw_output`、`pid_output`、`turn_correction_mm_s`、基础速度、左右轮目标速度、`line_strength`、`sequence` 和 `pid_update_count`，用于区分灰度输入、PID 分量、输出限幅和底盘目标生成问题。
+
+将 `APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE` 改为 `1U` 可通过 UART8 以 10 ms 周期发送 13 通道 JustFloat；该宏与其他 UART8 遥测互斥。通道顺序为：`line_position`、`error`、`p_out`、`i_out`、`d_out`、`raw_output`、`pid_output`、`turn_correction_mm_s`、`base_speed_mm_s`、`left_target_speed_mm_s`、`right_target_speed_mm_s`、`line_strength`、`sequence`。本功能只用于观察，不改变 CRSF 安全门、M2006 速度环或 CAN 输出逻辑。
