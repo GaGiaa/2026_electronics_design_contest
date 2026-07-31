@@ -621,13 +621,13 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 ## STM32H723 I2C4 OLED 测试页
 
-最后更新：2026-07-30
+最后更新：2026-08-01
 
-- 已接入 0.96 寸 128x64 SSD1306 四针 I2C OLED。CubeMX 配置为 `I2C4`：`PD12=I2C4_SCL`、`PD13=I2C4_SDA`、7-bit 地址模式、模拟滤波开启、时序 `0x00B03FDB`（400 kHz 快速模式）；原有 FDCAN2 `PB12/PB13` 保持不变，没有使用 `PB8/PB9`。
+- 已接入 0.96 寸 128x64 SSD1306 四针 I2C OLED。CubeMX 配置为 `I2C4`：`PD12=I2C4_SCL`、`PD13=I2C4_SDA`、7-bit 地址模式、模拟滤波开启、Fast Mode Plus、`I2C4.Timing=0x10A20D1F`。该 1 MHz Timing 基于 137.5 MHz I2C4 内核时钟、数字滤波 `0` 与 SCL/SDA 100 ns 上升/下降时间计算；原有 FDCAN2 `PB12/PB13` 保持不变，没有使用 `PB8/PB9`。
 - `App/Src/app_oled.c` 提供阻塞式 `HAL_I2C_Master_Transmit(&hi2c4, 0x3C << 1, ...)`、128x64 framebuffer、页寻址、`0x00` 命令控制字节、`0x40` 数据控制字节、清屏、光标、字符和字符串输出、整屏刷新以及 SSD1306 初始化。`oled_font.c` 提供 0x20..0x7E 的 5x7 可打印 ASCII 字库。
-- `oledTask` 使用低优先级和默认 1000 ms 周期，只显示固定英文测试页和递增计数，不读取电机实时数据。I2C 超时或其他总线错误只会在 `g_h723_debug.oled` 中累计并按周期重试，不会阻塞 FDCAN2、电机控制和 UART8；Watch 可观察 `initialized`、`init_attempt_count`、`last_hal_status`、`update_count` 和 `error_count`。
-- 硬件接线要求 OLED 使用 3.3 V 供电，SCL/SDA 上拉不能高于 3.3 V；无合适上拉时外接约 4.7 kOhm 到 3.3 V。当前只完成软件静态检查和 Keil 构建，尚未执行烧录、示波器/I2C 波形、OLED 实物显示或电机联动验收。
-- 可从 `stm32h723_app` 目录执行 `D:\STM32CubeMX\STM32CubeMX.exe -q .\cubemx_generate_crsf.txt` 重现 CubeMX 生成；生成后需检查 ADC H723 的 `DataAlign=0U` 兼容修正，以及 Keil 工程仍收录 `app_oled.c`、`oled_font.c` 和 `i2c.c`。
+- `oledTask` 使用低优先级，任务和实际刷新周期均为 100 ms，显示运行菜单、遥控状态或任务 2 状态。I2C 超时或其他总线错误只会在 `g_h723_debug.oled` 中累计并按周期重试，不会阻塞 FDCAN2、电机控制和 UART8；Watch 可观察 `initialized`、`init_attempt_count`、`last_hal_status`、`i2c_error_code`、`i2c_recovery_count`、`update_count` 和 `error_count`。
+- 硬件接线要求 OLED 使用 3.3 V 供电，SCL/SDA 上拉不能高于 3.3 V。1 MHz 不属于通用 SSD1306 保证规格，实物验收必须以示波器确认两条线的上升、下降时间均不超过 100 ns，并连续观察 NACK、花屏及 OLED 错误/恢复计数；异常时将 I2C4 配置回 400 kHz。当前尚未执行烧录、示波器/I2C 波形、OLED 实物显示或电机联动验收。
+- 可从 `stm32h723_app` 目录执行 `D:\STM32CubeMX\STM32CubeMX.exe -q .\cubemx_generate_crsf.txt` 重现 CubeMX 生成；生成后执行 `tests\test_stm32h723_oled.ps1`，检查 `.ioc`、`i2c.c` 中的 1 MHz Timing 和 FMP 调用，同时检查 ADC H723 的 `DataAlign=0U` 兼容修正，以及 Keil 工程仍收录 `app_oled.c`、`oled_font.c` 和 `i2c.c`。
 
 ### 本轮指定提交合并（2026-07-30）
 

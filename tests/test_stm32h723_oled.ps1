@@ -48,7 +48,12 @@ $project = Read-RequiredFile 'stm32h723_app\MDK-ARM\stm32h723_app.uvprojx'
 
 foreach ($line in @(
     'I2C4',
-    'I2C4.Timing=0x00B03FDB',
+    'I2C4.Timing=0x10A20D1F',
+    'I2C4.FASTMODEPLUS=I2C_FASTMODEPLUS_I2C4',
+    'I2C4.I2C_Speed_Mode=I2C_Fast_Plus',
+    'I2C4.Speed=1000',
+    'I2C4.I2C_Rise_Time=100',
+    'I2C4.I2C_Fall_Time=100',
     'I2C4.AddressingMode=I2C_ADDRESSINGMODE_7BIT',
     'I2C4.AnalogFilter=I2C_ANALOGFILTER_ENABLE',
     'PD12.Signal=I2C4_SCL',
@@ -72,7 +77,9 @@ foreach ($line in @(
 
 foreach ($line in @(
     'hi2c4.Instance = I2C4',
+    'hi2c4.Init.Timing = 0x10A20D1F',
     'HAL_I2C_Init\(&hi2c4\)',
+    'HAL_I2CEx_EnableFastModePlus\(I2C_FASTMODEPLUS_I2C4\)',
     'PD12.*I2C4_SCL',
     'PD13.*I2C4_SDA',
     'GPIO_AF4_I2C4'
@@ -83,7 +90,7 @@ foreach ($line in @(
 foreach ($line in @(
     '#define APP_H723_OLED_I2C_ADDRESS 0x3CU',
     '#define APP_H723_OLED_TASK_PERIOD_MS 100U',
-    '#define APP_H723_OLED_REFRESH_PERIOD_MS 1000U',
+    '#define APP_H723_OLED_REFRESH_PERIOD_MS 100U',
     '#define APP_H723_OLED_I2C_TIMEOUT_MS'
 )) {
     Require-Text $appConfig ([regex]::Escape($line)) "Missing OLED configuration: $line"
