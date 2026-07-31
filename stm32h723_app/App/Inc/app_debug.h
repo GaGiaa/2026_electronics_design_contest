@@ -136,6 +136,38 @@ typedef struct {
 } h723_debug_single_motor_t;
 
 typedef struct {
+    /* Keil Watch inputs. `rehome_request` is consumed as a one-shot command. */
+    float target_position_deg;
+    uint32_t rehome_request;
+    /* Program state and feedback. */
+    uint32_t state;
+    uint32_t fault;
+    uint32_t zero_valid;
+    uint32_t target_clamped;
+    uint32_t cycle_count;
+    float active_target_position_deg;
+    float zero_offset_deg;
+    float feedback_position_deg;
+    float feedback_output_speed_rpm;
+    float feedback_current_a;
+    float target_output_speed_rpm;
+    float commanded_current_a;
+    /* 平衡速度内环的实际配置与状态，供 Keil Watch 排查增量 PID。 */
+    float speed_pid_kp;
+    float speed_pid_ki;
+    float speed_pid_kd;
+    float speed_pid_dt_s;
+    float speed_pid_error_rpm;
+    float speed_pid_integral_output_a;
+    float speed_pid_raw_output_a;
+    float speed_pid_p_out_a;
+    float speed_pid_i_out_a;
+    float speed_pid_d_out_a;
+    float speed_pid_output_a;
+    int16_t commanded_current_raw;
+} h723_debug_balance_t;
+
+typedef struct {
     int16_t acceleration_raw[3];
     int16_t temperature_raw;
     int16_t angular_rate_raw[3];
@@ -237,6 +269,7 @@ typedef struct {
     /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */
     h723_m2006_debug_t m2006[3];
     h723_debug_single_motor_t single_motor;
+    h723_debug_balance_t balance;
     h723_debug_jy901s_t jy901s;
     h723_debug_grayscale_t grayscale;
     h723_debug_buttons_t buttons;

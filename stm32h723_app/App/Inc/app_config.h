@@ -188,10 +188,116 @@
 #define APP_H723_M2006_PID_KP 0.25f
 #define APP_H723_M2006_PID_KI 5.0f
 #define APP_H723_M2006_PID_KD 0.0f
-#define APP_H723_M2006_PID_INTEGRAL_LIMIT 100000.0f
+#define APP_H723_M2006_PID_INTEGRAL_LIMIT 0.0f
 #define APP_H723_M2006_PID_OUTPUT_DELTA_LIMIT 0.0f
 #define APP_H723_M2006_PID_DEADBAND_RPM 0.1f
 #define APP_H723_M2006_PID_INTEGRAL_SEPARATION_RPM 0.0f
+
+/* ID 3 平衡机构专用控制；启用后不允许单电机调试通道接管该电机。 */
+#ifndef APP_H723_BALANCE_ENABLE
+#define APP_H723_BALANCE_ENABLE 1U
+#endif
+/* 平衡曲柄固定使用 M2006 CAN ID 3，索引为电流组帧的第三个槽位。 */
+#ifndef APP_H723_BALANCE_MOTOR_ID
+#define APP_H723_BALANCE_MOTOR_ID 3U
+#endif
+/* 输出轴右手系的负值：反转搜索并顶住机械限位，单位为输出轴 RPM。 */
+#ifndef APP_H723_BALANCE_HOME_SEARCH_OUTPUT_SPEED_RPM
+#define APP_H723_BALANCE_HOME_SEARCH_OUTPUT_SPEED_RPM -8.0f
+#endif
+/* 归零搜索和顶住确认共用的最大电流，直接限制机械限位处的驱动力。 */
+#ifndef APP_H723_BALANCE_HOME_CURRENT_LIMIT_A
+#define APP_H723_BALANCE_HOME_CURRENT_LIMIT_A 1.0f
+#endif
+/* 判定顶到限位时允许的最大输出轴速度绝对值，单位为输出轴 RPM。 */
+#ifndef APP_H723_BALANCE_HOME_STALL_SPEED_RPM
+#define APP_H723_BALANCE_HOME_STALL_SPEED_RPM 1.0f
+#endif
+/* 实际反馈电流绝对值达到归零限流的此比例后，才允许开始顶住计时。 */
+#ifndef APP_H723_BALANCE_HOME_STALL_CURRENT_RATIO
+#define APP_H723_BALANCE_HOME_STALL_CURRENT_RATIO 0.80f
+#endif
+/* 低速且有负载需要连续保持的时间，单位为 ms。 */
+#ifndef APP_H723_BALANCE_HOME_CONFIRM_MS
+#define APP_H723_BALANCE_HOME_CONFIRM_MS 300U
+#endif
+/* 从开始反向搜索到判定失败的总超时，单位为 ms；超时后电流清零并锁定故障。 */
+#ifndef APP_H723_BALANCE_HOME_TIMEOUT_MS
+#define APP_H723_BALANCE_HOME_TIMEOUT_MS 12000U
+#endif
+/* 归零搜索速度内环 PID；输出和积分上限始终由归零电流上限强制覆盖。 */
+#ifndef APP_H723_BALANCE_HOME_SPEED_PID_KP
+#define APP_H723_BALANCE_HOME_SPEED_PID_KP 0.25f
+#endif
+#ifndef APP_H723_BALANCE_HOME_SPEED_PID_KI
+#define APP_H723_BALANCE_HOME_SPEED_PID_KI 5.0f
+#endif
+#ifndef APP_H723_BALANCE_HOME_SPEED_PID_KD
+#define APP_H723_BALANCE_HOME_SPEED_PID_KD 0.0f
+#endif
+/* 软件坐标范围必须包含触限点的 0 deg，不能用此宏设置归零后的安全避让距离。 */
+#ifndef APP_H723_BALANCE_POSITION_MIN_DEG
+#define APP_H723_BALANCE_POSITION_MIN_DEG 0.0f
+#endif
+/* 归零后的正常运行安全下限；Watch 目标低于该值会被夹紧，避免再次靠近机械限位。 */
+#ifndef APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG
+#define APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG 5.0f
+#endif
+/* 曲柄从软件零位向正方向的首次保守行程上限，单位为输出轴 deg。 */
+#ifndef APP_H723_BALANCE_POSITION_MAX_DEG
+#define APP_H723_BALANCE_POSITION_MAX_DEG 275.0f
+#endif
+/* 位置外环更新周期，单位为 ms；速度内环固定由 1 ms 底盘任务执行。 */
+#ifndef APP_H723_BALANCE_POSITION_PERIOD_MS
+#define APP_H723_BALANCE_POSITION_PERIOD_MS 5U
+#endif
+/* 位置外环输出的最大目标速度，单位为输出轴 RPM。 */
+#ifndef APP_H723_BALANCE_POSITION_MAX_OUTPUT_SPEED_RPM
+#define APP_H723_BALANCE_POSITION_MAX_OUTPUT_SPEED_RPM 550.0f
+#endif
+/* 正常位置控制的电流上限；与归零限流分开，仍保持 3D 打印机构的保守值。 */
+#ifndef APP_H723_BALANCE_POSITION_CURRENT_LIMIT_A
+#define APP_H723_BALANCE_POSITION_CURRENT_LIMIT_A 10.0f
+#endif
+/* 归零后位置控制使用的速度内环 PID。 */
+#ifndef APP_H723_BALANCE_POSITION_SPEED_PID_KP
+#define APP_H723_BALANCE_POSITION_SPEED_PID_KP 0.25f
+#endif
+#ifndef APP_H723_BALANCE_POSITION_SPEED_PID_KI
+#define APP_H723_BALANCE_POSITION_SPEED_PID_KI 5.0f
+#endif
+#ifndef APP_H723_BALANCE_POSITION_SPEED_PID_KD
+#define APP_H723_BALANCE_POSITION_SPEED_PID_KD 0.0f
+#endif
+/* 输出轴位置外环 PID，输入与反馈单位均为相对软件零位的 deg。 */
+#ifndef APP_H723_BALANCE_POSITION_PID_KP
+#define APP_H723_BALANCE_POSITION_PID_KP 2.0f
+#endif
+#ifndef APP_H723_BALANCE_POSITION_PID_KI
+#define APP_H723_BALANCE_POSITION_PID_KI 0.0f
+#endif
+#ifndef APP_H723_BALANCE_POSITION_PID_KD
+#define APP_H723_BALANCE_POSITION_PID_KD 0.0f
+#endif
+
+#if (APP_H723_BALANCE_ENABLE != 0U) && (APP_H723_BALANCE_ENABLE != 1U)
+#error "APP_H723_BALANCE_ENABLE must be 0U or 1U"
+#endif
+#if (APP_H723_BALANCE_MOTOR_ID != 3U)
+#error "APP_H723_BALANCE_MOTOR_ID must remain 3U"
+#endif
+#if (APP_H723_BALANCE_HOME_CONFIRM_MS == 0U) || \
+    (APP_H723_BALANCE_HOME_TIMEOUT_MS <= APP_H723_BALANCE_HOME_CONFIRM_MS)
+#error "Balance homing timeouts are invalid"
+#endif
+#if (APP_H723_BALANCE_POSITION_PERIOD_MS == 0U)
+#error "Balance position loop configuration is invalid"
+#endif
+#if (APP_H723_BALANCE_ENABLE == 1U) && \
+    (APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID == APP_H723_BALANCE_MOTOR_ID)
+#error "Single motor debug default cannot claim the balance motor"
+#endif
+
 #define APP_H723_SINGLE_MOTOR_MAX_OUTPUT_RPM APP_H723_CHASSIS_MAX_OUTPUT_RPM
 #define APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS 5U
 #define APP_H723_SINGLE_MOTOR_POSITION_PID_KP 2.0f

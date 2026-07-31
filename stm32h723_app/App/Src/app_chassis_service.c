@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "app_balance.h"
 #include "app_chassis.h"
 #include "app_config.h"
 #include "app_crsf.h"
@@ -30,6 +31,9 @@ static bool s_feedback_valid[3];
 static PID_Incremental s_speed_pid[3];
 static PID_Position s_position_pid[3];
 static app_m2006_position_tracker_t s_position_tracker[3];
+#if (APP_H723_BALANCE_ENABLE == 1U)
+static app_balance_t s_balance;
+#endif
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
 static float s_position_origin_deg[3];
 #endif
@@ -99,6 +103,46 @@ static const PID_Position_Param_Config s_position_pid_params = {
     .deadband = APP_H723_SINGLE_MOTOR_POSITION_PID_DEADBAND_DEG,
 };
 
+#if (APP_H723_BALANCE_ENABLE == 1U)
+static const app_balance_config_t s_balance_config = {
+    .home_search_output_speed_rpm = APP_H723_BALANCE_HOME_SEARCH_OUTPUT_SPEED_RPM,
+    .home_current_limit_a = APP_H723_BALANCE_HOME_CURRENT_LIMIT_A,
+    .home_stall_speed_rpm = APP_H723_BALANCE_HOME_STALL_SPEED_RPM,
+    .home_stall_current_ratio = APP_H723_BALANCE_HOME_STALL_CURRENT_RATIO,
+    .home_confirm_ms = APP_H723_BALANCE_HOME_CONFIRM_MS,
+    .home_timeout_ms = APP_H723_BALANCE_HOME_TIMEOUT_MS,
+    .position_min_deg = APP_H723_BALANCE_POSITION_MIN_DEG,
+    .position_active_min_deg = APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG,
+    .position_max_deg = APP_H723_BALANCE_POSITION_MAX_DEG,
+    .position_period_ms = APP_H723_BALANCE_POSITION_PERIOD_MS,
+    .home_speed_params = {
+        .kp = APP_H723_BALANCE_HOME_SPEED_PID_KP,
+        .ki = APP_H723_BALANCE_HOME_SPEED_PID_KI,
+        .kd = APP_H723_BALANCE_HOME_SPEED_PID_KD,
+        .output_limit = APP_H723_BALANCE_HOME_CURRENT_LIMIT_A,
+        .deadband = APP_H723_M2006_PID_DEADBAND_RPM,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.0f,
+    },
+    .position_speed_params = {
+        .kp = APP_H723_BALANCE_POSITION_SPEED_PID_KP,
+        .ki = APP_H723_BALANCE_POSITION_SPEED_PID_KI,
+        .kd = APP_H723_BALANCE_POSITION_SPEED_PID_KD,
+        .output_limit = APP_H723_BALANCE_POSITION_CURRENT_LIMIT_A,
+        .deadband = APP_H723_M2006_PID_DEADBAND_RPM,
+        .derivative_filter_N = 0.0f,
+        .output_delta_limit = 0.0f,
+    },
+    .position_params = {
+        .kp = APP_H723_BALANCE_POSITION_PID_KP,
+        .ki = APP_H723_BALANCE_POSITION_PID_KI,
+        .kd = APP_H723_BALANCE_POSITION_PID_KD,
+        .output_limit = APP_H723_BALANCE_POSITION_MAX_OUTPUT_SPEED_RPM,
+        .deadband = 0.0f,
+    },
+};
+#endif
+
 static const PID_Position_Param_Config s_line_follow_pid_params = {
     .kp = APP_H723_LINE_FOLLOW_PID_KP,
     .ki = APP_H723_LINE_FOLLOW_PID_KI,
@@ -139,6 +183,9 @@ void h723_chassis_service_init(void)
                           (float)APP_H723_SINGLE_MOTOR_POSITION_PID_PERIOD_MS / 1000.0f);
         app_m2006_position_tracker_init(&s_position_tracker[index]);
     }
+#if (APP_H723_BALANCE_ENABLE == 1U)
+    app_balance_init(&s_balance, &s_balance_config);
+#endif
     app_line_follow_init(&s_line_follow, &s_line_follow_pid_params,
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
     (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
@@ -163,6 +210,8 @@ void h723_chassis_service_init(void)
     g_h723_debug.single_motor.position_kd = APP_H723_SINGLE_MOTOR_POSITION_PID_KD;
     g_h723_debug.single_motor.position_output_limit_rpm = APP_H723_SINGLE_MOTOR_POSITION_PID_OUTPUT_LIMIT_RPM;
     g_h723_debug.single_motor.position_deadband_deg = APP_H723_SINGLE_MOTOR_POSITION_PID_DEADBAND_DEG;
+    g_h723_debug.balance.target_position_deg = 0.0f;
+    g_h723_debug.balance.rehome_request = 0U;
     s_single_motor_last_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     s_single_motor_last_enable = 0U;
     s_single_motor_last_control_mode = APP_SINGLE_MOTOR_CONTROL_MODE_SPEED;
@@ -271,6 +320,70 @@ static void h723_update_m2006_debug(uint32_t index, uint32_t now_ms, float targe
     debug->target_output_speed_rpm = target_rpm;
 }
 
+#if (APP_H723_BALANCE_ENABLE == 1U)
+static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3])
+{
+    const uint32_t index = APP_H723_BALANCE_MOTOR_ID - 1U;
+    const app_balance_step_input_t input = {
+        .now_ms = now_ms,
+        .feedback_valid = h723_m2006_feedback_is_fresh(index, now_ms),
+        .feedback_position_deg = app_m2006_position_tracker_output_degrees(&s_position_tracker[index]),
+        .feedback_output_speed_rpm = s_feedback[index].output_speed_rpm,
+        .feedback_current_a = s_feedback[index].current_a,
+        .requested_target_position_deg = g_h723_debug.balance.target_position_deg,
+        .rehome_request = g_h723_debug.balance.rehome_request != 0U,
+    };
+    app_balance_step_output_t result;
+    volatile h723_m2006_debug_t *debug = &g_h723_debug.m2006[index];
+
+    app_balance_step(&s_balance, &input, &result);
+    if (result.rehome_request_consumed) {
+        g_h723_debug.balance.rehome_request = 0U;
+    }
+    g_h723_debug.balance.state = (uint32_t)result.state;
+    g_h723_debug.balance.fault = (uint32_t)result.fault;
+    g_h723_debug.balance.zero_valid = result.zero_valid ? 1U : 0U;
+    g_h723_debug.balance.target_clamped = result.target_clamped ? 1U : 0U;
+    g_h723_debug.balance.cycle_count++;
+    g_h723_debug.balance.active_target_position_deg = result.active_target_position_deg;
+    g_h723_debug.balance.zero_offset_deg = result.zero_offset_deg;
+    g_h723_debug.balance.feedback_position_deg = result.feedback_position_deg;
+    g_h723_debug.balance.feedback_output_speed_rpm = input.feedback_output_speed_rpm;
+    g_h723_debug.balance.feedback_current_a = input.feedback_current_a;
+    g_h723_debug.balance.target_output_speed_rpm = result.target_output_speed_rpm;
+    g_h723_debug.balance.speed_pid_kp = s_balance.speed_pid.params.kp;
+    g_h723_debug.balance.speed_pid_ki = s_balance.speed_pid.params.ki;
+    g_h723_debug.balance.speed_pid_kd = s_balance.speed_pid.params.kd;
+    g_h723_debug.balance.speed_pid_dt_s = s_balance.speed_pid.dt_s;
+    g_h723_debug.balance.speed_pid_error_rpm = s_balance.speed_pid.error;
+    g_h723_debug.balance.speed_pid_integral_output_a = s_balance.speed_pid.integral_output;
+    g_h723_debug.balance.speed_pid_raw_output_a = s_balance.speed_pid.raw_output;
+    g_h723_debug.balance.speed_pid_p_out_a = s_balance.speed_pid.p_out;
+    g_h723_debug.balance.speed_pid_i_out_a = s_balance.speed_pid.i_out;
+    g_h723_debug.balance.speed_pid_d_out_a = s_balance.speed_pid.d_out;
+    g_h723_debug.balance.speed_pid_output_a = s_balance.speed_pid.output;
+    h723_update_m2006_debug(index, now_ms, result.target_output_speed_rpm);
+    output_current_A[index] = APP_H723_CHASSIS_ACTUATION_ENABLE == 1U ?
+                              result.commanded_current_a : 0.0f;
+    debug->pid_raw_output_A = s_balance.speed_pid.raw_output;
+    debug->pid_p_out_A = s_balance.speed_pid.p_out;
+    debug->pid_i_out_A = s_balance.speed_pid.i_out;
+    debug->pid_d_out_A = s_balance.speed_pid.d_out;
+    debug->pid_output_A = s_balance.speed_pid.output;
+    debug->commanded_current_raw = app_m2006_current_a_to_raw(output_current_A[index]);
+    debug->commanded_current_A = app_m2006_raw_current_to_a(debug->commanded_current_raw);
+    output_current_A[index] = debug->commanded_current_A;
+    g_h723_debug.balance.commanded_current_raw = debug->commanded_current_raw;
+    g_h723_debug.balance.commanded_current_a = debug->commanded_current_A;
+}
+#else
+static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3])
+{
+    (void)now_ms;
+    (void)output_current_A;
+}
+#endif
+
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
 static void h723_single_motor_service_step(uint32_t now_ms, float output_current_A[3])
 {
@@ -286,6 +399,9 @@ static void h723_single_motor_service_step(uint32_t now_ms, float output_current
 
     selected_id = app_single_motor_sanitize_id(g_h723_debug.single_motor.selected_id,
                                                 APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID);
+    if (selected_id == APP_H723_BALANCE_MOTOR_ID) {
+        selected_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
+    }
     selected_index = selected_id - 1U;
     g_h723_debug.single_motor.selected_id = selected_id;
     max_target_output_speed_rpm = app_single_motor_sanitize_max_output_speed_rpm(
@@ -514,6 +630,7 @@ void h723_chassis_service_step(uint32_t now_ms)
         output_current_A[index] = debug->commanded_current_A;
     }
 #endif
+    h723_balance_service_step(now_ms, output_current_A);
     g_h723_debug.chassis.left_target_output_speed_rpm = s_command.left_target_rpm;
     g_h723_debug.chassis.right_target_output_speed_rpm = s_command.right_target_rpm;
     g_h723_debug.chassis.left_target_speed_mm_s =

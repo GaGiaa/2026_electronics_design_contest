@@ -13,7 +13,7 @@ try {
     & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' '-Wno-unused-function' '-DAPP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE=1U' "-I$support" "-I$appDir\App\Inc" "-I$ProjectRoot\shared\pid" `
         "$ProjectRoot\shared\pid\pid.c" "$appDir\App\Src\app_crsf.c" `
         "$appDir\App\Src\app_chassis.c" "$appDir\App\Src\app_m2006.c" `
-        "$appDir\App\Src\app_line_follow.c" `
+        "$appDir\App\Src\app_line_follow.c" "$appDir\App\Src\app_balance.c" `
         "$appDir\App\Src\app_single_motor.c" "$appDir\App\Src\app_chassis_service.c" `
         "$PSScriptRoot\test_stm32h723_position_service.c" '-lm' '-o' $output
     if ($LASTEXITCODE -ne 0) { throw 'STM32H723 position service test build failed.' }
