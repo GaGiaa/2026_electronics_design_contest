@@ -84,6 +84,41 @@ typedef struct {
 } h723_debug_line_follow_t;
 
 typedef struct {
+    /* Keil Watch inputs. Apply geometry changes followed by reset_request=1. */
+    float wheel_diameter_mm;
+    float track_width_mm;
+    float left_encoder_sign;
+    float right_encoder_sign;
+    uint32_t reset_request;
+    /* Runtime odometry snapshot. */
+    uint32_t params_valid;
+    uint32_t params_rejected_count;
+    uint32_t initialized;
+    uint32_t valid;
+    uint32_t reset_count;
+    uint32_t rebaseline_count;
+    uint32_t sample_count;
+    uint16_t left_encoder;
+    uint16_t right_encoder;
+    int64_t left_motor_counts;
+    int64_t right_motor_counts;
+    float left_wheel_distance_mm;
+    float right_wheel_distance_mm;
+    float delta_left_mm;
+    float delta_right_mm;
+    float delta_distance_mm;
+    float delta_yaw_deg;
+    float x_mm;
+    float y_mm;
+    float yaw_deg;
+    float yaw_deg_continuous;
+    float linear_speed_mm_s;
+    float angular_speed_deg_s;
+    uint32_t left_feedback_age_ms;
+    uint32_t right_feedback_age_ms;
+} h723_debug_wheel_odometry_t;
+
+typedef struct {
     uint32_t mode;
     uint32_t remote_takeover;
     uint32_t buttons_enabled;
@@ -312,6 +347,7 @@ typedef struct {
     h723_debug_control_t control;
     h723_debug_chassis_t chassis;
     h723_debug_line_follow_t line_follow;
+    h723_debug_wheel_odometry_t wheel_odometry;
     h723_debug_fdcan_t fdcan;
     /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */
     h723_m2006_debug_t m2006[3];

@@ -19,6 +19,7 @@
 #define H723_VOFA_K230_CHANNEL_COUNT 3U
 #define H723_VOFA_CHASSIS_CHANNEL_COUNT 5U
 #define H723_VOFA_LINE_FOLLOW_PID_CHANNEL_COUNT 13U
+#define H723_VOFA_WHEEL_ODOMETRY_CHANNEL_COUNT 15U
 #define H723_VOFA_BUTTON_CHANNEL_COUNT 3U
 
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
@@ -62,6 +63,12 @@ static uint8_t s_line_follow_pid_frame[
 static uint32_t s_last_line_follow_pid_telemetry_ms;
 #endif
 
+#if (APP_H723_WHEEL_ODOMETRY_VOFA_TELEMETRY_ENABLE == 1U)
+static uint8_t s_wheel_odometry_frame[
+    VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_WHEEL_ODOMETRY_CHANNEL_COUNT)];
+static uint32_t s_last_wheel_odometry_telemetry_ms;
+#endif
+
 #if (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U)
 static uint8_t s_button_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_BUTTON_CHANNEL_COUNT)];
 static uint32_t s_last_button_telemetry_ms;
@@ -77,6 +84,7 @@ void h723_app_telemetry_init(void)
         (APP_H723_K230_UART2_TEST_ENABLE << 3U) |
         (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE << 4U) |
         (APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE << 5U) |
+        (APP_H723_WHEEL_ODOMETRY_VOFA_TELEMETRY_ENABLE << 6U) |
         (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE << 4U);
     g_h723_debug.uart8.last_hal_status = HAL_OK;
 #if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U)
@@ -103,6 +111,9 @@ void h723_app_telemetry_init(void)
 #endif
 #if (APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_line_follow_pid_telemetry_ms = h723_app_time_now_ms();
+#endif
+#if (APP_H723_WHEEL_ODOMETRY_VOFA_TELEMETRY_ENABLE == 1U)
+    s_last_wheel_odometry_telemetry_ms = h723_app_time_now_ms();
 #endif
 #if (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_button_telemetry_ms = h723_app_time_now_ms();
@@ -395,6 +406,48 @@ void h723_app_telemetry_step(void)
             H723_VOFA_LINE_FOLLOW_PID_CHANNEL_COUNT);
         status = HAL_UART_Transmit_DMA(&huart8, s_line_follow_pid_frame,
                                        sizeof(s_line_follow_pid_frame));
+        g_h723_debug.uart8.last_hal_status = (uint32_t)status;
+        if (status == HAL_OK) {
+            g_h723_debug.uart8.tx_in_flight = 1U;
+            g_h723_debug.uart8.tx_start_count++;
+        } else {
+            g_h723_debug.uart8.tx_drop_count++;
+        }
+    }
+#endif
+
+#if (APP_H723_WHEEL_ODOMETRY_VOFA_TELEMETRY_ENABLE == 1U)
+    if ((now_ms - s_last_wheel_odometry_telemetry_ms) >=
+        APP_H723_WHEEL_ODOMETRY_VOFA_TELEMETRY_INTERVAL_MS) {
+        const float channels[H723_VOFA_WHEEL_ODOMETRY_CHANNEL_COUNT] = {
+            g_h723_debug.wheel_odometry.left_wheel_distance_mm,
+            g_h723_debug.wheel_odometry.right_wheel_distance_mm,
+            g_h723_debug.wheel_odometry.delta_left_mm,
+            g_h723_debug.wheel_odometry.delta_right_mm,
+            g_h723_debug.wheel_odometry.delta_distance_mm,
+            g_h723_debug.wheel_odometry.delta_yaw_deg,
+            g_h723_debug.wheel_odometry.x_mm,
+            g_h723_debug.wheel_odometry.y_mm,
+            g_h723_debug.wheel_odometry.yaw_deg,
+            g_h723_debug.wheel_odometry.linear_speed_mm_s,
+            g_h723_debug.wheel_odometry.angular_speed_deg_s,
+            (float)g_h723_debug.wheel_odometry.left_feedback_age_ms,
+            (float)g_h723_debug.wheel_odometry.right_feedback_age_ms,
+            (float)g_h723_debug.wheel_odometry.valid,
+            (float)g_h723_debug.wheel_odometry.sample_count,
+        };
+        HAL_StatusTypeDef status;
+
+        s_last_wheel_odometry_telemetry_ms = now_ms;
+        if (g_h723_debug.uart8.tx_in_flight != 0U) {
+            g_h723_debug.uart8.tx_drop_count++;
+            return;
+        }
+        (void)vofa_justfloat_encode(s_wheel_odometry_frame,
+                                    sizeof(s_wheel_odometry_frame), channels,
+                                    H723_VOFA_WHEEL_ODOMETRY_CHANNEL_COUNT);
+        status = HAL_UART_Transmit_DMA(&huart8, s_wheel_odometry_frame,
+                                       sizeof(s_wheel_odometry_frame));
         g_h723_debug.uart8.last_hal_status = (uint32_t)status;
         if (status == HAL_OK) {
             g_h723_debug.uart8.tx_in_flight = 1U;

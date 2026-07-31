@@ -13,6 +13,7 @@
 #include "app_m2006.h"
 #include "app_single_motor.h"
 #include "app_time.h"
+#include "app_wheel_odometry.h"
 #include "fdcan.h"
 #include "usart.h"
 
@@ -53,6 +54,8 @@ static uint32_t s_single_motor_last_position_pid_ms;
 static app_line_follow_state_t s_line_follow;
 static app_line_follow_output_t s_line_follow_output;
 static uint32_t s_line_follow_debug_last_sequence;
+static app_wheel_odometry_t s_wheel_odometry;
+static app_wheel_odometry_output_t s_wheel_odometry_output;
 
 static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan);
 
@@ -265,6 +268,25 @@ void h723_chassis_service_init(void)
 #endif
     app_line_follow_init(&s_line_follow, &s_line_follow_pid_params,
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
+    {
+        const app_wheel_odometry_config_t config = {
+            .wheel_diameter_mm = APP_H723_WHEEL_ODOMETRY_WHEEL_DIAMETER_MM,
+            .track_width_mm = APP_H723_WHEEL_ODOMETRY_TRACK_WIDTH_MM,
+            .left_encoder_sign = APP_H723_WHEEL_ODOMETRY_LEFT_ENCODER_SIGN,
+            .right_encoder_sign = APP_H723_WHEEL_ODOMETRY_RIGHT_ENCODER_SIGN,
+        };
+        app_wheel_odometry_init(&s_wheel_odometry, &config);
+    }
+    (void)memset(&s_wheel_odometry_output, 0, sizeof(s_wheel_odometry_output));
+    g_h723_debug.wheel_odometry.wheel_diameter_mm =
+        APP_H723_WHEEL_ODOMETRY_WHEEL_DIAMETER_MM;
+    g_h723_debug.wheel_odometry.track_width_mm = APP_H723_WHEEL_ODOMETRY_TRACK_WIDTH_MM;
+    g_h723_debug.wheel_odometry.left_encoder_sign =
+        APP_H723_WHEEL_ODOMETRY_LEFT_ENCODER_SIGN;
+    g_h723_debug.wheel_odometry.right_encoder_sign =
+        APP_H723_WHEEL_ODOMETRY_RIGHT_ENCODER_SIGN;
+    g_h723_debug.wheel_odometry.reset_request = 0U;
+    g_h723_debug.wheel_odometry.params_valid = 1U;
     (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
     s_line_follow_debug_last_sequence = 0U;
     g_h723_debug.line_follow.pid_kp = APP_H723_LINE_FOLLOW_PID_KP;
@@ -389,6 +411,60 @@ static bool h723_m2006_feedback_is_fresh(uint32_t index, uint32_t now_ms)
 {
     return index < 3U && s_feedback_valid[index] &&
            (uint32_t)(now_ms - s_feedback_time_ms[index]) < APP_H723_M2006_FEEDBACK_TIMEOUT_MS;
+}
+
+static void h723_wheel_odometry_step(uint32_t now_ms)
+{
+    volatile h723_debug_wheel_odometry_t *debug = &g_h723_debug.wheel_odometry;
+    const bool left_feedback_valid = h723_m2006_feedback_is_fresh(0U, now_ms);
+    const bool right_feedback_valid = h723_m2006_feedback_is_fresh(1U, now_ms);
+    const app_wheel_odometry_config_t config = {
+        .wheel_diameter_mm = debug->wheel_diameter_mm,
+        .track_width_mm = debug->track_width_mm,
+        .left_encoder_sign = debug->left_encoder_sign,
+        .right_encoder_sign = debug->right_encoder_sign,
+    };
+    const app_wheel_odometry_input_t input = {
+        .now_ms = now_ms,
+        .left_feedback_valid = left_feedback_valid,
+        .right_feedback_valid = right_feedback_valid,
+        .left_feedback_age_ms = left_feedback_valid ?
+                                (uint32_t)(now_ms - s_feedback_time_ms[0U]) : UINT32_MAX,
+        .right_feedback_age_ms = right_feedback_valid ?
+                                 (uint32_t)(now_ms - s_feedback_time_ms[1U]) : UINT32_MAX,
+        .left_motor_counts = app_m2006_position_tracker_motor_counts(&s_position_tracker[0U]),
+        .right_motor_counts = app_m2006_position_tracker_motor_counts(&s_position_tracker[1U]),
+        .reset_request = debug->reset_request != 0U,
+    };
+    const bool config_accepted = app_wheel_odometry_set_config(&s_wheel_odometry, &config);
+
+    app_wheel_odometry_step(&s_wheel_odometry, &input, &s_wheel_odometry_output);
+    debug->params_valid = config_accepted ? 1U : 0U;
+    debug->params_rejected_count = s_wheel_odometry_output.params_rejected_count;
+    debug->initialized = s_wheel_odometry_output.initialized ? 1U : 0U;
+    debug->valid = s_wheel_odometry_output.valid ? 1U : 0U;
+    debug->reset_count = s_wheel_odometry_output.reset_count;
+    debug->rebaseline_count = s_wheel_odometry_output.rebaseline_count;
+    debug->sample_count = s_wheel_odometry_output.sample_count;
+    debug->left_encoder = s_feedback[0U].encoder;
+    debug->right_encoder = s_feedback[1U].encoder;
+    debug->left_motor_counts = s_wheel_odometry_output.left_motor_counts;
+    debug->right_motor_counts = s_wheel_odometry_output.right_motor_counts;
+    debug->left_wheel_distance_mm = s_wheel_odometry_output.left_wheel_distance_mm;
+    debug->right_wheel_distance_mm = s_wheel_odometry_output.right_wheel_distance_mm;
+    debug->delta_left_mm = s_wheel_odometry_output.delta_left_mm;
+    debug->delta_right_mm = s_wheel_odometry_output.delta_right_mm;
+    debug->delta_distance_mm = s_wheel_odometry_output.delta_distance_mm;
+    debug->delta_yaw_deg = s_wheel_odometry_output.delta_yaw_deg;
+    debug->x_mm = s_wheel_odometry_output.x_mm;
+    debug->y_mm = s_wheel_odometry_output.y_mm;
+    debug->yaw_deg = s_wheel_odometry_output.yaw_deg;
+    debug->yaw_deg_continuous = s_wheel_odometry_output.yaw_deg_continuous;
+    debug->linear_speed_mm_s = s_wheel_odometry_output.linear_speed_mm_s;
+    debug->angular_speed_deg_s = s_wheel_odometry_output.angular_speed_deg_s;
+    debug->left_feedback_age_ms = s_wheel_odometry_output.left_feedback_age_ms;
+    debug->right_feedback_age_ms = s_wheel_odometry_output.right_feedback_age_ms;
+    debug->reset_request = 0U;
 }
 
 static void h723_update_m2006_debug(uint32_t index, uint32_t now_ms, float target_rpm)
@@ -738,6 +814,7 @@ void h723_chassis_service_step(uint32_t now_ms)
         output_current_A[index] = debug->commanded_current_A;
     }
 #endif
+    h723_wheel_odometry_step(now_ms);
     h723_line_follow_publish_debug();
     h723_balance_service_step(now_ms, output_current_A);
     g_h723_debug.chassis.left_target_output_speed_rpm = s_command.left_target_rpm;

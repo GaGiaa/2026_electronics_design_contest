@@ -314,7 +314,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>3</Optim>
+            <Optim>4</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -675,6 +675,11 @@
               <FileName>app_chassis_service.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_chassis_service.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_wheel_odometry.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_wheel_odometry.c</FilePath>
             </File>
             <File>
               <FileName>app_single_motor.c</FileName>

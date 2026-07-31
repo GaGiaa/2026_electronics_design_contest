@@ -275,3 +275,11 @@ SB 中档、SC 中档时进入灰度巡线模式。灰度任务每 `10 ms` 发�
 该调试快照还提供 `line_position`、`error`、`integral`、`p_out`、`i_out`、`d_out`、`raw_output`、`pid_output`、`turn_correction_mm_s`、基础速度、左右轮目标速度、`line_strength`、`sequence` 和 `pid_update_count`，用于区分灰度输入、PID 分量、输出限幅和底盘目标生成问题。
 
 将 `APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE` 改为 `1U` 可通过 UART8 以 10 ms 周期发送 13 通道 JustFloat；该宏与其他 UART8 遥测互斥。通道顺序为：`line_position`、`error`、`p_out`、`i_out`、`d_out`、`raw_output`、`pid_output`、`turn_correction_mm_s`、`base_speed_mm_s`、`left_target_speed_mm_s`、`right_target_speed_mm_s`、`line_strength`、`sequence`。本功能只用于观察，不改变 CRSF 安全门、M2006 速度环或 CAN 输出逻辑。
+
+## H723 双轮编码器里程计
+
+新增 `g_h723_debug.wheel_odometry`，使用 M2006 CAN ID 1/2 的累计编码器 counts 计算差速轮式里程计。默认左轮方向为 `+1`、右轮方向为 `-1`，编码器为 `8192 counts/电机转`，减速比为 `36:1`，轮径为 `65 mm`，轮距为 `205 mm`。底盘任务每 `1 ms` 更新，车体坐标为 `x` 前进、`y` 左移、`yaw` 逆时针为正；`yaw_deg` 为 `[-180, 180)` 的当前航向，`yaw_deg_continuous` 保留累计转角。
+
+Keil Watch 可修改 `wheel_diameter_mm`、`track_width_mm`、`left_encoder_sign`、`right_encoder_sign` 和一次性 `reset_request`。任一路 M2006 反馈超时后位姿冻结并置 `valid=0`；恢复后重新建立 counts 基线，避免断帧期间产生跳变。完整字段、15 通道 VOFA 顺序、理论值和车架悬空测试步骤见 [`docs/STM32H723_WHEEL_ODOMETRY.md`](../docs/STM32H723_WHEEL_ODOMETRY.md)。
+
+将 `APP_H723_WHEEL_ODOMETRY_VOFA_TELEMETRY_ENABLE` 改为 `1U` 可通过 UART8 以 `10 ms` 周期发送里程计 JustFloat；它与其他 UART8 遥测编译期互斥。输出包含左右轮累计位移、单周期位移、`x/y/yaw`、线速度、角速度、反馈年龄、有效标志和样本数。

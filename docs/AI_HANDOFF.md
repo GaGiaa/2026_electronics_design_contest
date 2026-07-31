@@ -755,3 +755,13 @@ Keil Watch 可直接修改以下字段，并在下一次 PID 计算前生效：
 VOFA JustFloat、debug layout 检查和 Keil 纯软件构建；构建日志为
 `0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、UART/VOFA 实物、
 CAN、电机或灰度传感器硬件验收。
+
+## H723 双轮编码器轮式里程计（2026-07-31）
+
+里程计的 `yaw_deg` 是归一化当前航向，范围为 `[-180, 180)`；`yaw_deg_continuous` 保留不折返的累计转角。原地转一整圈时，`yaw_deg` 应回到初始角附近，而 `yaw_deg_continuous` 应变化约 `360 deg`。排查闭环误差时先比较这两个字段，再检查左右轮累计位移、编码器方向、反馈有效性、轮距和轮胎打滑。
+
+新增 `app_wheel_odometry` 纯 C 差速里程计模块。H723 底盘服务复用 M2006 ID 1/2 的 `8192 counts/电机转` 多圈展开结果，默认减速比 `36:1`、轮径 `65 mm`、轮距 `205 mm`，左/右编码器方向为 `+1/-1`。底盘任务每 `1 ms` 更新，输出 `x/y`、归一化 `yaw`、累计 `yaw_deg_continuous`、左右轮累计位移、单周期位移、线速度和角速度。
+
+`g_h723_debug.wheel_odometry` 提供 Watch 可写的轮径、轮距、左右编码器方向和一次性 `reset_request`。任一路反馈超过现有 `50 ms` 有效窗口时位姿冻结并置 `valid=0`；恢复时重新建立双轮 counts 基线，避免断帧跳变。新增 `APP_H723_WHEEL_ODOMETRY_VOFA_TELEMETRY_ENABLE=0U`，启用后 UART8 以 `10 ms` 发送 15 通道 JustFloat，且参与 UART8 遥测互斥检查。
+
+新增主机算法测试、H723 FDCAN2 服务测试和静态契约测试，覆盖直行、原地旋转、编码器绕回、超时冻结、恢复重建、Watch 重置、非法参数、ID 1/2 映射、VOFA 通道和 Keil 工程源文件。完整现场操作和通道顺序见 `docs/STM32H723_WHEEL_ODOMETRY.md`。本轮未执行 Flash、SWD/GDB、CAN、UART/VOFA 实物、电机或车架验收；实车测试必须先车架悬空并禁用电机输出。

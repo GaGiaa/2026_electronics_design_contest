@@ -30,6 +30,7 @@ function Resolve-ProjectPath {
 $markdownFiles = @(
     'README.md',
     'docs/AI_HANDOFF.md',
+    'docs/STM32H723_WHEEL_ODOMETRY.md',
     'docs/DEPENDENCIES.md',
     'docs/SETUP.md',
     'docs/CODING_STYLE.md',
