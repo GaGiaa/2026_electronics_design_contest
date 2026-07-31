@@ -7,6 +7,17 @@
 
 /* Keil Watch snapshot; single_motor input fields are the explicit debug control interface. */
 typedef struct {
+    float pid_kp;
+    float pid_ki;
+    float pid_kd;
+    float pid_output_limit_mm_s;
+    float pid_deadband;
+    uint32_t reset_pid_request;
+    uint32_t params_valid;
+    uint32_t params_rejected_count;
+} h723_debug_line_follow_params_t;
+
+typedef struct {
     uint32_t boot_count;
     uint32_t uptime_ms;
     uint32_t task_loop_count;
@@ -87,6 +98,7 @@ typedef struct {
     float base_speed_mm_s;
     float left_target_speed_mm_s;
     float right_target_speed_mm_s;
+    uint32_t active_group;
 } h723_debug_line_follow_t;
 
 typedef struct {
@@ -99,6 +111,7 @@ typedef struct {
     uint32_t button_stable_high_mask;
     uint32_t selected_task;
     uint32_t task_request_available;
+    uint32_t active_task_elapsed_ms;
 } h723_debug_control_t;
 
 typedef struct {
@@ -110,6 +123,21 @@ typedef struct {
     float distance_mm;
     float base_speed_mm_s;
 } h723_debug_task2_t;
+
+typedef struct {
+    uint32_t phase;
+    uint32_t running;
+    uint32_t elapsed_ms;
+    float base_speed_mm_s;
+} h723_debug_task4_t;
+
+typedef struct {
+    uint32_t task_id;
+    uint32_t phase;
+    uint32_t running;
+    uint32_t elapsed_ms;
+    float base_speed_mm_s;
+} h723_debug_task56_t;
 
 typedef struct {
     uint32_t rx_count;
@@ -378,7 +406,11 @@ typedef struct {
     h723_debug_crsf_t crsf;
     h723_debug_control_t control;
     h723_debug_task2_t task2;
+    h723_debug_task4_t task4;
+    h723_debug_task56_t task56;
     h723_debug_chassis_t chassis;
+    h723_debug_line_follow_params_t task2_line_follow;
+    h723_debug_line_follow_params_t task456_line_follow;
     h723_debug_line_follow_t line_follow;
     h723_debug_fdcan_t fdcan;
     /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */

@@ -158,6 +158,6 @@ foreach ($line in @(
 }
 
 Require-Text $project '<FilePath>../App/Src/app_buttons.c</FilePath>' 'Keil project does not include app_buttons.c.'
-Require-Text $telemetry 'APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE << 4U' 'Button telemetry debug bit is missing.'
+Require-Text $telemetry 'APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE << 8U' 'Button telemetry debug bit is missing.'
 
 Write-Output 'STM32H723 button static integration test passed.'

@@ -91,6 +91,13 @@ void app_task_menu_reset(void)
     app_task_menu_render();
 }
 
+void app_task_menu_finish_execution(void)
+{
+    s_execution_requested = false;
+    s_locked = false;
+    app_task_menu_render();
+}
+
 uint32_t app_task_menu_current_page(void)
 {
     return s_current_page;

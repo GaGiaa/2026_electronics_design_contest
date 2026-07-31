@@ -18,12 +18,14 @@ if ($config -notmatch 'APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE') {
     throw 'Chassis VOFA telemetry must participate in the UART8 mutual-exclusion check.'
 }
 foreach ($pattern in @(
-    'H723_VOFA_CHASSIS_CHANNEL_COUNT\s+5U',
+    'H723_VOFA_CHASSIS_CHANNEL_COUNT\s+6U',
     'APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE',
     'left_target_speed_mm_s',
     'right_target_speed_mm_s',
     'feedback_output_speed_rpm\s*\*\s*APP_H723_OUTPUT_RPM_TO_MM_S',
-    'g_h723_debug\.grayscale\.black_count'
+    'g_h723_debug\.grayscale\.black_count',
+    'active_task_elapsed_ms',
+    '1000\.0f'
 )) {
     if ($telemetry -notmatch $pattern) {
         throw "Missing chassis telemetry behavior: $pattern"

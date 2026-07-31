@@ -90,9 +90,27 @@ static void test_menu_debounces_and_locks_after_confirm(void)
     assert(app_task_menu_selected_task() == 2U);
 }
 
+static void test_unimplemented_task_can_be_rejected_and_menu_unlocked(void)
+{
+    test_display_state_t display_state = {0};
+    const app_task_menu_display_t display = make_display(&display_state);
+    uint32_t task_id = 0U;
+
+    app_task_menu_init(&display);
+    app_task_menu_key_event(APP_TASK_MENU_KEY_NEXT, 200U);
+    app_task_menu_key_event(APP_TASK_MENU_KEY_CONFIRM, 400U);
+    assert(app_task_menu_take_execution_request(&task_id));
+    assert(task_id == 3U);
+
+    app_task_menu_finish_execution();
+    app_task_menu_key_event(APP_TASK_MENU_KEY_NEXT, 600U);
+    assert(app_task_menu_selected_task() == 4U);
+}
+
 int main(void)
 {
     test_menu_wraps_and_reports_selected_task();
     test_menu_debounces_and_locks_after_confirm();
+    test_unimplemented_task_can_be_rejected_and_menu_unlocked();
     return 0;
 }

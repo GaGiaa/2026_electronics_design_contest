@@ -18,7 +18,7 @@
 #define H723_VOFA_SINGLE_MOTOR_MAX_CHANNEL_COUNT H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT
 #define H723_VOFA_BNO055_CHANNEL_COUNT 10U
 #define H723_VOFA_K230_CHANNEL_COUNT 3U
-#define H723_VOFA_CHASSIS_CHANNEL_COUNT 5U
+#define H723_VOFA_CHASSIS_CHANNEL_COUNT 6U
 #define H723_VOFA_LINE_FOLLOW_PID_CHANNEL_COUNT 13U
 #define H723_VOFA_BUTTON_CHANNEL_COUNT 3U
 #define H723_VOFA_TILT_CONTROL_CHANNEL_COUNT 13U
@@ -31,6 +31,16 @@ static void h723_uart8_publish_hal_state(void)
     g_h723_debug.uart8.hal_error_code = huart8.ErrorCode;
 }
 
+#if (APP_VOFA_HEALTH_TELEMETRY_ENABLE == 1U) || \
+    (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U) || \
+    (APP_BNO055_VOFA_TELEMETRY_ENABLE == 1U) || \
+    (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE == 1U) || \
+    (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE == 1U) || \
+    (APP_H723_K230_UART2_TEST_ENABLE == 1U) || \
+    (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE == 1U) || \
+    (APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE == 1U) || \
+    (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U) || \
+    (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE == 1U)
 static bool h723_uart8_try_transmit(uint8_t *frame, uint16_t frame_size, uint32_t now_ms)
 {
     HAL_StatusTypeDef status;
@@ -55,6 +65,7 @@ static bool h723_uart8_try_transmit(uint8_t *frame, uint16_t frame_size, uint32_
     g_h723_debug.uart8.tx_drop_count++;
     return false;
 }
+#endif
 
 static void h723_uart8_recover_timed_out_transfer(uint32_t now_ms)
 {
@@ -133,15 +144,17 @@ void h723_app_telemetry_init(void)
 {
     g_h723_debug.system.boot_count++;
     app_telemetry_tx_guard_init(&s_uart8_tx_guard);
-    g_h723_debug.uart8.telemetry_enabled = APP_VOFA_HEALTH_TELEMETRY_ENABLE |
-        APP_JY901S_VOFA_TELEMETRY_ENABLE |
-        (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE << 1U) |
-        (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE << 2U) |
-        (APP_H723_K230_UART2_TEST_ENABLE << 3U) |
-        (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE << 4U) |
-        (APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE << 5U) |
-        (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE << 4U) |
-        (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE << 6U);
+    g_h723_debug.uart8.telemetry_enabled =
+        (APP_VOFA_HEALTH_TELEMETRY_ENABLE << 0U) |
+        (APP_JY901S_VOFA_TELEMETRY_ENABLE << 1U) |
+        (APP_BNO055_VOFA_TELEMETRY_ENABLE << 2U) |
+        (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE << 3U) |
+        (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE << 4U) |
+        (APP_H723_K230_UART2_TEST_ENABLE << 5U) |
+        (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE << 6U) |
+        (APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE << 7U) |
+        (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE << 8U) |
+        (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE << 9U);
     g_h723_debug.uart8.last_hal_status = HAL_OK;
     g_h723_debug.uart8.tx_in_flight = 0U;
     g_h723_debug.uart8.tx_started_ms = 0U;
@@ -374,6 +387,7 @@ void h723_app_telemetry_step(void)
             g_h723_debug.m2006[1].feedback_output_speed_rpm *
                 APP_H723_OUTPUT_RPM_TO_MM_S,
             (float)g_h723_debug.grayscale.black_count,
+            (float)g_h723_debug.control.active_task_elapsed_ms / 1000.0f,
         };
         s_last_chassis_telemetry_ms = now_ms;
         (void)vofa_justfloat_encode(s_chassis_frame, sizeof(s_chassis_frame), channels,
