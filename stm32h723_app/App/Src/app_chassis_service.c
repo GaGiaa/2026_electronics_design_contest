@@ -5,6 +5,7 @@
 
 #include "app_balance.h"
 #include "app_chassis.h"
+#include "app_buttons.h"
 #include "app_config.h"
 #include "app_crsf.h"
 #include "app_debug.h"
@@ -25,6 +26,8 @@ static uint16_t s_crsf_read_index;
 static app_crsf_parser_t s_crsf_parser;
 static app_crsf_input_t s_crsf_input;
 static app_chassis_command_t s_command;
+static app_chassis_control_state_t s_control_state;
+static app_chassis_control_output_t s_control_output;
 static app_m2006_feedback_t s_feedback[3];
 static uint32_t s_feedback_time_ms[3];
 static bool s_feedback_valid[3];
@@ -177,6 +180,7 @@ void h723_chassis_service_init(void)
     FDCAN_HandleTypeDef *fdcan = h723_m2006_fdcan();
     uint32_t index;
     app_crsf_parser_init(&s_crsf_parser);
+    app_chassis_control_init(&s_control_state);
     for (index = 0U; index < 3U; ++index) {
         PID_Incremental_Init(&s_speed_pid[index], &s_speed_pid_params, 0.001f);
         PID_Position_Init(&s_position_pid[index], &s_position_pid_params,
@@ -542,11 +546,16 @@ void h723_chassis_service_step(uint32_t now_ms)
     float output_current_A[3] = {0.0f, 0.0f, 0.0f};
     int16_t output_raw[3] = {0, 0, 0};
     uint32_t index;
+    h723_app_buttons_snapshot_t button_snapshot;
     while (s_crsf_read_index != s_crsf_write_index) {
         (void)app_crsf_parser_feed(&s_crsf_parser, s_crsf_ring[s_crsf_read_index], now_ms, &s_crsf_input);
         s_crsf_read_index = (uint16_t)((s_crsf_read_index + 1U) % H723_CRSF_RING_SIZE);
     }
-    app_chassis_mix(&s_crsf_input, now_ms, &s_command);
+    h723_app_buttons_snapshot_copy(&button_snapshot);
+    app_chassis_control_step(&s_control_state, &s_crsf_input,
+                             button_snapshot.stable_high_mask, now_ms,
+                             &s_control_output);
+    s_command = s_control_output.chassis;
     for (index = 0U; index < APP_CRSF_CHANNEL_COUNT; ++index) {
         g_h723_debug.crsf.channels_raw[index] = s_crsf_input.channels[index];
     }
@@ -556,8 +565,10 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.crsf.age_ms = s_crsf_input.valid ? (uint32_t)(now_ms - s_crsf_input.last_valid_ms) : UINT32_MAX;
     g_h723_debug.crsf.uart_error_count = s_crsf_uart_error_count;
     g_h723_debug.crsf.ring_overrun_count = s_crsf_ring_overrun_count;
-    g_h723_debug.crsf.sb_state = h723_crsf_switch_state(s_crsf_input.channels[6]);
-    g_h723_debug.crsf.sc_state = h723_crsf_switch_state(s_crsf_input.channels[7]);
+    g_h723_debug.crsf.sb_state = h723_crsf_switch_state(
+        s_crsf_input.channels[APP_H723_CRSF_SB_CHANNEL_INDEX]);
+    g_h723_debug.crsf.sc_state = h723_crsf_switch_state(
+        s_crsf_input.channels[APP_H723_CRSF_SC_CHANNEL_INDEX]);
     if (g_h723_debug.crsf.age_ms >= APP_H723_CRSF_TIMEOUT_MS) {
         if (!s_crsf_was_timed_out) { ++g_h723_debug.crsf.timeout_count; }
         s_crsf_was_timed_out = true;
@@ -573,6 +584,16 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.chassis.line_turn_correction_mm_s = 0.0f;
     g_h723_debug.chassis.left_target_output_speed_rpm = s_command.left_target_rpm;
     g_h723_debug.chassis.right_target_output_speed_rpm = s_command.right_target_rpm;
+    g_h723_debug.control.mode = (uint32_t)s_control_output.mode;
+    g_h723_debug.control.remote_takeover = s_control_output.remote_takeover ? 1U : 0U;
+    g_h723_debug.control.buttons_enabled = s_control_output.buttons_enabled ? 1U : 0U;
+    g_h723_debug.control.se_pressed = s_control_output.se_pressed ? 1U : 0U;
+    g_h723_debug.control.sb_state = s_control_output.sb_state;
+    g_h723_debug.control.sc_state = s_control_output.sc_state;
+    g_h723_debug.control.button_stable_high_mask = button_snapshot.stable_high_mask;
+    g_h723_debug.control.selected_task = s_control_output.selected_task;
+    g_h723_debug.control.task_request_available =
+        s_control_output.task_request_available ? 1U : 0U;
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
     g_h723_debug.chassis.mode = 2U;
     g_h723_debug.chassis.actuation_enabled = g_h723_debug.single_motor.enable;

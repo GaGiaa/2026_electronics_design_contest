@@ -54,8 +54,9 @@ static void test_crsf_manual_mix_and_switch_guard(void)
 
     channels[2] = 1811U;
     channels[0] = 992U;
+    channels[4] = 992U;
     channels[6] = 992U;
-    channels[7] = 992U;
+    channels[7] = 172U;
     make_channels_frame(frame, channels);
     app_crsf_parser_init(&parser);
     for (index = 0U; index < sizeof(frame); ++index) {
@@ -63,6 +64,15 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     }
     assert(input.valid);
     assert(input.channels[2] == 1811U);
+
+    app_chassis_mix(&input, 10U, &command);
+    assert(!command.manual_active);
+    assert(command.mode == APP_CHASSIS_MODE_REMOTE_IDLE);
+    assert(command.left_target_rpm == 0.0f);
+    assert(command.right_target_rpm == 0.0f);
+    assert(command.third_motor_target_rpm == 0.0f);
+
+    input.channels[4] = 1811U;
     app_chassis_mix(&input, 10U, &command);
     assert(command.manual_active);
     assert(command.mode == APP_CHASSIS_MODE_MANUAL);
@@ -75,7 +85,7 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     assert(command.mode == APP_CHASSIS_MODE_STOP);
     assert(command.left_target_rpm == 0.0f);
 
-    input.channels[6] = 1811U;
+    input.channels[6] = 992U;
     input.channels[7] = 992U;
     input.channels[2] = 992U;
     app_chassis_mix(&input, 10U, &command);
@@ -87,13 +97,14 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     assert(fabsf(command.right_target_rpm +
                  APP_H723_LINE_FOLLOW_BASE_SPEED_MM_S * APP_H723_MM_S_TO_OUTPUT_RPM) < 0.0001f);
 
-    input.channels[7] = 1811U;
+    input.channels[6] = 1811U;
+    input.channels[7] = 992U;
     app_chassis_mix(&input, 10U, &command);
     assert(!command.manual_active);
     assert(command.mode == APP_CHASSIS_MODE_STOP);
 
     input.channels[6] = 992U;
-    input.channels[7] = 992U;
+    input.channels[7] = 172U;
     input.channels[2] = 1811U;
     input.channels[0] = 1811U;
     app_chassis_mix(&input, 10U, &command);

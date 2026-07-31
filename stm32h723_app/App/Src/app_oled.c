@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "app_config.h"
+#include "app_chassis.h"
 #include "app_debug.h"
 #include "i2c.h"
 #include "oled_font.h"
@@ -198,9 +199,24 @@ board_oled_status_t board_oled_write_string(const char *text)
     return BOARD_OLED_STATUS_OK;
 }
 
-static board_oled_status_t render_test_page(void)
+static const char *oled_mode_name(uint32_t mode)
 {
-    char counter_text[16];
+    switch (mode) {
+    case APP_CHASSIS_MODE_TASK_MENU:
+        return "MENU";
+    case APP_CHASSIS_MODE_REMOTE_MANUAL:
+        return "MANUAL";
+    case APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW:
+        return "LINE FOLLOW";
+    case APP_CHASSIS_MODE_REMOTE_IDLE:
+    default:
+        return "IDLE";
+    }
+}
+
+static board_oled_status_t render_runtime_page(void)
+{
+    char line[24];
     board_oled_status_t status;
 
     status = board_oled_clear();
@@ -211,7 +227,8 @@ static board_oled_status_t render_test_page(void)
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
-    status = board_oled_write_string("H723 OLED TEST");
+    status = board_oled_write_string(g_h723_debug.control.remote_takeover ?
+                                     "REMOTE CONTROL" : "TASK MENU");
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
@@ -219,7 +236,14 @@ static board_oled_status_t render_test_page(void)
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
-    status = board_oled_write_string("I2C4 PD12/PD13");
+    if (g_h723_debug.control.remote_takeover) {
+        (void)snprintf(line, sizeof(line), "MODE:%s",
+                       oled_mode_name(g_h723_debug.control.mode));
+    } else {
+        (void)snprintf(line, sizeof(line), "TASK:%lu",
+                       (unsigned long)g_h723_debug.control.selected_task);
+    }
+    status = board_oled_write_string(line);
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
@@ -227,7 +251,26 @@ static board_oled_status_t render_test_page(void)
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
-    status = board_oled_write_string("SSD1306 128X64");
+    if (g_h723_debug.control.remote_takeover) {
+        (void)snprintf(line, sizeof(line), "SB:%lu SC:%lu",
+                       (unsigned long)g_h723_debug.control.sb_state,
+                       (unsigned long)g_h723_debug.control.sc_state);
+    } else {
+        status = board_oled_write_string("B1:OK B2:UP");
+        if (status != BOARD_OLED_STATUS_OK) {
+            return status;
+        }
+        status = board_oled_set_cursor(0U, 6U);
+        if (status != BOARD_OLED_STATUS_OK) {
+            return status;
+        }
+        status = board_oled_write_string("B3:DOWN");
+        if (status != BOARD_OLED_STATUS_OK) {
+            return status;
+        }
+        return board_oled_update();
+    }
+    status = board_oled_write_string(line);
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
@@ -235,9 +278,9 @@ static board_oled_status_t render_test_page(void)
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
-    (void)snprintf(counter_text, sizeof(counter_text), "COUNT:%05lu",
-                   (unsigned long)s_display_count);
-    status = board_oled_write_string(counter_text);
+    (void)snprintf(line, sizeof(line), "LINK AGE:%lums",
+                   (unsigned long)g_h723_debug.crsf.age_ms);
+    status = board_oled_write_string(line);
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
@@ -258,7 +301,7 @@ static void record_oled_status(board_oled_status_t status)
 
 void h723_oled_service_init(void)
 {
-    g_h723_debug.oled.enabled = APP_H723_OLED_ENABLE;
+    g_h723_debug.oled.enabled = 1U;
     g_h723_debug.oled.initialized = 0U;
     g_h723_debug.oled.init_attempt_count = 0U;
     g_h723_debug.oled.last_hal_status = HAL_OK;
@@ -274,9 +317,6 @@ void h723_oled_service_step(uint32_t now_ms)
 {
     board_oled_status_t status;
 
-    if (APP_H723_OLED_ENABLE == 0U) {
-        return;
-    }
     if (!s_service_initialized) {
         if ((uint32_t)(now_ms - s_last_attempt_ms) <
             APP_H723_OLED_TASK_PERIOD_MS) {
@@ -289,7 +329,7 @@ void h723_oled_service_step(uint32_t now_ms)
             record_oled_status(status);
             return;
         }
-        status = render_test_page();
+        status = render_runtime_page();
         record_oled_status(status);
         if (status == BOARD_OLED_STATUS_OK) {
             s_service_initialized = true;
@@ -305,7 +345,7 @@ void h723_oled_service_step(uint32_t now_ms)
         return;
     }
     s_last_update_ms = now_ms;
-    status = render_test_page();
+    status = render_runtime_page();
     record_oled_status(status);
     if (status == BOARD_OLED_STATUS_OK) {
         g_h723_debug.oled.update_count++;

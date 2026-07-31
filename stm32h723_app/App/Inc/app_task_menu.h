@@ -60,4 +60,12 @@ uint32_t app_task_menu_selected_task(void);
  */
 bool app_task_menu_execution_requested(void);
 
+/**
+ * @brief 取走一次已确认的任务请求。
+ *
+ * @param[out] task_id 输出任务号，不能为空。
+ * @return 存在未消费请求并成功写出时返回 true。
+ */
+bool app_task_menu_take_execution_request(uint32_t *task_id);
+
 #endif

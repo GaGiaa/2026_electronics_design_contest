@@ -624,6 +624,14 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
   示波器/逻辑分析仪测量、VOFA+ 实物收发或灰度传感器验收。灰度标定准确性、M2006
   反馈方向、位置环增益和底盘联动仍需在车架悬空及电流输出受控的条件下复核。
 
+## H723 任务菜单与 CRSF 接管状态机（2026-07-31）
+
+- `app_chassis` 新增纯 C 控制状态机。SE 使用 CRSF 数组索引 `4`，`raw >= 1300` 为按下；SB/SC 继续使用索引 `6/7`。SE 未按下时车辆进入任务菜单并保持三电机零电流；SE 按下后屏蔽按键，SB 低为遥控空闲，SB 中 + SC 低为手动底盘，SB 中 + SC 中为灰度循迹，其他挡位均安全清零。
+- `chassisTask` 消费按键稳定电平的上升沿：按键 1 确认、按键 2 上移、按键 3 下移。SE 释放后菜单重置到任务 2。`app_task_menu_take_execution_request()` 提供一次性任务号接口，当前不执行任务具体流程。
+- `g_h723_debug.control` 新增接管、按键、SE/SB/SC、当前任务和请求状态快照。OLED 不再显示固定测试页，始终显示任务菜单或 `REMOTE CONTROL`、`IDLE`、`MANUAL`、`LINE FOLLOW` 运行页面；已移除 `APP_H723_OLED_ENABLE` 和 `APP_H723_OLED_DEBUG_MODE_ENABLE`，刷新周期为 100 ms。
+- 新增 `tests/test_stm32h723_control.ps1` 与主机状态机用例；已通过全部 H723 测试脚本（`H723_FAIL_COUNT=0`）、任务菜单、底盘、OLED、按键、debug、RTOS、IOC、Keil 工程和循迹服务检查。Keil ArmClang 6.24 纯软件构建生成 `stm32h723_app.axf`，日志为 `0 Error(s), 0 Warning(s)`；`git diff --check` 无差异错误。全仓库回归中 4 个既有 MSPM0/基线检查仍失败，原因是既有 PID 路径断言和 README 机器绝对路径，与本轮 H723 改动无关。
+- 未执行 Flash、烧录、探针连接、GDB/SWD、CRSF 实物收发、CAN 总线、电机、灰度传感器或 OLED 实物验收；首次联动必须车架悬空并确认 SE/SB/SC 通道档位和电机反馈。
+
 ## 任务完成清单
 
 每个开发任务结束时，必须：
@@ -653,8 +661,10 @@ metadata, so only its core gray-line-follow and task-menu behavior was
 transferred. Existing BNO055, K230 UART2, I2C4 OLED, M2006 position-loop, and
 CubeMX/Keil project content were retained.
 
-The chassis mode table is SB middle + SC middle for the existing manual mode,
-SB high + SC middle for line follow, and stop for every other switch state.
+The current chassis mode table is SE pressed + SB middle + SC low for manual
+mode, SE pressed + SB middle + SC middle for line follow, and remote idle for
+every other SE/SB/SC state. SE not pressed selects the task menu and forces
+three motor outputs to zero current.
 Line follow uses a 65 mm wheel, 225 mm/s base speed, +/-300 mm/s stick range,
 and a 525 mm/s cap. It requires line strength >= 800 and no ADC timeout; four
 black channels latch a stop. The gray sequence prevents repeated PID updates,
