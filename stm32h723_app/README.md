@@ -34,7 +34,7 @@
 
 外环周期为 5 ms，当前默认 `Kp=120`、`Ki=0`、`Kd=6`、死区 `0.05 deg`、最大位置变化率 `3000 deg/s`。它使用局部两自由度 PID：P/I 使用倾角误差，D 只对水管倾角测量值求导，因此修改 `target_tilt_deg` 不会产生微分冲击。`derivative_filter_N` 是 D 项一阶低通系数，默认 `20 s^-1`，可在 Watch 实时修改；`0` 表示不滤波。首次启用、失效恢复和捕获零偏后的首个样本均强制 D 为零。输出速率或位置请求碰限时，本周期积分会被拒绝以避免风up。先只调 P，确认没有曲柄虚位引起的频繁换向后，再逐步加入 D，最后才加入 I。运行状态、样本年龄、校零值、误差、测得/滤波倾角速率、PID 分量及最终位置目标均在 `g_h723_debug.tilt`。
 
-当前 `APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE=1U`，UART8 每
+`APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE` 默认 `0U`。将其设为 `1U` 后，UART8 每
 `APP_H723_TILT_CONTROL_VOFA_TELEMETRY_INTERVAL_MS`（当前配置 `2 ms`）发送 13 通道
 VOFA+ JustFloat。它与所有其他 UART8 遥测模式编译期互斥，启用前必须关闭其他
 VOFA 宏。通道顺序固定为：

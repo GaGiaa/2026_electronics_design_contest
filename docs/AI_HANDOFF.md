@@ -680,8 +680,8 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 ## H723 Tilt-Control VOFA Telemetry (2026-08-01)
 
-- Added the compile-time UART8 switch
-  `APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE=1U`. It sends a
+- Added the default-off compile-time UART8 switch
+  `APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE=0U`. When enabled, it sends a
   13-float VOFA+ JustFloat frame every 2 ms. The fixed layout shows the full
   water-pipe outer loop and ID 3 inner-loop chain: target/calibrated tilt,
   error, P/I/D/total rate, outer position request, ID 3 position feedback and
