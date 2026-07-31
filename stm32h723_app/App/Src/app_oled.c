@@ -8,6 +8,9 @@
 #include "app_config.h"
 #include "app_chassis.h"
 #include "app_debug.h"
+#include "app_task2.h"
+#include "app_task4.h"
+#include "app_task56.h"
 #include "i2c.h"
 #include "oled_font.h"
 
@@ -224,14 +227,59 @@ static const char *oled_mode_name(uint32_t mode)
 static const char *oled_task2_phase_name(uint32_t phase)
 {
     static const char *const names[] = {
-        "IDLE", "DEPART", "CRUISE", "APPROACH", "STOPPED", "FAULT"
+        "IDLE", "RUNNING", "STOPPED"
     };
     return (phase < (sizeof(names) / sizeof(names[0]))) ? names[phase] : "UNKNOWN";
+}
+
+static bool oled_should_show_task2(void)
+{
+    if (g_h723_debug.task2.phase == APP_TASK2_PHASE_RUNNING) {
+        return true;
+    }
+    return (g_h723_debug.task2.phase == APP_TASK2_PHASE_STOPPED) &&
+           (g_h723_debug.control.selected_task == APP_TASK_MENU_FIRST_TASK_ID);
+}
+
+static bool oled_should_show_task4(void)
+{
+    if (g_h723_debug.task4.phase == APP_TASK4_PHASE_RUNNING) {
+        return true;
+    }
+    return (g_h723_debug.task4.phase == APP_TASK4_PHASE_STOPPED) &&
+           (g_h723_debug.control.selected_task == 4U);
+}
+
+static bool oled_should_show_task56(void)
+{
+    const bool selected_task_matches =
+        g_h723_debug.task56.task_id == g_h723_debug.control.selected_task;
+
+    if (selected_task_matches &&
+        (g_h723_debug.task56.phase == APP_TASK56_PHASE_RUNNING)) {
+        return true;
+    }
+    return selected_task_matches &&
+           (g_h723_debug.task56.phase == APP_TASK56_PHASE_STOPPED);
 }
 
 static board_oled_status_t render_runtime_page(void)
 {
     char line[24];
+    const bool show_task2 = oled_should_show_task2();
+    const bool show_task4 = oled_should_show_task4();
+    const bool show_task56 = oled_should_show_task56();
+    const bool show_task_page = show_task2 || show_task4 || show_task56;
+    const uint32_t task_phase = show_task56 ? g_h723_debug.task56.phase :
+                                (show_task4 ? g_h723_debug.task4.phase :
+                                 g_h723_debug.task2.phase);
+    const uint32_t task_elapsed_ms = show_task56 ?
+        g_h723_debug.task56.elapsed_ms : (show_task4 ?
+        g_h723_debug.task4.elapsed_ms : g_h723_debug.task2.elapsed_ms);
+    const float task_speed_mm_s = show_task56 ?
+        g_h723_debug.task56.base_speed_mm_s : (show_task4 ?
+        g_h723_debug.task4.base_speed_mm_s : g_h723_debug.task2.base_speed_mm_s);
+    const char *title;
     board_oled_status_t status;
 
     status = board_oled_clear();
@@ -242,10 +290,18 @@ static board_oled_status_t render_runtime_page(void)
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
-    status = board_oled_write_string(g_h723_debug.control.remote_takeover ?
-                                     "REMOTE CONTROL" :
-                                     ((g_h723_debug.task2.phase != 0U) ?
-                                      "TASK 2" : "TASK MENU"));
+    if (g_h723_debug.control.remote_takeover) {
+        title = "REMOTE CONTROL";
+    } else if (g_h723_debug.control.selected_task == 3U) {
+        title = "TASK 3 N/A";
+    } else if (show_task56) {
+        title = g_h723_debug.task56.task_id == 6U ? "TASK 6" : "TASK 5";
+    } else if (show_task4) {
+        title = "TASK 4";
+    } else {
+        title = show_task2 ? "TASK 2" : "TASK MENU";
+    }
+    status = board_oled_write_string(title);
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
@@ -256,9 +312,11 @@ static board_oled_status_t render_runtime_page(void)
     if (g_h723_debug.control.remote_takeover) {
         (void)snprintf(line, sizeof(line), "MODE:%s",
                        oled_mode_name(g_h723_debug.control.mode));
-    } else if (g_h723_debug.task2.phase != 0U) {
+    } else if (g_h723_debug.control.selected_task == 3U) {
+        (void)snprintf(line, sizeof(line), "NOT IMPLEMENTED");
+    } else if (show_task_page) {
         (void)snprintf(line, sizeof(line), "STATE:%s",
-                       oled_task2_phase_name(g_h723_debug.task2.phase));
+                       oled_task2_phase_name(task_phase));
     } else {
         (void)snprintf(line, sizeof(line), "TASK:%lu",
                        (unsigned long)g_h723_debug.control.selected_task);
@@ -275,16 +333,16 @@ static board_oled_status_t render_runtime_page(void)
         (void)snprintf(line, sizeof(line), "SB:%lu SC:%lu",
                        (unsigned long)g_h723_debug.control.sb_state,
                        (unsigned long)g_h723_debug.control.sc_state);
-    } else if (g_h723_debug.task2.phase != 0U) {
-        (void)snprintf(line, sizeof(line), "DIST:%lum",
-                       (unsigned long)(g_h723_debug.task2.distance_mm / 1000.0f));
+    } else if (show_task_page) {
+        (void)snprintf(line, sizeof(line), "SPEED:%lumm/s",
+                       (unsigned long)task_speed_mm_s);
         status = board_oled_write_string(line);
         if (status != BOARD_OLED_STATUS_OK) { return status; }
         status = board_oled_set_cursor(0U, 6U);
         if (status != BOARD_OLED_STATUS_OK) { return status; }
         (void)snprintf(line, sizeof(line), "TIME:%lu.%03lus",
-                       (unsigned long)(g_h723_debug.task2.elapsed_ms / 1000U),
-                       (unsigned long)(g_h723_debug.task2.elapsed_ms % 1000U));
+                       (unsigned long)(task_elapsed_ms / 1000U),
+                       (unsigned long)(task_elapsed_ms % 1000U));
         status = board_oled_write_string(line);
         if (status != BOARD_OLED_STATUS_OK) {
             return status;

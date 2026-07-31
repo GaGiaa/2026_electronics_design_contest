@@ -162,9 +162,9 @@ K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使
 - `PD12` -> `I2C4_SCL`
 - `PD13` -> `I2C4_SDA`
 - 7-bit 地址 `0x3C`
-- CubeMX I2C4 时序 `0x00B03FDB`，对应 400 kHz 快速模式
+- CubeMX I2C4 使用 Fast Mode Plus：`I2C4.Timing=0x10A20D1F`、`I2C4.FASTMODEPLUS=I2C_FASTMODEPLUS_I2C4`，目标 1 MHz。该 Timing 基于 137.5 MHz I2C4 内核时钟、模拟滤波开启、数字滤波 `0`、SCL/SDA 100 ns 上升/下降时间计算。
 
-OLED 必须使用 3.3 V 供电，SCL/SDA 上拉电压不能高于 3.3 V；模块没有合适上拉时，外接约 4.7 kOhm 上拉到 3.3 V。`oledTask` 为低优先级、默认 100 ms 周期，使用阻塞式 HAL I2C 传输和 50 ms 超时。屏幕未连接时只累计 OLED 错误并按周期重试，不会改变 FDCAN2、电机控制或 UART8 任务。OLED 始终作为应用服务运行，不使用 OLED enable 或 debug 编译宏。
+OLED 必须使用 3.3 V 供电，SCL/SDA 上拉电压不能高于 3.3 V。1 MHz 时必须按实际总线电容选取上拉并用示波器确认上升、下降时间不超过 100 ns；常见 SSD1306 模块只保证 400 kHz，因此出现 NACK、花屏或 `i2c_recovery_count` 增长时必须回退到 400 kHz。`oledTask` 为低优先级，每 100 ms 唤醒且每 100 ms 刷新一次，使用阻塞式 HAL I2C 传输和 50 ms 超时。屏幕未连接时只累计 OLED 错误并按周期重试，不会改变 FDCAN2、电机控制或 UART8 任务。OLED 始终作为应用服务运行，不使用 OLED enable 或 debug 编译宏。每次 CubeMX 重生成后运行 `tests\\test_stm32h723_oled.ps1`，确认 `.ioc`、`i2c.c` 的 Timing 和 FMP 调用仍一致。
 
 任务菜单页面显示 `TASK MENU`、当前任务号以及按键提示；SE 接管时显示 `REMOTE CONTROL`、`IDLE`、`MANUAL` 或 `LINE FOLLOW`，并显示 SB/SC 档位和 CRSF 帧年龄。详细诊断数据仍通过 `g_h723_debug` 提供给 Keil Watch，不通过 OLED 宏切换页面。
 

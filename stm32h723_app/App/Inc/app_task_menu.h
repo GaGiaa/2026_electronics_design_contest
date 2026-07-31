@@ -46,6 +46,11 @@ void app_task_menu_key_event(app_task_menu_key_t key, uint32_t now_ms);
 void app_task_menu_reset(void);
 
 /**
+ * @brief 完成或拒绝当前任务并解除菜单锁定，保留当前选择页面。
+ */
+void app_task_menu_finish_execution(void);
+
+/**
  * @brief 获取当前页面编号，范围为 0 至 `APP_TASK_MENU_PAGE_COUNT - 1`。
  */
 uint32_t app_task_menu_current_page(void);

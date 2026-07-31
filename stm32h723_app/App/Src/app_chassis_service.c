@@ -15,6 +15,8 @@
 #include "app_m2006.h"
 #include "app_single_motor.h"
 #include "app_task2.h"
+#include "app_task4.h"
+#include "app_task56.h"
 #include "app_task_menu.h"
 #include "app_time.h"
 #include "app_tilt_control.h"
@@ -61,9 +63,14 @@ static uint32_t s_single_motor_last_position_pid_ms;
 static app_line_follow_state_t s_line_follow;
 static app_line_follow_output_t s_line_follow_output;
 static uint32_t s_line_follow_debug_last_sequence;
+static uint32_t s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
 static app_task2_state_t s_task2;
 static app_task2_output_t s_task2_output;
-static uint32_t s_task2_last_button_mask;
+static app_task4_state_t s_task4;
+static app_task4_output_t s_task4_output;
+static app_task56_state_t s_task56;
+static app_task56_output_t s_task56_output;
+static uint32_t s_task56_task_id;
 
 static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan);
 
@@ -177,12 +184,28 @@ static const app_tilt_control_config_t s_tilt_control_config = {
 #endif
 #endif
 
-static const PID_Position_Param_Config s_line_follow_pid_params = {
+static const PID_Position_Param_Config s_line_follow_common_pid_params = {
     .kp = APP_H723_LINE_FOLLOW_PID_KP,
     .ki = APP_H723_LINE_FOLLOW_PID_KI,
     .kd = APP_H723_LINE_FOLLOW_PID_KD,
     .output_limit = APP_H723_LINE_FOLLOW_MAX_TURN_SPEED_MM_S,
     .deadband = APP_H723_LINE_FOLLOW_PID_DEADBAND,
+};
+
+static const PID_Position_Param_Config s_line_follow_task2_pid_defaults = {
+    .kp = APP_H723_TASK2_LINE_FOLLOW_PID_KP,
+    .ki = APP_H723_TASK2_LINE_FOLLOW_PID_KI,
+    .kd = APP_H723_TASK2_LINE_FOLLOW_PID_KD,
+    .output_limit = APP_H723_TASK2_LINE_FOLLOW_PID_OUTPUT_LIMIT_MM_S,
+    .deadband = APP_H723_TASK2_LINE_FOLLOW_PID_DEADBAND,
+};
+
+static const PID_Position_Param_Config s_line_follow_task456_pid_defaults = {
+    .kp = APP_H723_TASK456_LINE_FOLLOW_PID_KP,
+    .ki = APP_H723_TASK456_LINE_FOLLOW_PID_KI,
+    .kd = APP_H723_TASK456_LINE_FOLLOW_PID_KD,
+    .output_limit = APP_H723_TASK456_LINE_FOLLOW_PID_OUTPUT_LIMIT_MM_S,
+    .deadband = APP_H723_TASK456_LINE_FOLLOW_PID_DEADBAND,
 };
 
 static bool h723_line_follow_pid_params_are_valid(float kp, float ki, float kd,
@@ -193,31 +216,109 @@ static bool h723_line_follow_pid_params_are_valid(float kp, float ki, float kd,
            output_limit > 0.0f && deadband >= 0.0f;
 }
 
-static void h723_line_follow_apply_debug_params(void)
+static bool h723_line_follow_validate_task_params(
+    volatile h723_debug_line_follow_params_t *debug)
 {
-    volatile h723_debug_line_follow_t *debug = &g_h723_debug.line_follow;
-    const float kp = debug->pid_kp;
-    const float ki = debug->pid_ki;
-    const float kd = debug->pid_kd;
-    const float output_limit = debug->pid_output_limit_mm_s;
-    const float deadband = debug->pid_deadband;
+    const bool valid = h723_line_follow_pid_params_are_valid(
+        debug->pid_kp, debug->pid_ki, debug->pid_kd,
+        debug->pid_output_limit_mm_s, debug->pid_deadband);
 
-    if (h723_line_follow_pid_params_are_valid(kp, ki, kd, output_limit, deadband)) {
-        s_line_follow.pid.params.kp = kp;
-        s_line_follow.pid.params.ki = ki;
-        s_line_follow.pid.params.kd = kd;
-        s_line_follow.pid.params.output_limit = output_limit;
-        s_line_follow.pid.params.deadband = deadband;
+    if (valid) {
         debug->params_valid = 1U;
     } else {
         debug->params_valid = 0U;
         debug->params_rejected_count++;
     }
+    return valid;
+}
 
-    if (debug->reset_pid_request != 0U) {
-        app_line_follow_reset(&s_line_follow);
-        s_line_follow_debug_last_sequence = 0U;
-        debug->reset_pid_request = 0U;
+static bool h723_line_follow_validate_common_params(
+    volatile h723_debug_line_follow_t *debug)
+{
+    const bool valid = h723_line_follow_pid_params_are_valid(
+        debug->pid_kp, debug->pid_ki, debug->pid_kd,
+        debug->pid_output_limit_mm_s, debug->pid_deadband);
+
+    if (valid) {
+        debug->params_valid = 1U;
+    } else {
+        debug->params_valid = 0U;
+        debug->params_rejected_count++;
+    }
+    return valid;
+}
+
+static void h723_line_follow_apply_pid_params(
+    const PID_Position_Param_Config *defaults,
+    float kp, float ki, float kd, float output_limit, float deadband)
+{
+    if (defaults == NULL) {
+        return;
+    }
+    s_line_follow.pid.params = *defaults;
+    s_line_follow.pid.params.kp = kp;
+    s_line_follow.pid.params.ki = ki;
+    s_line_follow.pid.params.kd = kd;
+    s_line_follow.pid.params.output_limit = output_limit;
+    s_line_follow.pid.params.deadband = deadband;
+}
+
+static void h723_line_follow_apply_debug_params(uint32_t active_group)
+{
+    volatile h723_debug_line_follow_t *common_debug = &g_h723_debug.line_follow;
+    volatile h723_debug_line_follow_params_t *task2_debug =
+        &g_h723_debug.task2_line_follow;
+    volatile h723_debug_line_follow_params_t *task456_debug =
+        &g_h723_debug.task456_line_follow;
+    const bool common_valid = h723_line_follow_validate_common_params(common_debug);
+    const bool task2_valid = h723_line_follow_validate_task_params(task2_debug);
+    const bool task456_valid = h723_line_follow_validate_task_params(task456_debug);
+
+    s_line_follow_active_group = active_group;
+    if (active_group == APP_H723_LINE_FOLLOW_GROUP_TASK2) {
+        if (task2_valid) {
+            h723_line_follow_apply_pid_params(
+                &s_line_follow_task2_pid_defaults,
+                task2_debug->pid_kp, task2_debug->pid_ki, task2_debug->pid_kd,
+                task2_debug->pid_output_limit_mm_s, task2_debug->pid_deadband);
+        } else {
+            s_line_follow.pid.params = s_line_follow_task2_pid_defaults;
+        }
+        if (task2_debug->reset_pid_request != 0U) {
+            app_line_follow_reset(&s_line_follow);
+            s_line_follow_debug_last_sequence = 0U;
+            task2_debug->reset_pid_request = 0U;
+        }
+    } else if (active_group == APP_H723_LINE_FOLLOW_GROUP_TASK456) {
+        if (task456_valid) {
+            h723_line_follow_apply_pid_params(
+                &s_line_follow_task456_pid_defaults,
+                task456_debug->pid_kp, task456_debug->pid_ki,
+                task456_debug->pid_kd, task456_debug->pid_output_limit_mm_s,
+                task456_debug->pid_deadband);
+        } else {
+            s_line_follow.pid.params = s_line_follow_task456_pid_defaults;
+        }
+        if (task456_debug->reset_pid_request != 0U) {
+            app_line_follow_reset(&s_line_follow);
+            s_line_follow_debug_last_sequence = 0U;
+            task456_debug->reset_pid_request = 0U;
+        }
+    } else {
+        s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
+        if (common_valid) {
+            h723_line_follow_apply_pid_params(
+                &s_line_follow_common_pid_params,
+                common_debug->pid_kp, common_debug->pid_ki, common_debug->pid_kd,
+                common_debug->pid_output_limit_mm_s, common_debug->pid_deadband);
+        } else {
+            s_line_follow.pid.params = s_line_follow_common_pid_params;
+        }
+        if (common_debug->reset_pid_request != 0U) {
+            app_line_follow_reset(&s_line_follow);
+            s_line_follow_debug_last_sequence = 0U;
+            common_debug->reset_pid_request = 0U;
+        }
     }
 }
 
@@ -248,6 +349,7 @@ static void h723_line_follow_publish_debug(void)
     debug->d_out = pid->d_out;
     debug->raw_output = pid->p_out + pid->i_out + pid->d_out;
     debug->pid_output = pid->output;
+    debug->active_group = s_line_follow_active_group;
 
     if (!active) {
         s_line_follow_debug_last_sequence = 0U;
@@ -296,13 +398,37 @@ void h723_chassis_service_init(void)
     app_tilt_control_init(&s_tilt_control, &s_tilt_control_config);
 #endif
 #endif
-    app_line_follow_init(&s_line_follow, &s_line_follow_pid_params,
+    app_line_follow_init(&s_line_follow, &s_line_follow_common_pid_params,
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
     app_task2_init(&s_task2);
     (void)memset(&s_task2_output, 0, sizeof(s_task2_output));
-    s_task2_last_button_mask = 0U;
+    app_task4_init(&s_task4);
+    (void)memset(&s_task4_output, 0, sizeof(s_task4_output));
+    app_task56_init(&s_task56);
+    (void)memset(&s_task56_output, 0, sizeof(s_task56_output));
     (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
     s_line_follow_debug_last_sequence = 0U;
+    s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
+    g_h723_debug.task2_line_follow.pid_kp = APP_H723_TASK2_LINE_FOLLOW_PID_KP;
+    g_h723_debug.task2_line_follow.pid_ki = APP_H723_TASK2_LINE_FOLLOW_PID_KI;
+    g_h723_debug.task2_line_follow.pid_kd = APP_H723_TASK2_LINE_FOLLOW_PID_KD;
+    g_h723_debug.task2_line_follow.pid_output_limit_mm_s =
+        APP_H723_TASK2_LINE_FOLLOW_PID_OUTPUT_LIMIT_MM_S;
+    g_h723_debug.task2_line_follow.pid_deadband =
+        APP_H723_TASK2_LINE_FOLLOW_PID_DEADBAND;
+    g_h723_debug.task2_line_follow.reset_pid_request = 0U;
+    g_h723_debug.task2_line_follow.params_valid = 1U;
+    g_h723_debug.task2_line_follow.params_rejected_count = 0U;
+    g_h723_debug.task456_line_follow.pid_kp = APP_H723_TASK456_LINE_FOLLOW_PID_KP;
+    g_h723_debug.task456_line_follow.pid_ki = APP_H723_TASK456_LINE_FOLLOW_PID_KI;
+    g_h723_debug.task456_line_follow.pid_kd = APP_H723_TASK456_LINE_FOLLOW_PID_KD;
+    g_h723_debug.task456_line_follow.pid_output_limit_mm_s =
+        APP_H723_TASK456_LINE_FOLLOW_PID_OUTPUT_LIMIT_MM_S;
+    g_h723_debug.task456_line_follow.pid_deadband =
+        APP_H723_TASK456_LINE_FOLLOW_PID_DEADBAND;
+    g_h723_debug.task456_line_follow.reset_pid_request = 0U;
+    g_h723_debug.task456_line_follow.params_valid = 1U;
+    g_h723_debug.task456_line_follow.params_rejected_count = 0U;
     g_h723_debug.line_follow.pid_kp = APP_H723_LINE_FOLLOW_PID_KP;
     g_h723_debug.line_follow.pid_ki = APP_H723_LINE_FOLLOW_PID_KI;
     g_h723_debug.line_follow.pid_kd = APP_H723_LINE_FOLLOW_PID_KD;
@@ -312,6 +438,7 @@ void h723_chassis_service_init(void)
     g_h723_debug.line_follow.reset_pid_request = 0U;
     g_h723_debug.line_follow.params_valid = 1U;
     g_h723_debug.line_follow.params_rejected_count = 0U;
+    g_h723_debug.line_follow.active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
     g_h723_debug.line_follow.pid_dt_s =
         (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f;
     g_h723_debug.line_follow.target_position = 0.0f;
@@ -463,9 +590,9 @@ static bool h723_tilt_pid_params_are_valid(float kp, float ki, float kd,
                                            float deadband)
 {
     return isfinite(kp) && isfinite(ki) && isfinite(kd) && isfinite(derivative_filter_n) &&
-           isfinite(output_limit) &&
-           isfinite(deadband) && kp >= 0.0f && ki >= 0.0f && kd >= 0.0f &&
-           derivative_filter_n >= 0.0f && output_limit > 0.0f && deadband >= 0.0f;
+           isfinite(output_limit) && isfinite(deadband) && kp >= 0.0f && ki >= 0.0f &&
+           kd >= 0.0f && derivative_filter_n >= 0.0f && output_limit > 0.0f &&
+           deadband >= 0.0f;
 }
 
 static void h723_tilt_apply_debug_params(void)
@@ -778,56 +905,125 @@ void h723_chassis_service_step(uint32_t now_ms)
     h723_app_buttons_snapshot_t button_snapshot;
     uint32_t requested_task = 0U;
     bool task2_controls_chassis = false;
-    bool task2_restart_requested;
+    bool task2_was_running = false;
+    bool task4_controls_chassis = false;
+    bool task4_was_running = false;
+    bool task56_controls_chassis = false;
+    bool task56_was_running = false;
+    bool task_controls_chassis = false;
     while (s_crsf_read_index != s_crsf_write_index) {
         (void)app_crsf_parser_feed(&s_crsf_parser, s_crsf_ring[s_crsf_read_index], now_ms, &s_crsf_input);
         s_crsf_read_index = (uint16_t)((s_crsf_read_index + 1U) % H723_CRSF_RING_SIZE);
     }
     h723_app_buttons_snapshot_copy(&button_snapshot);
-    task2_restart_requested =
-        ((button_snapshot.stable_high_mask & 0x01U) != 0U) &&
-        ((s_task2_last_button_mask & 0x01U) == 0U) &&
-        ((s_task2.phase == APP_TASK2_PHASE_STOPPED) ||
-         (s_task2.phase == APP_TASK2_PHASE_FAULT));
-    s_task2_last_button_mask = button_snapshot.stable_high_mask;
     app_chassis_control_step(&s_control_state, &s_crsf_input,
                              button_snapshot.stable_high_mask, now_ms,
                              &s_control_output);
     s_command = s_control_output.chassis;
     if (s_control_output.remote_takeover) {
         app_task2_abort(&s_task2);
-    } else if (app_task_menu_take_execution_request(&requested_task) &&
-               (requested_task == 2U)) {
-        app_task2_start(&s_task2, now_ms);
-        app_line_follow_reset(&s_line_follow);
-    } else if (task2_restart_requested) {
-        app_task2_start(&s_task2, now_ms);
-        app_line_follow_reset(&s_line_follow);
+        app_task4_abort(&s_task4);
+        app_task56_abort(&s_task56);
+        s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
+    } else if (app_task_menu_take_execution_request(&requested_task)) {
+        if (requested_task == 2U) {
+            app_task4_abort(&s_task4);
+            app_task2_start(&s_task2, now_ms);
+            s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK2;
+            app_line_follow_reset(&s_line_follow);
+        } else if (requested_task == 4U) {
+            app_task2_abort(&s_task2);
+            app_task4_start(&s_task4, now_ms);
+            s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK456;
+            app_line_follow_reset(&s_line_follow);
+        } else if ((requested_task == 5U) || (requested_task == 6U)) {
+            app_task2_abort(&s_task2);
+            app_task4_abort(&s_task4);
+            app_task56_start(&s_task56, now_ms);
+            s_task56_task_id = requested_task;
+            s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK456;
+            app_line_follow_reset(&s_line_follow);
+        } else if (requested_task == 3U) {
+            /* Task 3 has no executor: release the menu without issuing motion. */
+            app_task2_abort(&s_task2);
+            app_task4_abort(&s_task4);
+            app_task56_abort(&s_task56);
+            s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
+            app_line_follow_reset(&s_line_follow);
+            app_task_menu_finish_execution();
+        }
     }
+    task2_was_running = !s_control_output.remote_takeover &&
+                        (s_task2.phase == APP_TASK2_PHASE_RUNNING);
+    task4_was_running = !s_control_output.remote_takeover &&
+                        (s_task4.phase == APP_TASK4_PHASE_RUNNING);
+    task56_was_running = !s_control_output.remote_takeover &&
+                         (s_task56.phase == APP_TASK56_PHASE_RUNNING);
     if (!s_control_output.remote_takeover &&
-        (s_task2.phase != APP_TASK2_PHASE_IDLE)) {
+        (s_task2.phase == APP_TASK2_PHASE_RUNNING)) {
         const app_task2_input_t task2_input = {
             .now_ms = now_ms,
-            .grayscale_sequence = g_h723_debug.grayscale.sequence,
-            .line_strength = g_h723_debug.grayscale.line_strength,
-            .black_mask = g_h723_debug.grayscale.black_mask,
-            .adc_timeout_mask = g_h723_debug.grayscale.adc_timeout_mask,
-            .left_feedback_fresh = h723_m2006_feedback_is_fresh(0U, now_ms),
-            .right_feedback_fresh = h723_m2006_feedback_is_fresh(1U, now_ms),
-            .left_speed_mm_s = s_feedback[0].output_speed_rpm *
-                               APP_H723_OUTPUT_RPM_TO_MM_S,
-            .right_speed_mm_s = s_feedback[1].output_speed_rpm *
-                                APP_H723_OUTPUT_RPM_TO_MM_S,
+            .black_count = g_h723_debug.grayscale.black_count,
         };
         app_task2_step(&s_task2, &task2_input);
         app_task2_get_output(&s_task2, &s_task2_output);
         task2_controls_chassis = s_task2_output.follow_line;
         s_command.mode = APP_CHASSIS_MODE_LINE_FOLLOW;
         s_command.manual_active = task2_controls_chassis;
-        s_command.base_speed_mm_s = s_task2_output.base_speed_mm_s;
+        s_command.base_speed_mm_s = s_task2_output.running ?
+            APP_H723_TASK2_SPEED_MM_S : 0.0f;
+        if (!task2_controls_chassis) {
+            s_command.left_target_rpm = 0.0f;
+            s_command.right_target_rpm = 0.0f;
+        }
+        if (task2_was_running && (s_task2.phase == APP_TASK2_PHASE_STOPPED)) {
+            app_task_menu_finish_execution();
+        }
+    } else if (!s_control_output.remote_takeover &&
+               (s_task4.phase == APP_TASK4_PHASE_RUNNING)) {
+        const app_task4_input_t task4_input = {
+            .now_ms = now_ms,
+        };
+        app_task4_step(&s_task4, &task4_input);
+        app_task4_get_output(&s_task4, &s_task4_output);
+        task4_controls_chassis = s_task4_output.follow_line;
+        s_command.mode = APP_CHASSIS_MODE_LINE_FOLLOW;
+        s_command.manual_active = task4_controls_chassis;
+        s_command.base_speed_mm_s = s_task4_output.base_speed_mm_s;
+        if (!task4_controls_chassis) {
+            s_command.left_target_rpm = 0.0f;
+            s_command.right_target_rpm = 0.0f;
+        }
+        if (task4_was_running && (s_task4.phase == APP_TASK4_PHASE_STOPPED)) {
+            app_task_menu_finish_execution();
+        }
+    } else if (!s_control_output.remote_takeover &&
+               (s_task56.phase == APP_TASK56_PHASE_RUNNING)) {
+        const app_task56_input_t task56_input = {
+            .now_ms = now_ms,
+        };
+        app_task56_step(&s_task56, &task56_input);
+        app_task56_get_output(&s_task56, &s_task56_output);
+        task56_controls_chassis = s_task56_output.follow_line;
+        s_command.mode = APP_CHASSIS_MODE_LINE_FOLLOW;
+        s_command.manual_active = task56_controls_chassis;
+        s_command.base_speed_mm_s = s_task56_output.base_speed_mm_s;
+        if (!task56_controls_chassis) {
+            s_command.left_target_rpm = 0.0f;
+            s_command.right_target_rpm = 0.0f;
+        }
+        if (task56_was_running &&
+            (s_task56.phase == APP_TASK56_PHASE_STOPPED)) {
+            app_task_menu_finish_execution();
+        }
     } else {
         app_task2_get_output(&s_task2, &s_task2_output);
+        app_task4_get_output(&s_task4, &s_task4_output);
+        app_task56_get_output(&s_task56, &s_task56_output);
     }
+    task_controls_chassis = task2_controls_chassis || task4_controls_chassis ||
+                            task56_controls_chassis;
+    (void)task_controls_chassis;
     for (index = 0U; index < APP_CRSF_CHANNEL_COUNT; ++index) {
         g_h723_debug.crsf.channels_raw[index] = s_crsf_input.channels[index];
     }
@@ -866,16 +1062,43 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.control.selected_task = s_control_output.selected_task;
     g_h723_debug.control.task_request_available =
         s_control_output.task_request_available ? 1U : 0U;
+    if (s_control_output.selected_task == 2U) {
+        g_h723_debug.control.active_task_elapsed_ms = s_task2_output.elapsed_ms;
+    } else if (s_control_output.selected_task == 4U) {
+        g_h723_debug.control.active_task_elapsed_ms = s_task4_output.elapsed_ms;
+    } else if ((s_control_output.selected_task == 5U) ||
+               (s_control_output.selected_task == 6U)) {
+        g_h723_debug.control.active_task_elapsed_ms =
+            s_task56_task_id == s_control_output.selected_task ?
+            s_task56_output.elapsed_ms : 0U;
+    } else {
+        g_h723_debug.control.active_task_elapsed_ms = 0U;
+    }
     g_h723_debug.task2.phase = (uint32_t)s_task2_output.phase;
-    g_h723_debug.task2.fault = (uint32_t)s_task2_output.fault;
+    g_h723_debug.task2.fault = 0U;
     g_h723_debug.task2.running = s_task2_output.running ? 1U : 0U;
     g_h723_debug.task2.stop_mark =
-        ((g_h723_debug.grayscale.black_mask & APP_H723_TASK2_STOP_BLACK_MASK) ==
-         APP_H723_TASK2_STOP_BLACK_MASK) ? 1U : 0U;
+        g_h723_debug.grayscale.black_count >= APP_H723_TASK2_STOP_BLACK_COUNT ? 1U : 0U;
     g_h723_debug.task2.elapsed_ms = s_task2_output.elapsed_ms;
-    g_h723_debug.task2.distance_mm = s_task2_output.distance_mm;
+    g_h723_debug.task2.distance_mm = 0.0f;
     g_h723_debug.task2.base_speed_mm_s = s_task2_output.base_speed_mm_s;
-    h723_line_follow_apply_debug_params();
+    g_h723_debug.task4.phase = (uint32_t)s_task4_output.phase;
+    g_h723_debug.task4.running = s_task4_output.running ? 1U : 0U;
+    g_h723_debug.task4.elapsed_ms = s_task4_output.elapsed_ms;
+    g_h723_debug.task4.base_speed_mm_s = s_task4_output.base_speed_mm_s;
+    g_h723_debug.task56.task_id = s_task56_task_id;
+    g_h723_debug.task56.phase = (uint32_t)s_task56_output.phase;
+    g_h723_debug.task56.running = s_task56_output.running ? 1U : 0U;
+    g_h723_debug.task56.elapsed_ms = s_task56_output.elapsed_ms;
+    g_h723_debug.task56.base_speed_mm_s = s_task56_output.base_speed_mm_s;
+    if (task2_controls_chassis) {
+        s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK2;
+    } else if (task4_controls_chassis || task56_controls_chassis) {
+        s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK456;
+    } else {
+        s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
+    }
+    h723_line_follow_apply_debug_params(s_line_follow_active_group);
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
     g_h723_debug.chassis.mode = 2U;
     g_h723_debug.chassis.actuation_enabled = g_h723_debug.single_motor.enable;
@@ -904,7 +1127,7 @@ void h723_chassis_service_step(uint32_t now_ms)
         } else {
             s_command.left_target_rpm = 0.0f;
             s_command.right_target_rpm = 0.0f;
-            if (task2_controls_chassis) {
+            if (task_controls_chassis) {
                 s_command.manual_active = false;
             }
         }

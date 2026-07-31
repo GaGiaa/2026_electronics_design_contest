@@ -1,5 +1,26 @@
 # MSPM0 核心板工程交接索引
 
+## H723 合并任务菜单、循迹与定时任务（2026-08-01）
+
+- 以 `8b87ba111e11fcabf31d808320cf9bd032d12416` 为共同基线，选择性合并无 Git 对方目录中的 H723
+  任务与灰度循迹源码。导入 `app_task4`、`app_task56`、任务菜单完成接口、任务 2 简化停车逻辑、
+  OLED 运行页、分组巡线 PID、任务/遥测测试和 Keil 工程源文件登记；未导入 `.o`、`.d`、`.axf`、
+  `.hex`、`.map`、`.uvoptx`、`.uvguix` 或构建日志。
+- 底盘服务以对方的 SE/SB/SC 状态、菜单与任务调度为主体，重新接入当前 JY901S 一致性快照、倾角 PID、
+  ID 3 独占电流槽位、归零和扩展调试范围。ID 3 正常活动范围继续为 `70–210 deg`；BNO055 服务默认
+  关闭，JY901S 倾角闭环的参数与保护条件保持不变。
+- 任务 2 固定 `360 mm/s` 灰度循迹，`black_count >= 5` 立即停车；任务 4 使用 `350 mm/s`、
+  `100 mm/s^2`、10 s 速度曲线；任务 5/6 使用 `220 mm/s`、`100 mm/s^2`、30 s 速度曲线。任务 3
+  无执行器，确认后中止所有任务、清零运动路径、解除菜单锁定，OLED 显示 `TASK 3 N/A` 和
+  `NOT IMPLEMENTED`。
+- 底盘 VOFA 扩展为 6 通道，最后一项为当前任务运行秒数；实现与互斥检查已保留，但
+  `APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE=0U`，默认 UART8 静默。遥测状态位已改为互不重叠，
+  按键遥测重复配置校验已删除。
+- 验证：以独立 PowerShell 进程运行全部 39 个 `tests/test_stm32h723_*.ps1`，结果均通过；执行
+  `D:\Keil_v5\UV4\UV4.exe -r .\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx -j0` 后，构建日志为
+  `0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、CAN、电机、JY901S、灰度、OLED、
+  UART8/VOFA 或机械限位实物验收；首次联动应车架悬空并可立即断电。
+
 ## H723 JY901S 接管水管倾角闭环（2026-08-01）
 
 - 水管上的 BNO055 已移出当前项目。ID 3 倾角外环现在唯一消费 JY901S UART9 服务发布的一致性控制快照；快照以序列号保护，包含校准 `vehicle_angle_deg[1]`、完整样本序号、样本时间、样本有效性和启动校准有效性。`chassisTask` 读取发布中的快照不等待，当周期按保持保护处理，绝不读取 `g_h723_debug.jy901s`。
@@ -621,13 +642,13 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 
 ## STM32H723 I2C4 OLED 测试页
 
-最后更新：2026-07-30
+最后更新：2026-08-01
 
-- 已接入 0.96 寸 128x64 SSD1306 四针 I2C OLED。CubeMX 配置为 `I2C4`：`PD12=I2C4_SCL`、`PD13=I2C4_SDA`、7-bit 地址模式、模拟滤波开启、时序 `0x00B03FDB`（400 kHz 快速模式）；原有 FDCAN2 `PB12/PB13` 保持不变，没有使用 `PB8/PB9`。
+- 已接入 0.96 寸 128x64 SSD1306 四针 I2C OLED。CubeMX 配置为 `I2C4`：`PD12=I2C4_SCL`、`PD13=I2C4_SDA`、7-bit 地址模式、模拟滤波开启、Fast Mode Plus、`I2C4.Timing=0x10A20D1F`。该 1 MHz Timing 基于 137.5 MHz I2C4 内核时钟、数字滤波 `0` 与 SCL/SDA 100 ns 上升/下降时间计算；原有 FDCAN2 `PB12/PB13` 保持不变，没有使用 `PB8/PB9`。
 - `App/Src/app_oled.c` 提供阻塞式 `HAL_I2C_Master_Transmit(&hi2c4, 0x3C << 1, ...)`、128x64 framebuffer、页寻址、`0x00` 命令控制字节、`0x40` 数据控制字节、清屏、光标、字符和字符串输出、整屏刷新以及 SSD1306 初始化。`oled_font.c` 提供 0x20..0x7E 的 5x7 可打印 ASCII 字库。
-- `oledTask` 使用低优先级和默认 1000 ms 周期，只显示固定英文测试页和递增计数，不读取电机实时数据。I2C 超时或其他总线错误只会在 `g_h723_debug.oled` 中累计并按周期重试，不会阻塞 FDCAN2、电机控制和 UART8；Watch 可观察 `initialized`、`init_attempt_count`、`last_hal_status`、`update_count` 和 `error_count`。
-- 硬件接线要求 OLED 使用 3.3 V 供电，SCL/SDA 上拉不能高于 3.3 V；无合适上拉时外接约 4.7 kOhm 到 3.3 V。当前只完成软件静态检查和 Keil 构建，尚未执行烧录、示波器/I2C 波形、OLED 实物显示或电机联动验收。
-- 可从 `stm32h723_app` 目录执行 `D:\STM32CubeMX\STM32CubeMX.exe -q .\cubemx_generate_crsf.txt` 重现 CubeMX 生成；生成后需检查 ADC H723 的 `DataAlign=0U` 兼容修正，以及 Keil 工程仍收录 `app_oled.c`、`oled_font.c` 和 `i2c.c`。
+- `oledTask` 使用低优先级，任务和实际刷新周期均为 100 ms，显示运行菜单、遥控状态或任务 2 状态。I2C 超时或其他总线错误只会在 `g_h723_debug.oled` 中累计并按周期重试，不会阻塞 FDCAN2、电机控制和 UART8；Watch 可观察 `initialized`、`init_attempt_count`、`last_hal_status`、`i2c_error_code`、`i2c_recovery_count`、`update_count` 和 `error_count`。
+- 硬件接线要求 OLED 使用 3.3 V 供电，SCL/SDA 上拉不能高于 3.3 V。1 MHz 不属于通用 SSD1306 保证规格，实物验收必须以示波器确认两条线的上升、下降时间均不超过 100 ns，并连续观察 NACK、花屏及 OLED 错误/恢复计数；异常时将 I2C4 配置回 400 kHz。当前尚未执行烧录、示波器/I2C 波形、OLED 实物显示或电机联动验收。
+- 可从 `stm32h723_app` 目录执行 `D:\STM32CubeMX\STM32CubeMX.exe -q .\cubemx_generate_crsf.txt` 重现 CubeMX 生成；生成后执行 `tests\test_stm32h723_oled.ps1`，检查 `.ioc`、`i2c.c` 中的 1 MHz Timing 和 FMP 调用，同时检查 ADC H723 的 `DataAlign=0U` 兼容修正，以及 Keil 工程仍收录 `app_oled.c`、`oled_font.c` 和 `i2c.c`。
 
 ### 本轮指定提交合并（2026-07-30）
 
