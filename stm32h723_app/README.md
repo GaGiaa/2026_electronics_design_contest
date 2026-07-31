@@ -58,6 +58,22 @@ Watch 可直接修改速度 PID 的 `kp`、`ki`、`kd`、`output_limit`、`deadb
 
 该遥测宏与健康遥测和 JY901S 十通道遥测编译期互斥，三者均默认关闭。UART8 仍使用 PE1 TX、1 Mbit/s 和 `DMA1_Stream1`；DMA 忙时丢弃本周期帧并递增 UART8 丢帧计数，不阻塞控制环。
 
+## JY901S 安装姿态与校准
+
+JY901S 使用 UART9：`PG0=RX`、`PG1=TX`、`234000 bit/s`，接收采用 DMA1 Stream2
+ReceiveToIdle。车体坐标约定为 `X=前、Y=左、Z=上`。`App/Src/app_jy901s_calibration.c`
+在原始解析后执行正交轴映射、角度偏置和启动陀螺零偏校准；原始数据与车体坐标数据同时发布到
+`g_h723_debug.jy901s`。
+
+当前配置已开启启动校准，需要车辆连续静止约 2~3 秒，累计 200 个完整样本；静止门限为加速度模长
+`0.85~1.15 g`、角速度绝对值不超过 `3 deg/s`，总超时 `5000 ms`。安装方向通过
+`App/Inc/app_config.h` 的 `APP_JY901S_VEHICLE_*_SENSOR_AXIS/SIGN` 配置，Roll/Pitch/Yaw
+固定偏置通过 `APP_JY901S_*_OFFSET_DEG` 配置。校准只保存在 RAM，不写 Flash。
+
+当前 `APP_JY901S_VOFA_CALIBRATED_ENABLE` 为 `1U`，现有 JY901S 十通道 VOFA 输出切换到车体坐标和校准结果；
+设为 `0U` 时恢复原始数据。详细操作和验收步骤见
+[`docs/STM32H723_JY901S.md`](../docs/STM32H723_JY901S.md)。当前校准结果尚未接入底盘 PID。
+
 ## K230 UART2 Position Test
 
 `APP_H723_K230_UART2_TEST_ENABLE` 默认是 `0U`。设为 `1U` 后，`k230Task` 每 5 ms

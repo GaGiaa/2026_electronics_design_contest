@@ -138,7 +138,24 @@ void h723_app_telemetry_step(void)
 
 #if (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
     if (g_h723_debug.jy901s.sample_valid != 0U &&
+#if (APP_JY901S_VOFA_CALIBRATED_ENABLE == 1U)
+        g_h723_debug.jy901s.calibration_valid != 0U &&
+#endif
         (now_ms - s_last_jy901s_telemetry_ms) >= APP_JY901S_VOFA_TELEMETRY_INTERVAL_MS) {
+#if (APP_JY901S_VOFA_CALIBRATED_ENABLE == 1U)
+        const float channels[H723_VOFA_JY901S_CHANNEL_COUNT] = {
+            g_h723_debug.jy901s.vehicle_acceleration_g[0],
+            g_h723_debug.jy901s.vehicle_acceleration_g[1],
+            g_h723_debug.jy901s.vehicle_acceleration_g[2],
+            g_h723_debug.jy901s.vehicle_angular_rate_dps[0],
+            g_h723_debug.jy901s.vehicle_angular_rate_dps[1],
+            g_h723_debug.jy901s.vehicle_angular_rate_dps[2],
+            g_h723_debug.jy901s.vehicle_angle_deg[0],
+            g_h723_debug.jy901s.vehicle_angle_deg[1],
+            g_h723_debug.jy901s.vehicle_angle_deg[2],
+            g_h723_debug.jy901s.temperature_celsius
+        };
+#else
         const float channels[H723_VOFA_JY901S_CHANNEL_COUNT] = {
             g_h723_debug.jy901s.acceleration_g[0],
             g_h723_debug.jy901s.acceleration_g[1],
@@ -151,6 +168,7 @@ void h723_app_telemetry_step(void)
             g_h723_debug.jy901s.angle_deg[2],
             g_h723_debug.jy901s.temperature_celsius
         };
+#endif
         HAL_StatusTypeDef status;
 
         s_last_jy901s_telemetry_ms = now_ms;

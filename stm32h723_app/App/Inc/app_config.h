@@ -4,9 +4,62 @@
 #define APP_VOFA_HEALTH_TELEMETRY_ENABLE 0U
 #define APP_VOFA_HEALTH_TELEMETRY_INTERVAL_MS 20U
 
-#define APP_JY901S_VOFA_TELEMETRY_ENABLE 0U
+/* JY901S 通过 UART8 输出 VOFA+ JustFloat 遥测；UART8 遥测模式只能同时启用一种。 */
+#define APP_JY901S_VOFA_TELEMETRY_ENABLE 1U
 #define APP_JY901S_VOFA_TELEMETRY_INTERVAL_MS 5U
 #define APP_JY901S_TASK_PERIOD_MS 5U
+
+/* 设为 1 时，VOFA 输出车体坐标和校准后的数据；设为 0 时保留传感器原始坐标输出。 */
+#define APP_JY901S_VOFA_CALIBRATED_ENABLE 1U
+
+/* 启动时自动估计陀螺仪零偏；结果只保存在 RAM，重启后重新采集。 */
+#define APP_JY901S_CALIBRATION_ENABLE 1U
+/* 连续满足静止条件的完整样本数量；车辆需保持静止约 2~3 秒。 */
+#define APP_JY901S_CALIBRATION_SAMPLE_TARGET 200U
+/* 从开始校准到失败的最大时间，单位 ms。 */
+#define APP_JY901S_CALIBRATION_TIMEOUT_MS 5000U
+/* 静止判断的加速度模长范围，单位 g。 */
+#define APP_JY901S_CALIBRATION_STATIONARY_ACCEL_MIN_G 0.85f
+#define APP_JY901S_CALIBRATION_STATIONARY_ACCEL_MAX_G 1.15f
+/* 静止判断的单轴角速度最大值，单位 deg/s。 */
+#define APP_JY901S_CALIBRATION_STATIONARY_GYRO_MAX_DPS 3.0f
+
+/* 车体右手坐标系：X 向车头，Y 向车体左侧，Z 向上。 */
+/* 每个车体轴对应的 JY901S 传感器轴：0=X，1=Y，2=Z；三个值必须互不相同。 */
+#define APP_JY901S_VEHICLE_X_SENSOR_AXIS 1U
+#define APP_JY901S_VEHICLE_Y_SENSOR_AXIS 0U
+#define APP_JY901S_VEHICLE_Z_SENSOR_AXIS 2U
+/* 对应轴的方向符号，只能为 1 或 -1；用于适配旋转、翻面等正交安装方向。 */
+#define APP_JY901S_VEHICLE_X_SENSOR_SIGN 1
+#define APP_JY901S_VEHICLE_Y_SENSOR_SIGN -1
+#define APP_JY901S_VEHICLE_Z_SENSOR_SIGN 1
+
+/* 车体静止参考姿态相对 JY901S 输出的固定角度偏置，单位 deg。 */
+#define APP_JY901S_ROLL_OFFSET_DEG 0.0f
+#define APP_JY901S_PITCH_OFFSET_DEG 0.0f
+#define APP_JY901S_YAW_OFFSET_DEG 0.0f
+
+#if (APP_JY901S_CALIBRATION_SAMPLE_TARGET == 0U) || \
+    (APP_JY901S_CALIBRATION_TIMEOUT_MS == 0U)
+#error "JY901S calibration sample target and timeout must be nonzero"
+#endif
+#if (APP_JY901S_CALIBRATION_ENABLE > 1U) || \
+    (APP_JY901S_VOFA_CALIBRATED_ENABLE > 1U)
+#error "JY901S calibration switches must be 0U or 1U"
+#endif
+#if (APP_JY901S_VEHICLE_X_SENSOR_AXIS > 2U) || \
+    (APP_JY901S_VEHICLE_Y_SENSOR_AXIS > 2U) || \
+    (APP_JY901S_VEHICLE_Z_SENSOR_AXIS > 2U) || \
+    (APP_JY901S_VEHICLE_X_SENSOR_AXIS == APP_JY901S_VEHICLE_Y_SENSOR_AXIS) || \
+    (APP_JY901S_VEHICLE_X_SENSOR_AXIS == APP_JY901S_VEHICLE_Z_SENSOR_AXIS) || \
+    (APP_JY901S_VEHICLE_Y_SENSOR_AXIS == APP_JY901S_VEHICLE_Z_SENSOR_AXIS)
+#error "JY901S vehicle axis mapping must be a permutation of sensor axes"
+#endif
+#if ((APP_JY901S_VEHICLE_X_SENSOR_SIGN != 1) && (APP_JY901S_VEHICLE_X_SENSOR_SIGN != -1)) || \
+    ((APP_JY901S_VEHICLE_Y_SENSOR_SIGN != 1) && (APP_JY901S_VEHICLE_Y_SENSOR_SIGN != -1)) || \
+    ((APP_JY901S_VEHICLE_Z_SENSOR_SIGN != 1) && (APP_JY901S_VEHICLE_Z_SENSOR_SIGN != -1))
+#error "JY901S vehicle axis signs must be 1 or -1"
+#endif
 
 #define APP_GRAYSCALE_TASK_PERIOD_MS 10U
 #define APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE 0U

@@ -199,6 +199,14 @@ typedef struct {
     uint32_t sample_age_ms;
     uint32_t sample_valid;
     uint32_t dma_active;
+    float vehicle_acceleration_g[3];
+    float vehicle_angular_rate_dps[3];
+    float vehicle_angle_deg[3];
+    float gyro_bias_dps[3];
+    uint32_t calibration_status;
+    uint32_t calibration_reason;
+    uint32_t calibration_sample_count;
+    uint32_t calibration_valid;
 } h723_debug_jy901s_t;
 
 typedef struct {

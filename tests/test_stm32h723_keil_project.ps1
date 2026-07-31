@@ -28,6 +28,7 @@ foreach ($line in @(
     '<FilePath>../App/Src/app_grayscale_service.c</FilePath>',
     '<FilePath>../App/Src/app_telemetry.c</FilePath>',
     '<FilePath>../App/Src/app_jy901s.c</FilePath>',
+    '<FilePath>../App/Src/app_jy901s_calibration.c</FilePath>',
     '<FilePath>../App/Src/app_jy901s_service.c</FilePath>',
     '<FilePath>../App/Src/app_bno055.c</FilePath>',
     '<FilePath>../App/Src/app_bno055_service.c</FilePath>',
