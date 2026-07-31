@@ -19,6 +19,12 @@ typedef struct {
     uint32_t tx_drop_count;
     uint32_t last_hal_status;
     uint32_t tx_in_flight;
+    uint32_t tx_started_ms;
+    uint32_t tx_timeout_count;
+    uint32_t tx_recovery_count;
+    uint32_t tx_recovery_failure_count;
+    uint32_t hal_g_state;
+    uint32_t hal_error_code;
 } h723_debug_uart8_t;
 
 typedef struct {
@@ -194,11 +200,14 @@ typedef struct {
     /* Keil Watch inputs. `rehome_request` is consumed as a one-shot command. */
     float target_position_deg;
     uint32_t rehome_request;
+    /* Set only after confirming the debug range and chassis are safe. */
+    uint32_t allow_extended_position_range;
     /* Program state and feedback. */
     uint32_t state;
     uint32_t fault;
     uint32_t zero_valid;
     uint32_t target_clamped;
+    uint32_t extended_position_range_active;
     uint32_t cycle_count;
     float active_target_position_deg;
     float zero_offset_deg;
@@ -221,6 +230,39 @@ typedef struct {
     float speed_pid_output_a;
     int16_t commanded_current_raw;
 } h723_debug_balance_t;
+
+typedef struct {
+    /* Keil Watch inputs. capture_zero_request is consumed as a one-shot command. */
+    uint32_t enable;
+    float target_tilt_deg;
+    uint32_t capture_zero_request;
+    float pid_kp;
+    float pid_ki;
+    float pid_kd;
+    float derivative_filter_N;
+    float pid_deadband_deg;
+    float max_position_rate_deg_s;
+    /* Runtime state and 100 Hz outer-loop snapshot. */
+    uint32_t state;
+    uint32_t fault;
+    uint32_t capture_zero_consumed;
+    uint32_t zero_captured_valid;
+    uint32_t new_imu_sample;
+    uint32_t motor_target_clamped;
+    uint32_t imu_sample_age_ms;
+    float raw_pitch_deg;
+    float captured_zero_deg;
+    float tilt_deg;
+    float error_deg;
+    float pid_rate_deg_s;
+    float pid_p_out_deg_s;
+    float pid_i_out_deg_s;
+    float pid_d_out_deg_s;
+    float pid_integral;
+    float measured_tilt_rate_deg_s;
+    float filtered_tilt_rate_deg_s;
+    float motor_target_position_deg;
+} h723_debug_tilt_t;
 
 typedef struct {
     int16_t acceleration_raw[3];
@@ -343,6 +385,7 @@ typedef struct {
     h723_m2006_debug_t m2006[3];
     h723_debug_single_motor_t single_motor;
     h723_debug_balance_t balance;
+    h723_debug_tilt_t tilt;
     h723_debug_jy901s_t jy901s;
     h723_debug_grayscale_t grayscale;
     h723_debug_buttons_t buttons;

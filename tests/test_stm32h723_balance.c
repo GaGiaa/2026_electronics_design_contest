@@ -17,6 +17,8 @@ static app_balance_config_t make_config(void)
     config.position_min_deg = 0.0f;
     config.position_active_min_deg = 0.0f;
     config.position_max_deg = 30.0f;
+    config.position_debug_active_min_deg = 1.0f;
+    config.position_debug_max_deg = 60.0f;
     config.position_period_ms = 5U;
     config.home_speed_params = (PID_Incremental_Param_Config){
         .kp = 0.25f, .ki = 5.0f, .kd = 0.0f, .output_limit = 0.35f,
@@ -171,6 +173,47 @@ static void test_position_uses_a_separate_active_minimum_after_homing(void)
     assert(output.active_target_position_deg == 5.0f);
 }
 
+static void test_extended_range_switch_uses_debug_bounds_without_removing_soft_limits(void)
+{
+    app_balance_t balance;
+    app_balance_config_t config = make_config();
+    app_balance_step_input_t input = make_feedback(0U);
+    app_balance_step_output_t output;
+
+    config.position_active_min_deg = 5.0f;
+    app_balance_init(&balance, &config);
+    app_balance_step(&balance, &input, &output);
+    input.now_ms = 1U;
+    input.feedback_output_speed_rpm = 0.2f;
+    input.feedback_current_a = -0.3f;
+    app_balance_step(&balance, &input, &output);
+    input.now_ms = 301U;
+    app_balance_step(&balance, &input, &output);
+    assert(output.state == APP_BALANCE_STATE_HOMED_IDLE);
+
+    input.now_ms = 306U;
+    input.feedback_current_a = 0.0f;
+    input.requested_target_position_deg = 45.0f;
+    app_balance_step(&balance, &input, &output);
+    assert(output.target_clamped);
+    assert(output.active_target_position_deg == 30.0f);
+    assert(!output.extended_position_range_active);
+
+    input.now_ms = 311U;
+    input.allow_extended_position_range = true;
+    app_balance_step(&balance, &input, &output);
+    assert(!output.target_clamped);
+    assert(output.active_target_position_deg == 45.0f);
+    assert(output.extended_position_range_active);
+
+    input.now_ms = 316U;
+    input.requested_target_position_deg = 100.0f;
+    app_balance_step(&balance, &input, &output);
+    assert(output.target_clamped);
+    assert(output.active_target_position_deg == 60.0f);
+    assert(output.extended_position_range_active);
+}
+
 static void test_timeout_feedback_loss_and_manual_rehome_stay_safe(void)
 {
     app_balance_t balance;
@@ -215,6 +258,7 @@ int main(void)
     test_homing_confirms_stall_then_establishes_zero();
     test_position_clamps_target_and_rejects_nonfinite_value();
     test_position_uses_a_separate_active_minimum_after_homing();
+    test_extended_range_switch_uses_debug_bounds_without_removing_soft_limits();
     test_timeout_feedback_loss_and_manual_rehome_stay_safe();
     return 0;
 }

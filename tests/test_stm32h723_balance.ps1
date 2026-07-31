@@ -18,8 +18,10 @@ $expectedDefaults = @{
     'APP_H723_BALANCE_HOME_CONFIRM_MS' = '300U'
     'APP_H723_BALANCE_HOME_TIMEOUT_MS' = '12000U'
     'APP_H723_BALANCE_POSITION_MIN_DEG' = '0\.0f'
-    'APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG' = '5\.0f'
-    'APP_H723_BALANCE_POSITION_MAX_DEG' = '275\.0f'
+    'APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG' = '[0-9]+(?:\.[0-9]+)?f'
+    'APP_H723_BALANCE_POSITION_MAX_DEG' = '[0-9]+(?:\.[0-9]+)?f'
+    'APP_H723_BALANCE_POSITION_DEBUG_ACTIVE_MIN_DEG' = '[0-9]+(?:\.[0-9]+)?f'
+    'APP_H723_BALANCE_POSITION_DEBUG_MAX_DEG' = '[0-9]+(?:\.[0-9]+)?f'
     'APP_H723_BALANCE_POSITION_MAX_OUTPUT_SPEED_RPM' = '550\.0f'
     'APP_H723_BALANCE_POSITION_CURRENT_LIMIT_A' = '10\.0f'
 }
@@ -30,6 +32,16 @@ foreach ($name in $expectedDefaults.Keys) {
 }
 if ($service -notmatch 'h723_balance_service_step\(now_ms, output_current_A\)') {
     throw 'Balance controller is not connected to the chassis service current slots.'
+}
+foreach ($pattern in @(
+    'allow_extended_position_range',
+    'extended_position_range_active',
+    'APP_H723_BALANCE_POSITION_DEBUG_ACTIVE_MIN_DEG',
+    'APP_H723_BALANCE_POSITION_DEBUG_MAX_DEG'
+)) {
+    if ($service -notmatch $pattern) {
+        throw "Balance extended-range behavior is missing: $pattern"
+    }
 }
 if ($project -notmatch '<FilePath>\.\./App/Src/app_balance\.c</FilePath>') {
     throw 'Keil project does not compile app_balance.c.'

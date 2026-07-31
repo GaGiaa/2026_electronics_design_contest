@@ -20,10 +20,12 @@ if ($source -notmatch 'osKernelGetTickCount\s*\(\s*\)') {
 }
 
 $freertosSource = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\Core\Src\freertos.c')
-foreach ($required in @('h723_bno055_service_init\(\)', 'h723_bno055_service_step\(h723_app_time_now_ms\(\)\)')) {
-    if ($freertosSource -notmatch $required) {
-        throw "BNO055 task integration is missing: $required"
-    }
+$configSource = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Inc\app_config.h')
+if ($configSource -notmatch 'APP_H723_BNO055_SERVICE_ENABLE\s+0U') {
+    throw 'BNO055 service must default to disabled.'
+}
+if ($freertosSource -notmatch '#if \(APP_H723_BNO055_SERVICE_ENABLE == 1U\)[\s\S]*startBno055Task') {
+    throw 'BNO055 task must be conditionally compiled behind APP_H723_BNO055_SERVICE_ENABLE.'
 }
 
 $applicationSources = @(

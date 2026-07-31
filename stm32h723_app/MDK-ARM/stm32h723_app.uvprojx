@@ -607,6 +607,11 @@
               <FilePath>../App/Src/app_telemetry.c</FilePath>
             </File>
             <File>
+              <FileName>app_telemetry_tx_guard.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_telemetry_tx_guard.c</FilePath>
+            </File>
+            <File>
               <FileName>app_jy901s.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_jy901s.c</FilePath>
@@ -675,6 +680,11 @@
               <FileName>app_balance.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_balance.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_tilt_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_tilt_control.c</FilePath>
             </File>
             <File>
               <FileName>app_chassis_service.c</FileName>

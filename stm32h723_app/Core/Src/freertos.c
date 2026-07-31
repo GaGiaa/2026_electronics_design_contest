@@ -31,7 +31,9 @@
 #include "app_debug.h"
 #include "app_chassis_service.h"
 #include "app_config.h"
+#if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
 #include "app_bno055_service.h"
+#endif
 #include "app_jy901s_service.h"
 #include "app_k230_service.h"
 #include "app_grayscale_service.h"
@@ -80,12 +82,14 @@ static const osThreadAttr_t grayscaleTask_attributes = {
   .priority = (osPriority_t)osPriorityAboveNormal,
 };
 
+#if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
 static osThreadId_t bno055TaskHandle;
 static const osThreadAttr_t bno055Task_attributes = {
   .name = "bno055Task",
   .stack_size = 1024 * 2,
   .priority = (osPriority_t)osPriorityAboveNormal,
 };
+#endif
 #if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
 static osThreadId_t k230TaskHandle;
 static const osThreadAttr_t k230Task_attributes = {
@@ -124,7 +128,9 @@ const osThreadAttr_t defaultTask_attributes = {
 void startChassisTask(void *argument);
 void startJy901sTask(void *argument);
 void startGrayscaleTask(void *argument);
+#if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
 void startBno055Task(void *argument);
+#endif
 #if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
 void startK230Task(void *argument);
 #endif
@@ -188,8 +194,10 @@ void MX_FREERTOS_Init(void) {
   configASSERT(jy901sTaskHandle != NULL);
   grayscaleTaskHandle = osThreadNew(startGrayscaleTask, NULL, &grayscaleTask_attributes);
   configASSERT(grayscaleTaskHandle != NULL);
+#if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
   bno055TaskHandle = osThreadNew(startBno055Task, NULL, &bno055Task_attributes);
   configASSERT(bno055TaskHandle != NULL);
+#endif
 #if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
   k230TaskHandle = osThreadNew(startK230Task, NULL, &k230Task_attributes);
   configASSERT(k230TaskHandle != NULL);
@@ -295,6 +303,7 @@ void startGrayscaleTask(void *argument)
   }
 }
 
+#if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
 void startBno055Task(void *argument)
 {
   uint32_t next_wake_tick = osKernelGetTickCount();
@@ -307,6 +316,7 @@ void startBno055Task(void *argument)
     (void)osDelayUntil(next_wake_tick);
   }
 }
+#endif
 
 #if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
 void startK230Task(void *argument)

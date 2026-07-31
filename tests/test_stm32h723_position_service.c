@@ -5,6 +5,7 @@
 
 #include "app_chassis_service.h"
 #include "app_debug.h"
+#include "app_jy901s_service.h"
 #include "app_time.h"
 #include "fdcan.h"
 #include "usart.h"
@@ -16,6 +17,18 @@ UART_HandleTypeDef huart7 = {0};
 UART_HandleTypeDef huart8 = {0};
 UART_HandleTypeDef huart9 = {0};
 volatile h723_debug_t g_h723_debug = {0};
+
+bool h723_jy901s_service_get_snapshot(h723_jy901s_control_snapshot_t *snapshot,
+                                      uint32_t now_ms, uint32_t *sample_age_ms)
+{
+    if (snapshot == NULL || sample_age_ms == NULL) {
+        return false;
+    }
+    memset(snapshot, 0, sizeof(*snapshot));
+    (void)now_ms;
+    *sample_age_ms = UINT32_MAX;
+    return true;
+}
 
 static uint32_t s_now_ms;
 static uint32_t s_rx_pending;
