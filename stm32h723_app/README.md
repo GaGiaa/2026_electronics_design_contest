@@ -240,12 +240,13 @@ Chassis switch mapping in the current control state machine is:
 - SE pressed, SB middle and SC middle: gray line-follow mode.
 - All other switch combinations: remote idle and three motor outputs at zero current.
 
-Line follow uses the 65 mm wheel diameter, a 225 mm/s base speed, +/-300 mm/s
-stick adjustment, and a 525 mm/s target-speed cap. A line-strength value below
-800, any ADC timeout, or a missing gray sample stops the output. Four black
-channels latch a stop until the line-follow state is reset or exited. The
-line-follow debug snapshot exposes mode, base speed, line position, validity,
-turn correction, and final left/right target RPM values.
+Line follow uses the 65 mm wheel diameter. The normalized forward stick value
+maps to -300..+300 mm/s, allowing forward and reverse line following. A
+line-strength value below 800, any ADC timeout, or a missing gray sample stops
+the output. The gray sequence prevents repeated PID
+updates, and exiting/resetting the mode clears the PID state. The line-follow
+debug snapshot exposes mode, base speed, line position, validity, turn
+correction, and final left/right target RPM values.
 
 This checkout explicitly sets `APP_H723_CHASSIS_ACTUATION_ENABLE=1U`; nonzero
 current commands are therefore possible once every CRSF, switch, and feedback

@@ -18,7 +18,6 @@ typedef struct {
     uint8_t adc_timeout_mask;
     uint32_t sequence;
     float base_speed_mm_s;
-    uint8_t black_count;
 } app_line_follow_input_t;
 
 /**
@@ -46,7 +45,6 @@ typedef struct {
     PID_Position pid;
     uint32_t last_sequence;
     bool has_sequence;
-    bool stop_latched;
     float turn_correction_mm_s;
 } app_line_follow_state_t;
 
@@ -62,7 +60,7 @@ void app_line_follow_init(app_line_follow_state_t *state,
                           float dt_s);
 
 /**
- * @brief 清除巡线 PID 与全黑停车锁存状态。
+ * @brief 清除巡线 PID 与巡线状态。
  *
  * @param[in,out] state 巡线状态对象。
  */
@@ -71,8 +69,7 @@ void app_line_follow_reset(app_line_follow_state_t *state);
 /**
  * @brief 根据灰度快照生成左右轮目标速度。
  *
- * ADC 超时、线强度不足、无快照或全黑停车时输出非活动的零速度。达到
- * `APP_H723_LINE_FOLLOW_STOP_BLACK_COUNT` 后，必须先调用 reset 才能恢复。
+ * ADC 超时、线强度不足或无快照时输出非活动的零速度。
  *
  * @param[in,out] state 巡线状态对象。
  * @param[in] input 灰度输入快照。

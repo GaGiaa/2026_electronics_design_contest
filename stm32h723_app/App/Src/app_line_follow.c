@@ -36,7 +36,8 @@ static void make_output(const app_line_follow_state_t *state,
                         app_line_follow_output_t *output)
 {
     const float base_speed_mm_s = App_Math_ClampFloat(
-        input->base_speed_mm_s, 0.0f, APP_H723_LINE_FOLLOW_MAX_SPEED_MM_S);
+        input->base_speed_mm_s, -APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S,
+        APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S);
     const float left_speed_mm_s = base_speed_mm_s + state->turn_correction_mm_s;
     const float right_speed_mm_s = base_speed_mm_s - state->turn_correction_mm_s;
 
@@ -62,7 +63,6 @@ void app_line_follow_init(app_line_follow_state_t *state,
     PID_Position_Init(&state->pid, params, dt_s);
     state->last_sequence = 0U;
     state->has_sequence = false;
-    state->stop_latched = false;
     state->turn_correction_mm_s = 0.0f;
 }
 
@@ -75,7 +75,6 @@ void app_line_follow_reset(app_line_follow_state_t *state)
     PID_Position_Reset(&state->pid);
     state->last_sequence = 0U;
     state->has_sequence = false;
-    state->stop_latched = false;
     state->turn_correction_mm_s = 0.0f;
 }
 
@@ -89,18 +88,10 @@ void app_line_follow_step(app_line_follow_state_t *state,
         clear_output(output);
         return;
     }
-    if (input->black_count >= APP_H723_LINE_FOLLOW_STOP_BLACK_COUNT) {
-        app_line_follow_reset(state);
-        state->stop_latched = true;
-        clear_output(output);
-        return;
-    }
-    if (state->stop_latched || input->sequence == 0U ||
+    if (input->sequence == 0U ||
         input->adc_timeout_mask != 0U ||
         input->line_strength < APP_H723_LINE_FOLLOW_LINE_STRENGTH_MIN) {
-        if (!state->stop_latched) {
-            app_line_follow_reset(state);
-        }
+        app_line_follow_reset(state);
         clear_output(output);
         return;
     }

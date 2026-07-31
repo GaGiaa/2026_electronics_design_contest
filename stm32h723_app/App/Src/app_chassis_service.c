@@ -610,7 +610,6 @@ void h723_chassis_service_step(uint32_t now_ms)
             .adc_timeout_mask = g_h723_debug.grayscale.adc_timeout_mask,
             .sequence = g_h723_debug.grayscale.sequence,
             .base_speed_mm_s = s_command.base_speed_mm_s,
-            .black_count = g_h723_debug.grayscale.black_count,
         };
 
         app_line_follow_step(&s_line_follow, &line_input, &s_line_follow_output);

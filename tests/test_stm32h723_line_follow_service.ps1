@@ -14,12 +14,15 @@ foreach ($pattern in @(
     'APP_CHASSIS_MODE_LINE_FOLLOW',
     'app_line_follow_step\(&s_line_follow',
     'app_line_follow_reset\(&s_line_follow',
-    'g_h723_debug\.grayscale\.line_position',
-    'g_h723_debug\.grayscale\.black_count'
+    'g_h723_debug\.grayscale\.line_position'
 )) {
     if ($service -notmatch $pattern) {
         throw "Missing line-follow service integration: $pattern"
     }
+}
+
+if ($service -match '\.black_count\s*=') {
+    throw 'Line-follow service must not pass black_count as a stop gate.'
 }
 
 foreach ($pattern in @(

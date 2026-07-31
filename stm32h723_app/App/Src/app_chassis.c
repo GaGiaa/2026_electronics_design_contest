@@ -29,10 +29,10 @@ static uint32_t app_chassis_switch_state(uint16_t raw)
 
 static float app_chassis_line_follow_base_speed(float forward_normalized)
 {
-    const float speed = APP_H723_LINE_FOLLOW_BASE_SPEED_MM_S +
-                        forward_normalized * APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S;
+    const float speed = forward_normalized * APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S;
 
-    return App_Math_ClampFloat(speed, 0.0f, APP_H723_LINE_FOLLOW_MAX_SPEED_MM_S);
+    return App_Math_ClampFloat(speed, -APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S,
+                               APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S);
 }
 
 void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis_command_t *command)

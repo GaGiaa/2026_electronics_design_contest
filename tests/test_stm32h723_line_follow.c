@@ -40,6 +40,26 @@ static void test_center_line_uses_requested_base_speed(void)
     assert_close(output.right_target_rpm, -200.0f * APP_H723_MM_S_TO_OUTPUT_RPM);
 }
 
+static void test_reverse_base_speed_is_preserved(void)
+{
+    app_line_follow_state_t state;
+    app_line_follow_output_t output;
+    const app_line_follow_input_t input = {
+        .line_position = 0.0f,
+        .line_strength = 4095U,
+        .sequence = 1U,
+        .base_speed_mm_s = -200.0f,
+    };
+    const PID_Position_Param_Config params = make_params();
+
+    app_line_follow_init(&state, &params, 0.01f);
+    app_line_follow_step(&state, &input, &output);
+
+    assert(output.active);
+    assert_close(output.left_target_rpm, -200.0f * APP_H723_MM_S_TO_OUTPUT_RPM);
+    assert_close(output.right_target_rpm, 200.0f * APP_H723_MM_S_TO_OUTPUT_RPM);
+}
+
 static void test_new_grayscale_sequence_updates_turn_once(void)
 {
     app_line_follow_state_t state;
@@ -90,7 +110,7 @@ static void test_invalid_grayscale_input_stops_output(void)
     assert_close(output.right_target_rpm, 0.0f);
 }
 
-static void test_four_black_channels_latch_stop_until_reset(void)
+static void test_line_follow_has_no_black_stop_latch(void)
 {
     app_line_follow_state_t state;
     app_line_follow_output_t output;
@@ -100,11 +120,10 @@ static void test_four_black_channels_latch_stop_until_reset(void)
         .sequence = 1U,
         .base_speed_mm_s = 200.0f,
     };
-    const app_line_follow_input_t stop_input = {
+    const app_line_follow_input_t next_input = {
         .line_strength = 4095U,
         .sequence = 2U,
         .base_speed_mm_s = 200.0f,
-        .black_count = APP_H723_LINE_FOLLOW_STOP_BLACK_COUNT,
     };
     const app_line_follow_input_t resumed_input = {
         .line_strength = 4095U,
@@ -116,13 +135,9 @@ static void test_four_black_channels_latch_stop_until_reset(void)
     app_line_follow_step(&state, &running_input, &output);
     assert(output.active);
 
-    app_line_follow_step(&state, &stop_input, &output);
-    assert(!output.active);
+    app_line_follow_step(&state, &next_input, &output);
+    assert(output.active);
 
-    app_line_follow_step(&state, &resumed_input, &output);
-    assert(!output.active);
-
-    app_line_follow_reset(&state);
     app_line_follow_step(&state, &resumed_input, &output);
     assert(output.active);
 }
@@ -130,8 +145,9 @@ static void test_four_black_channels_latch_stop_until_reset(void)
 int main(void)
 {
     test_center_line_uses_requested_base_speed();
+    test_reverse_base_speed_is_preserved();
     test_new_grayscale_sequence_updates_turn_once();
     test_invalid_grayscale_input_stops_output();
-    test_four_black_channels_latch_stop_until_reset();
+    test_line_follow_has_no_black_stop_latch();
     return 0;
 }

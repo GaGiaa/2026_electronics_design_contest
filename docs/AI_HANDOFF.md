@@ -665,12 +665,12 @@ The current chassis mode table is SE pressed + SB middle + SC low for manual
 mode, SE pressed + SB middle + SC middle for line follow, and remote idle for
 every other SE/SB/SC state. SE not pressed selects the task menu and forces
 three motor outputs to zero current.
-Line follow uses a 65 mm wheel, 225 mm/s base speed, +/-300 mm/s stick range,
-and a 525 mm/s cap. It requires line strength >= 800 and no ADC timeout; four
-black channels latch a stop. The gray sequence prevents repeated PID updates,
-and mode exit/reset clears the latch. The chassis debug snapshot includes the
-line-follow mode, base speed, line position, validity, correction, and final
-left/right RPM targets.
+Line follow uses a 65 mm wheel. The normalized forward stick value maps to
+-300..+300 mm/s, allowing forward and reverse line following. It requires line
+strength >= 800 and no ADC timeout. The gray sequence prevents repeated PID
+updates, and mode exit/reset clears the PID state. The chassis debug snapshot
+includes the line-follow mode, base speed, line position, validity, correction,
+and final left/right RPM targets.
 
 The current checkout explicitly sets `APP_H723_CHASSIS_ACTUATION_ENABLE=1U`.
 Nonzero current commands therefore remain subject to the CRSF, switch, and
