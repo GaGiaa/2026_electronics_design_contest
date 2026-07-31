@@ -27,6 +27,13 @@ static uint32_t s_display_count;
 static bool s_service_initialized;
 static HAL_StatusTypeDef s_last_hal_status = HAL_OK;
 
+static void recover_i2c4(void)
+{
+    g_h723_debug.oled.i2c_recovery_status = HAL_I2C_DeInit(&hi2c4);
+    g_h723_debug.oled.i2c_recovery_count++;
+    MX_I2C4_Init();
+}
+
 static board_oled_status_t write_i2c(const uint8_t *data, uint16_t length)
 {
     if ((data == NULL) || (length == 0U) ||
@@ -214,6 +221,14 @@ static const char *oled_mode_name(uint32_t mode)
     }
 }
 
+static const char *oled_task2_phase_name(uint32_t phase)
+{
+    static const char *const names[] = {
+        "IDLE", "DEPART", "CRUISE", "APPROACH", "STOPPED", "FAULT"
+    };
+    return (phase < (sizeof(names) / sizeof(names[0]))) ? names[phase] : "UNKNOWN";
+}
+
 static board_oled_status_t render_runtime_page(void)
 {
     char line[24];
@@ -228,7 +243,9 @@ static board_oled_status_t render_runtime_page(void)
         return status;
     }
     status = board_oled_write_string(g_h723_debug.control.remote_takeover ?
-                                     "REMOTE CONTROL" : "TASK MENU");
+                                     "REMOTE CONTROL" :
+                                     ((g_h723_debug.task2.phase != 0U) ?
+                                      "TASK 2" : "TASK MENU"));
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
     }
@@ -239,6 +256,9 @@ static board_oled_status_t render_runtime_page(void)
     if (g_h723_debug.control.remote_takeover) {
         (void)snprintf(line, sizeof(line), "MODE:%s",
                        oled_mode_name(g_h723_debug.control.mode));
+    } else if (g_h723_debug.task2.phase != 0U) {
+        (void)snprintf(line, sizeof(line), "STATE:%s",
+                       oled_task2_phase_name(g_h723_debug.task2.phase));
     } else {
         (void)snprintf(line, sizeof(line), "TASK:%lu",
                        (unsigned long)g_h723_debug.control.selected_task);
@@ -255,6 +275,21 @@ static board_oled_status_t render_runtime_page(void)
         (void)snprintf(line, sizeof(line), "SB:%lu SC:%lu",
                        (unsigned long)g_h723_debug.control.sb_state,
                        (unsigned long)g_h723_debug.control.sc_state);
+    } else if (g_h723_debug.task2.phase != 0U) {
+        (void)snprintf(line, sizeof(line), "DIST:%lum",
+                       (unsigned long)(g_h723_debug.task2.distance_mm / 1000.0f));
+        status = board_oled_write_string(line);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_set_cursor(0U, 6U);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        (void)snprintf(line, sizeof(line), "TIME:%lu.%03lus",
+                       (unsigned long)(g_h723_debug.task2.elapsed_ms / 1000U),
+                       (unsigned long)(g_h723_debug.task2.elapsed_ms % 1000U));
+        status = board_oled_write_string(line);
+        if (status != BOARD_OLED_STATUS_OK) {
+            return status;
+        }
+        return board_oled_update();
     } else {
         status = board_oled_write_string("B1:OK B2:UP");
         if (status != BOARD_OLED_STATUS_OK) {
@@ -290,12 +325,20 @@ static board_oled_status_t render_runtime_page(void)
 static void record_oled_status(board_oled_status_t status)
 {
     g_h723_debug.oled.last_hal_status = (uint32_t)s_last_hal_status;
+    g_h723_debug.oled.i2c_error_code = hi2c4.ErrorCode;
+    g_h723_debug.oled.i2c_state = (uint32_t)hi2c4.State;
+    g_h723_debug.oled.i2c_isr = I2C4->ISR;
+    g_h723_debug.oled.gpio_pd_idr = GPIOD->IDR;
     if (status == BOARD_OLED_STATUS_OK) {
         g_h723_debug.oled.initialized = 1U;
     } else {
         g_h723_debug.oled.initialized = 0U;
         g_h723_debug.oled.error_count++;
         s_service_initialized = false;
+        if (status != BOARD_OLED_STATUS_ARGUMENT) {
+            /* HAL timeout can leave I2C4 BUSY with SCL held by the master. */
+            recover_i2c4();
+        }
     }
 }
 
@@ -305,9 +348,15 @@ void h723_oled_service_init(void)
     g_h723_debug.oled.initialized = 0U;
     g_h723_debug.oled.init_attempt_count = 0U;
     g_h723_debug.oled.last_hal_status = HAL_OK;
+    g_h723_debug.oled.i2c_error_code = HAL_I2C_ERROR_NONE;
+    g_h723_debug.oled.i2c_state = (uint32_t)hi2c4.State;
+    g_h723_debug.oled.i2c_isr = I2C4->ISR;
+    g_h723_debug.oled.gpio_pd_idr = GPIOD->IDR;
+    g_h723_debug.oled.i2c_recovery_count = 0U;
+    g_h723_debug.oled.i2c_recovery_status = HAL_OK;
     g_h723_debug.oled.update_count = 0U;
     g_h723_debug.oled.error_count = 0U;
-    s_last_attempt_ms = 0U - APP_H723_OLED_TASK_PERIOD_MS;
+    s_last_attempt_ms = 0U - APP_H723_OLED_REFRESH_PERIOD_MS;
     s_last_update_ms = 0U;
     s_display_count = 0U;
     s_service_initialized = false;
@@ -319,7 +368,7 @@ void h723_oled_service_step(uint32_t now_ms)
 
     if (!s_service_initialized) {
         if ((uint32_t)(now_ms - s_last_attempt_ms) <
-            APP_H723_OLED_TASK_PERIOD_MS) {
+            APP_H723_OLED_REFRESH_PERIOD_MS) {
             return;
         }
         s_last_attempt_ms = now_ms;
@@ -341,7 +390,7 @@ void h723_oled_service_step(uint32_t now_ms)
     }
 
     if ((uint32_t)(now_ms - s_last_update_ms) <
-        APP_H723_OLED_TASK_PERIOD_MS) {
+        APP_H723_OLED_REFRESH_PERIOD_MS) {
         return;
     }
     s_last_update_ms = now_ms;

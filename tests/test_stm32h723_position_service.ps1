@@ -13,6 +13,7 @@ try {
     & $gcc '-std=c99' '-Wall' '-Wextra' '-Werror' '-Wno-unused-function' '-DAPP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE=1U' "-I$support" "-I$appDir\App\Inc" "-I$ProjectRoot\shared\pid" `
         "-I$PSScriptRoot\stubs" "$ProjectRoot\shared\pid\pid.c" "$appDir\App\Src\app_crsf.c" `
         "$appDir\App\Src\app_chassis.c" "$appDir\App\Src\app_task_menu.c" `
+        "$appDir\App\Src\app_task2.c" `
         "$appDir\App\Src\app_buttons.c" "$PSScriptRoot\stubs\gpio_state.c" `
         "$appDir\App\Src\app_m2006.c" `
         "$appDir\App\Src\app_line_follow.c" "$appDir\App\Src\app_balance.c" `
