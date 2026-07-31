@@ -1,5 +1,31 @@
 # MSPM0 核心板工程交接索引
 
+## H723 JY901S 接管水管倾角闭环（2026-08-01）
+
+- 水管上的 BNO055 已移出当前项目。ID 3 倾角外环现在唯一消费 JY901S UART9 服务发布的一致性控制快照；快照以序列号保护，包含校准 `vehicle_angle_deg[1]`、完整样本序号、样本时间、样本有效性和启动校准有效性。`chassisTask` 读取发布中的快照不等待，当周期按保持保护处理，绝不读取 `g_h723_debug.jy901s`。
+- 倾角反馈为 `tilt_deg = -(vehicle_pitch_deg - captured_zero_deg)`，其中 `vehicle_pitch_deg=vehicle_angle_deg[1]`。用户实测校准 pitch 增大时水管倾角减小、ID 3 正转，因此外环保留位置负号映射并随 JY901S 200 Hz 完整样本以 5 ms PID 步长运行：`motor_target_deg -= pid_rate_deg_s * 0.005f`。`target_tilt_deg=+0.5f` 的预期是校准 pitch 减小、ID 3 位置减小、车尾抬高。
+- 倾角闭环仅在 ID 3 已归零、ID 3 反馈新鲜、JY901S 快照年龄不超过 30 ms、`sample_valid=1`、`calibration_valid=1` 且已成功捕获水管水平零偏时激活；其余情况冻结最后安全位置并清零 PID 积分。未捕获零偏会报告 `APP_TILT_FAULT_ZERO_NOT_CAPTURED` 并保持位置，避免启动姿态偏移直接驱动 ID 3。Watch 校零、PID 参数、70–210 deg 外环限幅、13 通道倾角 VOFA 和 UART8 超时恢复机制均保留，VOFA 中的原始/年龄数据已切换到 JY901S。
+- 新增 `APP_H723_BNO055_SERVICE_ENABLE`，默认 `0U`。默认构建不创建或运行 `bno055Task`，BNO055 不参与控制；源码、USART1 配置、Keil 工程项、Watch 分组、单元测试和恢复文档仍保留。若恢复 BNO055 UART8 遥测，必须同时设置该服务开关为 `1U`，编译期会检查依赖。
+- 已通过全部 `tests/test_stm32h723_*.ps1` 主机/静态测试，以及 `D:\Keil_v5\UV4\UV4.exe -r .\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx -j0` 纯软件重建；构建日志为 `0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、UART9/JY901S 实物、UART8/VOFA、CAN、电机或水管闭环实物验收。首次通电必须车架悬空、钢珠取出或固定并可立即断电；先等待 JY901S 校准完成，再校零并从低 P 验证正目标方向。
+
+## H723 BNO055 水管倾角闭环（2026-07-31）
+
+- 新增纯 C `App/app_tilt_control`，作为 ID 3 机械位置环之外的约 100 Hz 倾角外环。反馈为
+  校零后的 `pitch_deg`，不反相；实测 ID 3 正转、输出轴位置增大时，`pitch` 减小、车尾下降，
+  因此外环以 `motor_target_deg -= pid_rate_deg_s * 0.01f` 生成位置请求。外环不直接输出电流，
+  `app_balance` 仍独占归零、位置/速度 PID 和 CAN ID 3 电流槽位。
+- 正常活动范围已从 `5–275 deg` 收紧为归零后 `80–180 deg`；软件 `0 deg` 仍仅用于归零机械限位。
+  `g_h723_debug.tilt` 提供默认关闭的 `enable`、目标倾角、调平零偏捕获、P/I/D、死区和最大位置变化率，
+  并发布样本年龄、误差、PID 分量和最终位置目标。默认参数为 10 ms、`Kp=6`、`Ki=0`、`Kd=0`、
+  `0.20 deg` 死区及 `10 deg/s` 目标位置变化率。
+- BNO055 服务新增非阻塞的一致性快照读取接口。未归零、ID 3 反馈不新鲜、BNO055 无效/离线、样本超过
+  30 ms 或读取碰到发布中快照时，倾角外环冻结最后安全位置并清零积分；恢复后仅随新的完整样本更新。
+- 已通过 `tests/test_stm32h723_tilt_control.ps1`、`tests/test_stm32h723_tilt_integration.ps1`、
+  `tests/test_stm32h723_position_service.ps1` 及 ID 3、BNO055、调试布局、底盘和 Keil 工程静态测试。
+  本轮未执行 Flash、烧录、SWD/GDB、CAN/BNO055/电机实物闭环验收。首次实车必须车架悬空、钢珠取出或
+  固定且可立即断电；完成归零并捕获水平零偏后，从 `target_tilt_deg=0` 和低 P 开始，验证
+  `target_tilt_deg=+0.5 deg` 是否让 `pitch` 增大、ID 3 位置减小、车尾抬高。
+
 ## H723 ID 3 平衡机构机械零点校准（2026-07-31）
 
 - 新增 `App/app_balance`，独占 M2006 ID 3 的 `0x200` 第三个电流槽位；ID 1/2
@@ -15,7 +41,7 @@
   的目标。`APP_H723_BALANCE_POSITION_MIN_DEG` 必须保持包含 `0 deg`，以允许建立软件零点；
   归零后的正常运行安全下限由 `APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG` 单独定义，Watch
   请求低于该值时会被限幅并在 `active_target_position_deg` 中显示。当前配置为软件零点 `0 deg`、
-  正常运行下限 `5 deg`、上限 `275 deg`；其余速度和电流参数以 `app_config.h` 为准。
+  正常运行下限 `80 deg`、上限 `180 deg`；其余速度和电流参数以 `app_config.h` 为准。
 - `g_h723_debug.balance` 暴露 `state`、`fault`、`zero_valid`、`zero_offset_deg`、实际
   位置/速度/电流、请求与生效目标、限幅标志和命令电流；同时镜像平衡速度内环的
   PID 参数、采样周期、误差、积分状态以及 P/I/D、原始和最终输出，供 Keil Watch 排查。
@@ -651,6 +677,54 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 5. 注释规范变化时，更新 `docs/CODING_STYLE.md`；
 6. 检查 Markdown 相对链接、代码围栏、失效路径和说明性英文；
 7. 明确列出未执行的 Flash、烧录、GDB/SWD、电机调试和硬件验收操作。
+
+## H723 Tilt-Control VOFA Telemetry (2026-08-01)
+
+- Added the compile-time UART8 switch
+  `APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE=1U`. It sends a
+  13-float VOFA+ JustFloat frame every 2 ms. The fixed layout shows the full
+  water-pipe outer loop and ID 3 inner-loop chain: target/calibrated tilt,
+  error, P/I/D/total rate, outer position request, ID 3 position feedback and
+  active target, speed target, current command, and JY901S sample age.
+- The mode is included in the UART8 compile-time mutual-exclusion guard. It
+  reads only `g_h723_debug` and cannot change homing, 70–210 deg position
+  protection, PID behavior, current output, or CAN output.
+- Validation completed: `tests\\test_stm32h723_tilt_vofa.ps1`,
+  `tests\\test_stm32h723_vofa_justfloat.ps1`, and
+  `tests\\test_stm32h723_chassis_telemetry.ps1` passed. No Flash, SWD, UART,
+  VOFA, IMU, CAN, or motor hardware operation was performed.
+
+## H723 UART8 VOFA DMA Recovery (2026-08-01)
+
+- Fixed the UART8 DMA completion race: the software TX guard is reserved before
+  `HAL_UART_Transmit_DMA()` starts. A completion callback that runs while the
+  task is preempted can therefore no longer be overwritten by a later
+  `tx_in_flight=1` store.
+- Added the default `APP_H723_UART8_TX_TIMEOUT_MS=20U` watchdog. If an active
+  transfer does not complete by that deadline, the default task calls blocking
+  `HAL_UART_AbortTransmit()` and releases the guard only after the HAL reports
+  success. The same path applies to all mutually exclusive UART8 telemetry
+  modes. Watch publishes start time, timeout/recovery counters, HAL state, and
+  HAL error code.
+- Added pure-C guard tests for completion-during-start, start failure, and
+  timeout boundaries, plus a static recovery integration check. No Flash,
+  UART/VOFA physical test, IMU, CAN, or motor operation was performed.
+
+## H723 ID 3 Extended Position Range Watch Switch (2026-08-01)
+
+- Added `g_h723_debug.balance.allow_extended_position_range`, default `0U`.
+  When set to `1U`, the manual ID 3 position target uses the separately bounded
+  debug range `APP_H723_BALANCE_POSITION_DEBUG_ACTIVE_MIN_DEG=0.0f` through
+  `APP_H723_BALANCE_POSITION_DEBUG_MAX_DEG=360.0f`, instead of the normal
+  `70.0f–210.0f` active range. `extended_position_range_active` mirrors the
+  selected range in Keil Watch.
+- This is not an unlimited position override. Homing, feedback freshness,
+  position/speed PID limits, current limits, CAN output protection, and the
+  `0 deg` homing boundary remain active. The JY901S tilt outer loop retains its
+  own normal 70–210 deg target clamp.
+- Validation completed: the balance host unit test covers normal clamping,
+  extended-range acceptance, and debug-maximum clamping. No Flash, SWD, CAN,
+  IMU, motor, or mechanical range operation was performed.
 
 ## Git 操作授权规则
 

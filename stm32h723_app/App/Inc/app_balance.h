@@ -33,6 +33,8 @@ typedef struct {
     float position_min_deg;
     float position_active_min_deg;
     float position_max_deg;
+    float position_debug_active_min_deg;
+    float position_debug_max_deg;
     uint32_t position_period_ms;
     PID_Incremental_Param_Config home_speed_params;
     PID_Incremental_Param_Config position_speed_params;
@@ -46,6 +48,7 @@ typedef struct {
     float feedback_output_speed_rpm;
     float feedback_current_a;
     float requested_target_position_deg;
+    bool allow_extended_position_range;
     bool rehome_request;
 } app_balance_step_input_t;
 
@@ -54,6 +57,7 @@ typedef struct {
     app_balance_fault_t fault;
     bool zero_valid;
     bool target_clamped;
+    bool extended_position_range_active;
     bool rehome_request_consumed;
     float zero_offset_deg;
     float feedback_position_deg;

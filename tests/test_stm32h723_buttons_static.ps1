@@ -143,7 +143,7 @@ foreach ($line in @(
     'H723_APP_BUTTON_PC5',
     'H723_APP_BUTTON_PC4',
     'H723_APP_BUTTON_PA6',
-    'HAL_UART_Transmit_DMA(&huart8, s_button_frame'
+    'h723_uart8_try_transmit(s_button_frame, sizeof(s_button_frame), now_ms)'
 )) {
     Require-Text $telemetry $line "Missing button VOFA integration: $line"
 }

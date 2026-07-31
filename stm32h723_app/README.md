@@ -8,12 +8,59 @@
 - HSE 25 MHz，系统时钟 550 MHz；SWD 使用 `PA13/PA14`；M7 D-Cache 关闭，避免 DMA 缓冲区一致性问题。
 - UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
 - UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
-- USART1：`PB6` TX、`PB7` RX、8-N-1、115200 bit/s，不使用 DMA；用于 BNO055 原生 UART 请求应答。
+- USART1：`PB6` TX、`PB7` RX、8-N-1、115200 bit/s，不使用 DMA；保留给默认停用的 BNO055 原生 UART 服务。
 - USART2：`PD5` TX、`PD6` RX、8-N-1、234000 bit/s，RX 使用 `DMA1_Stream3` 的 ReceiveToIdle DMA，供默认关闭的 K230 钢珠位置测试链路使用。
 - M2006 总线使用 1 Mbit/s，接收 ID `0x201..0x203`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。硬件必须接到所选实例对应的引脚；若实际接线位于 FDCAN1 或 FDCAN3，需同步修改该宏并重新编译。
 - FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
-两台 M2006 的 CAN 实例由 `APP_H723_M2006_FDCAN_INSTANCE` 选择，当前默认使用 FDCAN2；左轮 ID 1、方向 `+1`，右轮 ID 2、方向 `-1`。ID 3 的上层平衡机构不属于本轮实现。
+两台 M2006 的 CAN 实例由 `APP_H723_M2006_FDCAN_INSTANCE` 选择，当前默认使用 FDCAN2；左轮 ID 1、方向 `+1`，右轮 ID 2、方向 `-1`。ID 3 由独占的平衡机构控制器使用，不参与底盘差速混控或单电机调试通道。
+
+## ID 3 水管倾角闭环
+
+`app_balance` 始终独占 ID 3 的机械归零、输出轴位置环、速度环和 `0x200` 第三个电流槽位。归零后，正常位置目标限制在相对软件零位 `70–210 deg`；`0 deg` 只保留给负向搜索机械限位。`app_tilt_control` 作为最外层，仅在 Keil Watch 的 `g_h723_debug.tilt.enable=1U` 时生成位置请求，绝不直接输出电流。
+
+为核对机构行程，Keil Watch 可将 `g_h723_debug.balance.allow_extended_position_range`
+设为 `1U`。默认 `0U` 保持正常 `70–210 deg`；设为 `1U` 后，手动
+`balance.target_position_deg` 切换到仍有边界的调试范围 `0–360 deg`，由
+`APP_H723_BALANCE_POSITION_DEBUG_ACTIVE_MIN_DEG` 和
+`APP_H723_BALANCE_POSITION_DEBUG_MAX_DEG` 配置。`extended_position_range_active`
+回显当前选择。此开关不会绕过归零、反馈超时、PID 限速/限流或 CAN 电流保护；它也不会扩大
+`app_tilt_control` 自己的 `70–210 deg` 外环限幅。只有在车架悬空、钢珠取出或固定且已确认
+调试范围不会撞击机构时才能置 `1U`，完成测试后立即恢复 `0U`。
+
+倾角反馈为 JY901S 车体校准 `vehicle_angle_deg[1]` 的校零后反相值：`tilt_deg = -(vehicle_pitch_deg - captured_zero_deg)`。实测该校准 pitch 增大时水管倾角减小、ID 3 正转，故外环把正的 PID 速率转换为负的位置变化：`motor_target_deg -= pid_rate_deg_s * 0.005f`。必须在水管调平后成功执行 `capture_zero_request`，`zero_captured_valid=1U` 之前闭环会保持当前位置并报告零偏未捕获故障。JY901S 回传 200 Hz，外环也只随每个新完整样本更新。因此请求更大的正倾角时，ID 3 的目标位置应减小，车尾抬高。
+
+首次调试必须车架悬空，钢珠取出或固定，并可随时断电：先等待 JY901S `sample_valid=1U` 和 `calibration_valid=1U`，完成归零后手动调平水管，在 Watch 写入 `capture_zero_request=1U` 并等待其自动清零；再以 `enable=1U`、`target_tilt_deg=0.0f` 和默认 P 参数启动。`target_tilt_deg=+0.5f` 时应观察到校准 pitch 减小、ID 3 位置减小。JY901S 未校准、离线、样本超过 30 ms、ID 3 反馈失效或尚未归零时，外环冻结最后安全位置并清除积分；内层位置/速度环仍保留。
+
+外环周期为 5 ms，当前默认 `Kp=120`、`Ki=0`、`Kd=6`、死区 `0.05 deg`、最大位置变化率 `3000 deg/s`。它使用局部两自由度 PID：P/I 使用倾角误差，D 只对水管倾角测量值求导，因此修改 `target_tilt_deg` 不会产生微分冲击。`derivative_filter_N` 是 D 项一阶低通系数，默认 `20 s^-1`，可在 Watch 实时修改；`0` 表示不滤波。首次启用、失效恢复和捕获零偏后的首个样本均强制 D 为零。输出速率或位置请求碰限时，本周期积分会被拒绝以避免风up。先只调 P，确认没有曲柄虚位引起的频繁换向后，再逐步加入 D，最后才加入 I。运行状态、样本年龄、校零值、误差、测得/滤波倾角速率、PID 分量及最终位置目标均在 `g_h723_debug.tilt`。
+
+当前 `APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE=1U`，UART8 每
+`APP_H723_TILT_CONTROL_VOFA_TELEMETRY_INTERVAL_MS`（当前配置 `2 ms`）发送 13 通道
+VOFA+ JustFloat。它与所有其他 UART8 遥测模式编译期互斥，启用前必须关闭其他
+VOFA 宏。通道顺序固定为：
+
+1. `target_tilt_deg`，目标倾角，deg；
+2. `tilt_deg`，JY901S 校准 pitch 反相并校零后的水管倾角，deg；
+3. `error_deg`，外环误差，deg；
+4. `pid_p_out_deg_s`；
+5. `pid_i_out_deg_s`；
+6. `pid_d_out_deg_s`；
+7. `pid_rate_deg_s`，外环总输出，deg/s；
+8. `motor_target_position_deg`，外环生成的 ID 3 位置请求，deg；
+9. `balance.feedback_position_deg`，ID 3 位置反馈，deg；
+10. `balance.active_target_position_deg`，经 `app_balance` 限幅后的有效位置目标，deg；
+11. `balance.target_output_speed_rpm`，ID 3 速度环目标，RPM；
+12. `balance.commanded_current_a`，实际请求的电流，A；
+13. `imu_sample_age_ms`，JY901S 完整样本年龄，ms。
+
+该遥测只读取调试快照，不改变倾角 PID、归零、70–210 deg 位置保护、速度/电流环或 CAN 输出。
+
+UART8 发送以“先预占、再启动 DMA”的方式消除完成回调与任务抢占的竞态。若单次传输超过
+`APP_H723_UART8_TX_TIMEOUT_MS`（默认 `20 ms`），默认任务会调用 `HAL_UART_AbortTransmit()`
+恢复 UART8。Watch 中 `g_h723_debug.uart8.tx_timeout_count`、`tx_recovery_count`、
+`tx_recovery_failure_count`、`hal_g_state` 和 `hal_error_code` 用于判断恢复是否发生。当前
+`2 ms` 周期为 500 Hz 调试配置；只有持续观察到 `tx_timeout_count=0` 时才应保留该频率，常规调参
+建议使用 `10 ms`。
 
 ## 任务 2：循迹一圈并停回 A 点
 

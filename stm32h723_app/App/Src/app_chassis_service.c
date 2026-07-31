@@ -1,5 +1,6 @@
 #include "app_chassis_service.h"
 
+#include <limits.h>
 #include <math.h>
 #include <string.h>
 
@@ -10,11 +11,13 @@
 #include "app_crsf.h"
 #include "app_debug.h"
 #include "app_line_follow.h"
+#include "app_jy901s_service.h"
 #include "app_m2006.h"
 #include "app_single_motor.h"
 #include "app_task2.h"
 #include "app_task_menu.h"
 #include "app_time.h"
+#include "app_tilt_control.h"
 #include "fdcan.h"
 #include "usart.h"
 
@@ -38,6 +41,9 @@ static PID_Position s_position_pid[3];
 static app_m2006_position_tracker_t s_position_tracker[3];
 #if (APP_H723_BALANCE_ENABLE == 1U)
 static app_balance_t s_balance;
+#if (APP_H723_TILT_CONTROL_ENABLE == 1U)
+static app_tilt_control_t s_tilt_control;
+#endif
 #endif
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
 static float s_position_origin_deg[3];
@@ -123,6 +129,8 @@ static const app_balance_config_t s_balance_config = {
     .position_min_deg = APP_H723_BALANCE_POSITION_MIN_DEG,
     .position_active_min_deg = APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG,
     .position_max_deg = APP_H723_BALANCE_POSITION_MAX_DEG,
+    .position_debug_active_min_deg = APP_H723_BALANCE_POSITION_DEBUG_ACTIVE_MIN_DEG,
+    .position_debug_max_deg = APP_H723_BALANCE_POSITION_DEBUG_MAX_DEG,
     .position_period_ms = APP_H723_BALANCE_POSITION_PERIOD_MS,
     .home_speed_params = {
         .kp = APP_H723_BALANCE_HOME_SPEED_PID_KP,
@@ -150,6 +158,23 @@ static const app_balance_config_t s_balance_config = {
         .deadband = 0.0f,
     },
 };
+#if (APP_H723_TILT_CONTROL_ENABLE == 1U)
+static const app_tilt_control_config_t s_tilt_control_config = {
+    .position_min_deg = APP_H723_BALANCE_POSITION_ACTIVE_MIN_DEG,
+    .position_max_deg = APP_H723_BALANCE_POSITION_MAX_DEG,
+    .sample_period_ms = APP_H723_TILT_CONTROL_PERIOD_MS,
+    .sample_max_age_ms = APP_H723_TILT_CONTROL_SAMPLE_MAX_AGE_MS,
+    .pitch_to_tilt_sign = APP_H723_TILT_CONTROL_PITCH_TO_TILT_SIGN,
+    .derivative_filter_N = APP_H723_TILT_CONTROL_DERIVATIVE_FILTER_N,
+    .pid_params = {
+        .kp = APP_H723_TILT_CONTROL_PID_KP,
+        .ki = APP_H723_TILT_CONTROL_PID_KI,
+        .kd = APP_H723_TILT_CONTROL_PID_KD,
+        .output_limit = APP_H723_TILT_CONTROL_MAX_POSITION_RATE_DEG_S,
+        .deadband = APP_H723_TILT_CONTROL_PID_DEADBAND_DEG,
+    },
+};
+#endif
 #endif
 
 static const PID_Position_Param_Config s_line_follow_pid_params = {
@@ -267,6 +292,9 @@ void h723_chassis_service_init(void)
     }
 #if (APP_H723_BALANCE_ENABLE == 1U)
     app_balance_init(&s_balance, &s_balance_config);
+#if (APP_H723_TILT_CONTROL_ENABLE == 1U)
+    app_tilt_control_init(&s_tilt_control, &s_tilt_control_config);
+#endif
 #endif
     app_line_follow_init(&s_line_follow, &s_line_follow_pid_params,
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
@@ -311,6 +339,16 @@ void h723_chassis_service_init(void)
     g_h723_debug.single_motor.position_deadband_deg = APP_H723_SINGLE_MOTOR_POSITION_PID_DEADBAND_DEG;
     g_h723_debug.balance.target_position_deg = 0.0f;
     g_h723_debug.balance.rehome_request = 0U;
+    g_h723_debug.balance.allow_extended_position_range = 0U;
+    g_h723_debug.tilt.enable = 0U;
+    g_h723_debug.tilt.target_tilt_deg = 0.0f;
+    g_h723_debug.tilt.capture_zero_request = 0U;
+    g_h723_debug.tilt.pid_kp = APP_H723_TILT_CONTROL_PID_KP;
+    g_h723_debug.tilt.pid_ki = APP_H723_TILT_CONTROL_PID_KI;
+    g_h723_debug.tilt.pid_kd = APP_H723_TILT_CONTROL_PID_KD;
+    g_h723_debug.tilt.derivative_filter_N = APP_H723_TILT_CONTROL_DERIVATIVE_FILTER_N;
+    g_h723_debug.tilt.pid_deadband_deg = APP_H723_TILT_CONTROL_PID_DEADBAND_DEG;
+    g_h723_debug.tilt.max_position_rate_deg_s = APP_H723_TILT_CONTROL_MAX_POSITION_RATE_DEG_S;
     s_single_motor_last_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     s_single_motor_last_enable = 0U;
     s_single_motor_last_control_mode = APP_SINGLE_MOTOR_CONTROL_MODE_SPEED;
@@ -419,22 +457,116 @@ static void h723_update_m2006_debug(uint32_t index, uint32_t now_ms, float targe
     debug->target_output_speed_rpm = target_rpm;
 }
 
+#if (APP_H723_BALANCE_ENABLE == 1U) && (APP_H723_TILT_CONTROL_ENABLE == 1U)
+static bool h723_tilt_pid_params_are_valid(float kp, float ki, float kd,
+                                           float derivative_filter_n, float output_limit,
+                                           float deadband)
+{
+    return isfinite(kp) && isfinite(ki) && isfinite(kd) && isfinite(derivative_filter_n) &&
+           isfinite(output_limit) &&
+           isfinite(deadband) && kp >= 0.0f && ki >= 0.0f && kd >= 0.0f &&
+           derivative_filter_n >= 0.0f && output_limit > 0.0f && deadband >= 0.0f;
+}
+
+static void h723_tilt_apply_debug_params(void)
+{
+    volatile h723_debug_tilt_t *debug = &g_h723_debug.tilt;
+
+    if (h723_tilt_pid_params_are_valid(debug->pid_kp, debug->pid_ki, debug->pid_kd,
+                                       debug->derivative_filter_N,
+                                       debug->max_position_rate_deg_s,
+                                       debug->pid_deadband_deg)) {
+        s_tilt_control.config.pid_params.kp = debug->pid_kp;
+        s_tilt_control.config.pid_params.ki = debug->pid_ki;
+        s_tilt_control.config.pid_params.kd = debug->pid_kd;
+        s_tilt_control.config.derivative_filter_N = debug->derivative_filter_N;
+        s_tilt_control.config.pid_params.output_limit = debug->max_position_rate_deg_s;
+        s_tilt_control.config.pid_params.deadband = debug->pid_deadband_deg;
+    }
+}
+
+static void h723_tilt_publish_debug(const app_tilt_control_output_t *output,
+                                    uint32_t sample_age_ms)
+{
+    volatile h723_debug_tilt_t *debug = &g_h723_debug.tilt;
+
+    debug->state = (uint32_t)output->state;
+    debug->fault = (uint32_t)output->fault;
+    debug->capture_zero_consumed = output->capture_zero_consumed ? 1U : 0U;
+    debug->zero_captured_valid = output->zero_captured_valid ? 1U : 0U;
+    debug->new_imu_sample = output->new_imu_sample ? 1U : 0U;
+    debug->motor_target_clamped = output->motor_target_clamped ? 1U : 0U;
+    debug->imu_sample_age_ms = sample_age_ms;
+    debug->raw_pitch_deg = output->raw_pitch_deg;
+    debug->captured_zero_deg = output->captured_zero_deg;
+    debug->tilt_deg = output->tilt_deg;
+    debug->error_deg = output->error_deg;
+    debug->pid_rate_deg_s = output->pid_rate_deg_s;
+    debug->pid_p_out_deg_s = output->pid_p_out_deg_s;
+    debug->pid_i_out_deg_s = output->pid_i_out_deg_s;
+    debug->pid_d_out_deg_s = output->pid_d_out_deg_s;
+    debug->pid_integral = output->pid_integral;
+    debug->measured_tilt_rate_deg_s = output->measured_tilt_rate_deg_s;
+    debug->filtered_tilt_rate_deg_s = output->filtered_tilt_rate_deg_s;
+    debug->motor_target_position_deg = output->motor_target_position_deg;
+}
+
+static float h723_tilt_service_step(uint32_t now_ms, uint32_t motor_index)
+{
+    h723_jy901s_control_snapshot_t imu_snapshot = {0};
+    uint32_t sample_age_ms = UINT_MAX;
+    app_tilt_control_output_t output;
+    const bool snapshot_available = h723_jy901s_service_get_snapshot(&imu_snapshot, now_ms,
+                                                                        &sample_age_ms);
+    const app_tilt_control_input_t input = {
+        .now_ms = now_ms,
+        .enabled = g_h723_debug.tilt.enable != 0U,
+        .target_tilt_deg = g_h723_debug.tilt.target_tilt_deg,
+        .capture_zero_request = g_h723_debug.tilt.capture_zero_request != 0U,
+        .balance_zero_valid = s_balance.zero_valid,
+        .motor_feedback_valid = h723_m2006_feedback_is_fresh(motor_index, now_ms),
+        .motor_feedback_position_deg =
+            app_m2006_position_tracker_output_degrees(&s_position_tracker[motor_index]),
+        .imu_online = snapshot_available && imu_snapshot.sample_valid,
+        .imu_valid = snapshot_available && imu_snapshot.sample_valid &&
+                     imu_snapshot.calibration_valid,
+        .imu_pitch_deg = imu_snapshot.vehicle_pitch_deg,
+        .imu_sample_count = imu_snapshot.complete_sample_count,
+        .imu_sample_age_ms = sample_age_ms,
+    };
+
+    h723_tilt_apply_debug_params();
+    app_tilt_control_step(&s_tilt_control, &input, &output);
+    if (output.capture_zero_consumed) {
+        g_h723_debug.tilt.capture_zero_request = 0U;
+    }
+    h723_tilt_publish_debug(&output, sample_age_ms);
+    return input.enabled ? output.motor_target_position_deg :
+                           g_h723_debug.balance.target_position_deg;
+}
+#endif
+
 #if (APP_H723_BALANCE_ENABLE == 1U)
 static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3])
 {
     const uint32_t index = APP_H723_BALANCE_MOTOR_ID - 1U;
-    const app_balance_step_input_t input = {
+    app_balance_step_input_t input = {
         .now_ms = now_ms,
         .feedback_valid = h723_m2006_feedback_is_fresh(index, now_ms),
         .feedback_position_deg = app_m2006_position_tracker_output_degrees(&s_position_tracker[index]),
         .feedback_output_speed_rpm = s_feedback[index].output_speed_rpm,
         .feedback_current_a = s_feedback[index].current_a,
         .requested_target_position_deg = g_h723_debug.balance.target_position_deg,
+        .allow_extended_position_range =
+            g_h723_debug.balance.allow_extended_position_range != 0U,
         .rehome_request = g_h723_debug.balance.rehome_request != 0U,
     };
     app_balance_step_output_t result;
     volatile h723_m2006_debug_t *debug = &g_h723_debug.m2006[index];
 
+#if (APP_H723_TILT_CONTROL_ENABLE == 1U)
+    input.requested_target_position_deg = h723_tilt_service_step(now_ms, index);
+#endif
     app_balance_step(&s_balance, &input, &result);
     if (result.rehome_request_consumed) {
         g_h723_debug.balance.rehome_request = 0U;
@@ -443,6 +575,8 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
     g_h723_debug.balance.fault = (uint32_t)result.fault;
     g_h723_debug.balance.zero_valid = result.zero_valid ? 1U : 0U;
     g_h723_debug.balance.target_clamped = result.target_clamped ? 1U : 0U;
+    g_h723_debug.balance.extended_position_range_active =
+        result.extended_position_range_active ? 1U : 0U;
     g_h723_debug.balance.cycle_count++;
     g_h723_debug.balance.active_target_position_deg = result.active_target_position_deg;
     g_h723_debug.balance.zero_offset_deg = result.zero_offset_deg;

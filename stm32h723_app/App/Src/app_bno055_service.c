@@ -14,6 +14,9 @@ static uint32_t s_last_sample_ms;
 static uint32_t s_next_start_attempt_ms;
 static uint32_t s_start_attempt_count;
 static uint32_t s_uart_error_count;
+static app_bno055_snapshot_t s_control_snapshot;
+static volatile uint32_t s_control_snapshot_sequence;
+static volatile uint32_t s_control_snapshot_age_ms;
 
 #define H723_BNO055_DRAIN_MAX_BYTES 16U
 
@@ -117,11 +120,52 @@ static void h723_bno055_publish_debug(uint32_t now_ms)
         (uint32_t)(now_ms - s_last_sample_ms) : UINT_MAX;
 }
 
+static void h723_bno055_publish_control_snapshot(uint32_t now_ms)
+{
+    const app_bno055_snapshot_t *snapshot = app_bno055_get_snapshot(&s_imu);
+
+    if (snapshot == NULL) {
+        return;
+    }
+
+    s_control_snapshot_sequence++;
+    __DMB();
+    s_control_snapshot = *snapshot;
+    s_control_snapshot_age_ms = snapshot->valid != 0 ?
+        (uint32_t)(now_ms - s_last_sample_ms) : UINT_MAX;
+    __DMB();
+    s_control_snapshot_sequence++;
+}
+
+bool h723_bno055_service_get_snapshot(app_bno055_snapshot_t *snapshot,
+                                      uint32_t *sample_age_ms)
+{
+    uint32_t sequence_before;
+    uint32_t sequence_after;
+
+    if (snapshot == NULL || sample_age_ms == NULL) {
+        return false;
+    }
+
+    sequence_before = s_control_snapshot_sequence;
+    if ((sequence_before & 1U) != 0U) {
+        return false;
+    }
+    __DMB();
+    *snapshot = s_control_snapshot;
+    *sample_age_ms = s_control_snapshot_age_ms;
+    __DMB();
+    sequence_after = s_control_snapshot_sequence;
+    return sequence_before == sequence_after && (sequence_after & 1U) == 0U;
+}
+
 void h723_bno055_service_init(void)
 {
     app_bno055_init(&s_imu, NULL, h723_bno055_write, h723_bno055_read,
                     h723_bno055_delay, APP_BNO055_UART_TIMEOUT_MS);
     app_bno055_set_drain(&s_imu, h723_bno055_drain);
+    s_control_snapshot_sequence = 0U;
+    s_control_snapshot_age_ms = UINT_MAX;
 }
 
 void h723_bno055_service_step(uint32_t now_ms)
@@ -138,6 +182,7 @@ void h723_bno055_service_step(uint32_t now_ms)
             }
         }
         h723_bno055_publish_debug(now_ms);
+        h723_bno055_publish_control_snapshot(now_ms);
         return;
     }
 
@@ -148,4 +193,5 @@ void h723_bno055_service_step(uint32_t now_ms)
         s_next_start_attempt_ms = now_ms + APP_BNO055_RETRY_INTERVAL_MS;
     }
     h723_bno055_publish_debug(now_ms);
+    h723_bno055_publish_control_snapshot(now_ms);
 }

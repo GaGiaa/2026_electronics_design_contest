@@ -2,6 +2,8 @@
 
 #include <limits.h>
 
+#include "cmsis_os.h"
+
 #include "app_debug.h"
 #include "app_jy901s.h"
 #include "app_jy901s_calibration.h"
@@ -22,6 +24,21 @@ static app_jy901s_parser_t s_parser;
 static app_jy901s_sample_t s_sample;
 static app_jy901s_calibration_t s_calibration;
 static app_jy901s_calibration_output_t s_calibration_output;
+static h723_jy901s_control_snapshot_t s_control_snapshot;
+static volatile uint32_t s_control_snapshot_sequence;
+
+static void h723_jy901s_publish_control_snapshot(void)
+{
+    s_control_snapshot_sequence++;
+    __DMB();
+    s_control_snapshot.vehicle_pitch_deg = s_calibration_output.angle_deg[1];
+    s_control_snapshot.complete_sample_count = s_sample.complete_sample_count;
+    s_control_snapshot.sample_time_ms = s_sample.last_sample_ms;
+    s_control_snapshot.sample_valid = s_sample.valid;
+    s_control_snapshot.calibration_valid = s_calibration_output.calibration_valid;
+    __DMB();
+    s_control_snapshot_sequence++;
+}
 
 static void h723_jy901s_calibration_init(uint32_t now_ms)
 {
@@ -100,7 +117,35 @@ void h723_jy901s_service_init(void)
 {
     app_jy901s_parser_init(&s_parser);
     h723_jy901s_calibration_init(h723_app_time_now_ms());
+    s_control_snapshot_sequence = 0U;
     h723_jy901s_start_receive();
+}
+
+bool h723_jy901s_service_get_snapshot(h723_jy901s_control_snapshot_t *snapshot,
+                                      uint32_t now_ms, uint32_t *sample_age_ms)
+{
+    uint32_t sequence_before;
+    uint32_t sequence_after;
+
+    if (snapshot == NULL || sample_age_ms == NULL) {
+        return false;
+    }
+
+    sequence_before = s_control_snapshot_sequence;
+    if ((sequence_before & 1U) != 0U) {
+        return false;
+    }
+    __DMB();
+    *snapshot = s_control_snapshot;
+    __DMB();
+    sequence_after = s_control_snapshot_sequence;
+    if (sequence_before != sequence_after || (sequence_after & 1U) != 0U) {
+        return false;
+    }
+
+    *sample_age_ms = snapshot->sample_valid ?
+        (uint32_t)(now_ms - snapshot->sample_time_ms) : UINT_MAX;
+    return true;
 }
 
 void h723_jy901s_on_uart9_rx_event(uint16_t size)
@@ -127,6 +172,7 @@ void h723_jy901s_service_step(uint32_t now_ms)
     while (s_read_index != s_write_index) {
         if (app_jy901s_parser_feed(&s_parser, s_ring[s_read_index], now_ms, &s_sample)) {
             (void)app_jy901s_calibration_update(&s_calibration, &s_sample, now_ms, &s_calibration_output);
+            h723_jy901s_publish_control_snapshot();
         }
         s_read_index = (uint16_t)((s_read_index + 1U) % H723_JY901S_RING_SIZE);
     }

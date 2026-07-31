@@ -10,7 +10,7 @@ $header = Get-Content -Raw -LiteralPath $headerPath
 foreach ($typeName in @(
     'h723_debug_system_t', 'h723_debug_uart8_t', 'h723_debug_crsf_t',
     'h723_debug_chassis_t', 'h723_debug_fdcan_t', 'h723_debug_jy901s_t',
-    'h723_debug_grayscale_t', 'h723_debug_balance_t',
+    'h723_debug_grayscale_t', 'h723_debug_balance_t', 'h723_debug_tilt_t',
     'h723_debug_bno055_t'
 )) {
     if ($header -notmatch "typedef struct \{[\s\S]*?\} $typeName;") {
@@ -24,6 +24,7 @@ foreach ($member in @(
     'h723_debug_fdcan_t fdcan;', 'h723_m2006_debug_t m2006[3];',
     'h723_debug_jy901s_t jy901s;', 'h723_debug_grayscale_t grayscale;',
     'h723_debug_single_motor_t single_motor;', 'h723_debug_balance_t balance;',
+    'h723_debug_tilt_t tilt;',
     'h723_debug_bno055_t bno055;'
 )) {
     if ($header -notmatch [regex]::Escape($member)) { throw "Missing grouped debug member: $member" }
@@ -61,6 +62,7 @@ foreach ($path in @(
     'g_h723_debug.balance.speed_pid_error_rpm',
     'g_h723_debug.balance.speed_pid_integral_output_a',
     'g_h723_debug.balance.speed_pid_output_a',
+    'g_h723_debug.tilt',
     'g_h723_debug.bno055.angle_deg'
 )) {
     if ($source -notmatch [regex]::Escape($path)) { throw "Missing grouped debug access: $path" }

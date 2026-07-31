@@ -20,6 +20,21 @@ static float app_balance_clamp(float value, float minimum, float maximum)
     return value;
 }
 
+static float app_balance_active_minimum(const app_balance_t *balance,
+                                        const app_balance_step_input_t *input)
+{
+    return input->allow_extended_position_range ?
+               balance->config.position_debug_active_min_deg :
+               balance->config.position_active_min_deg;
+}
+
+static float app_balance_active_maximum(const app_balance_t *balance,
+                                        const app_balance_step_input_t *input)
+{
+    return input->allow_extended_position_range ? balance->config.position_debug_max_deg :
+                                                  balance->config.position_max_deg;
+}
+
 static bool app_balance_config_is_valid(const app_balance_config_t *config)
 {
     return config != NULL && isfinite(config->home_search_output_speed_rpm) &&
@@ -34,6 +49,10 @@ static bool app_balance_config_is_valid(const app_balance_config_t *config)
            isfinite(config->position_active_min_deg) &&
            config->position_active_min_deg >= config->position_min_deg &&
            config->position_active_min_deg <= config->position_max_deg &&
+           isfinite(config->position_debug_active_min_deg) &&
+           config->position_debug_active_min_deg >= config->position_min_deg &&
+           isfinite(config->position_debug_max_deg) &&
+           config->position_debug_max_deg > config->position_debug_active_min_deg &&
            config->position_period_ms > 0U;
 }
 
@@ -104,6 +123,9 @@ static void app_balance_update_target(const app_balance_t *balance,
                                       const app_balance_step_input_t *input,
                                       app_balance_step_output_t *output)
 {
+    const float active_minimum = app_balance_active_minimum(balance, input);
+    const float active_maximum = app_balance_active_maximum(balance, input);
+
     output->requested_target_position_deg = input->requested_target_position_deg;
     if (!isfinite(input->requested_target_position_deg)) {
         return;
@@ -111,11 +133,10 @@ static void app_balance_update_target(const app_balance_t *balance,
     if (input->requested_target_position_deg <= balance->config.position_min_deg) {
         output->active_target_position_deg = app_balance_clamp(
             input->requested_target_position_deg, balance->config.position_min_deg,
-            balance->config.position_max_deg);
+            active_maximum);
     } else {
         output->active_target_position_deg = app_balance_clamp(
-            input->requested_target_position_deg, balance->config.position_active_min_deg,
-            balance->config.position_max_deg);
+            input->requested_target_position_deg, active_minimum, active_maximum);
     }
     output->target_clamped = output->active_target_position_deg != input->requested_target_position_deg;
 }
@@ -163,6 +184,7 @@ void app_balance_step(app_balance_t *balance,
         output->fault = APP_BALANCE_FAULT_INVALID_CONFIG;
         return;
     }
+    output->extended_position_range_active = input->allow_extended_position_range;
 
     feedback_valid = app_balance_feedback_is_valid(input);
     if (feedback_valid && balance->zero_valid) {
@@ -264,8 +286,8 @@ void app_balance_step(app_balance_t *balance,
             if ((uint32_t)(input->now_ms - balance->position_last_update_ms) >=
                 balance->config.position_period_ms) {
                 const float target = app_balance_clamp(input->requested_target_position_deg,
-                                                       balance->config.position_active_min_deg,
-                                                       balance->config.position_max_deg);
+                                                       app_balance_active_minimum(balance, input),
+                                                       app_balance_active_maximum(balance, input));
                 balance->target_output_speed_rpm = PID_Position_Calc(&balance->position_pid,
                                                                        target, relative_position);
                 balance->position_last_update_ms = input->now_ms;
@@ -288,8 +310,8 @@ void app_balance_step(app_balance_t *balance,
 
     if (entered_position) {
         const float target = app_balance_clamp(input->requested_target_position_deg,
-                                               balance->config.position_active_min_deg,
-                                               balance->config.position_max_deg);
+                                               app_balance_active_minimum(balance, input),
+                                               app_balance_active_maximum(balance, input));
         balance->target_output_speed_rpm = PID_Position_Calc(&balance->position_pid,
                                                                target, relative_position);
         balance->position_last_update_ms = input->now_ms;
