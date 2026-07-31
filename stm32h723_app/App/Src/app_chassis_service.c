@@ -12,6 +12,8 @@
 #include "app_line_follow.h"
 #include "app_m2006.h"
 #include "app_single_motor.h"
+#include "app_task2.h"
+#include "app_task_menu.h"
 #include "app_time.h"
 #include "fdcan.h"
 #include "usart.h"
@@ -53,6 +55,9 @@ static uint32_t s_single_motor_last_position_pid_ms;
 static app_line_follow_state_t s_line_follow;
 static app_line_follow_output_t s_line_follow_output;
 static uint32_t s_line_follow_debug_last_sequence;
+static app_task2_state_t s_task2;
+static app_task2_output_t s_task2_output;
+static uint32_t s_task2_last_button_mask;
 
 static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan);
 
@@ -265,6 +270,9 @@ void h723_chassis_service_init(void)
 #endif
     app_line_follow_init(&s_line_follow, &s_line_follow_pid_params,
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
+    app_task2_init(&s_task2);
+    (void)memset(&s_task2_output, 0, sizeof(s_task2_output));
+    s_task2_last_button_mask = 0U;
     (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
     s_line_follow_debug_last_sequence = 0U;
     g_h723_debug.line_follow.pid_kp = APP_H723_LINE_FOLLOW_PID_KP;
@@ -634,15 +642,58 @@ void h723_chassis_service_step(uint32_t now_ms)
     int16_t output_raw[3] = {0, 0, 0};
     uint32_t index;
     h723_app_buttons_snapshot_t button_snapshot;
+    uint32_t requested_task = 0U;
+    bool task2_controls_chassis = false;
+    bool task2_restart_requested;
     while (s_crsf_read_index != s_crsf_write_index) {
         (void)app_crsf_parser_feed(&s_crsf_parser, s_crsf_ring[s_crsf_read_index], now_ms, &s_crsf_input);
         s_crsf_read_index = (uint16_t)((s_crsf_read_index + 1U) % H723_CRSF_RING_SIZE);
     }
     h723_app_buttons_snapshot_copy(&button_snapshot);
+    task2_restart_requested =
+        ((button_snapshot.stable_high_mask & 0x01U) != 0U) &&
+        ((s_task2_last_button_mask & 0x01U) == 0U) &&
+        ((s_task2.phase == APP_TASK2_PHASE_STOPPED) ||
+         (s_task2.phase == APP_TASK2_PHASE_FAULT));
+    s_task2_last_button_mask = button_snapshot.stable_high_mask;
     app_chassis_control_step(&s_control_state, &s_crsf_input,
                              button_snapshot.stable_high_mask, now_ms,
                              &s_control_output);
     s_command = s_control_output.chassis;
+    if (s_control_output.remote_takeover) {
+        app_task2_abort(&s_task2);
+    } else if (app_task_menu_take_execution_request(&requested_task) &&
+               (requested_task == 2U)) {
+        app_task2_start(&s_task2, now_ms);
+        app_line_follow_reset(&s_line_follow);
+    } else if (task2_restart_requested) {
+        app_task2_start(&s_task2, now_ms);
+        app_line_follow_reset(&s_line_follow);
+    }
+    if (!s_control_output.remote_takeover &&
+        (s_task2.phase != APP_TASK2_PHASE_IDLE)) {
+        const app_task2_input_t task2_input = {
+            .now_ms = now_ms,
+            .grayscale_sequence = g_h723_debug.grayscale.sequence,
+            .line_strength = g_h723_debug.grayscale.line_strength,
+            .black_mask = g_h723_debug.grayscale.black_mask,
+            .adc_timeout_mask = g_h723_debug.grayscale.adc_timeout_mask,
+            .left_feedback_fresh = h723_m2006_feedback_is_fresh(0U, now_ms),
+            .right_feedback_fresh = h723_m2006_feedback_is_fresh(1U, now_ms),
+            .left_speed_mm_s = s_feedback[0].output_speed_rpm *
+                               APP_H723_OUTPUT_RPM_TO_MM_S,
+            .right_speed_mm_s = s_feedback[1].output_speed_rpm *
+                                APP_H723_OUTPUT_RPM_TO_MM_S,
+        };
+        app_task2_step(&s_task2, &task2_input);
+        app_task2_get_output(&s_task2, &s_task2_output);
+        task2_controls_chassis = s_task2_output.follow_line;
+        s_command.mode = APP_CHASSIS_MODE_LINE_FOLLOW;
+        s_command.manual_active = task2_controls_chassis;
+        s_command.base_speed_mm_s = s_task2_output.base_speed_mm_s;
+    } else {
+        app_task2_get_output(&s_task2, &s_task2_output);
+    }
     for (index = 0U; index < APP_CRSF_CHANNEL_COUNT; ++index) {
         g_h723_debug.crsf.channels_raw[index] = s_crsf_input.channels[index];
     }
@@ -681,6 +732,15 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.control.selected_task = s_control_output.selected_task;
     g_h723_debug.control.task_request_available =
         s_control_output.task_request_available ? 1U : 0U;
+    g_h723_debug.task2.phase = (uint32_t)s_task2_output.phase;
+    g_h723_debug.task2.fault = (uint32_t)s_task2_output.fault;
+    g_h723_debug.task2.running = s_task2_output.running ? 1U : 0U;
+    g_h723_debug.task2.stop_mark =
+        ((g_h723_debug.grayscale.black_mask & APP_H723_TASK2_STOP_BLACK_MASK) ==
+         APP_H723_TASK2_STOP_BLACK_MASK) ? 1U : 0U;
+    g_h723_debug.task2.elapsed_ms = s_task2_output.elapsed_ms;
+    g_h723_debug.task2.distance_mm = s_task2_output.distance_mm;
+    g_h723_debug.task2.base_speed_mm_s = s_task2_output.base_speed_mm_s;
     h723_line_follow_apply_debug_params();
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
     g_h723_debug.chassis.mode = 2U;
@@ -710,6 +770,9 @@ void h723_chassis_service_step(uint32_t now_ms)
         } else {
             s_command.left_target_rpm = 0.0f;
             s_command.right_target_rpm = 0.0f;
+            if (task2_controls_chassis) {
+                s_command.manual_active = false;
+            }
         }
     } else {
         app_line_follow_reset(&s_line_follow);

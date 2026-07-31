@@ -117,6 +117,9 @@
 #ifndef APP_H723_OLED_TASK_PERIOD_MS
 #define APP_H723_OLED_TASK_PERIOD_MS 100U
 #endif
+#ifndef APP_H723_OLED_REFRESH_PERIOD_MS
+#define APP_H723_OLED_REFRESH_PERIOD_MS 1000U
+#endif
 #ifndef APP_H723_OLED_I2C_TIMEOUT_MS
 #define APP_H723_OLED_I2C_TIMEOUT_MS 50U
 #endif
@@ -192,8 +195,9 @@
 #error "APP_H723_OLED_I2C_ADDRESS must be a 7-bit address"
 #endif
 #if (APP_H723_OLED_TASK_PERIOD_MS == 0U) || \
+    (APP_H723_OLED_REFRESH_PERIOD_MS == 0U) || \
     (APP_H723_OLED_I2C_TIMEOUT_MS == 0U)
-#error "OLED task period and I2C timeout must be nonzero"
+#error "OLED task period, refresh period, and I2C timeout must be nonzero"
 #endif
 
 #if (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE == 1U) && \
@@ -240,6 +244,24 @@
 #define APP_H723_LINE_FOLLOW_PID_KD 0.0f
 #define APP_H723_LINE_FOLLOW_PID_DEADBAND 0.0f
 #define APP_H723_LINE_FOLLOW_TURN_SIGN -1.0f
+
+/* 任务二正常巡线阶段的前进速度，单位 mm/s。 */
+#define APP_H723_TASK2_CRUISE_SPEED_MM_S 400.0f
+/* 接近 A 点停车线时的低速前进速度，单位 mm/s；减小可降低停车越线距离。 */
+#define APP_H723_TASK2_APPROACH_SPEED_MM_S 180.0f
+/* 从起点累计行驶到该里程后，重新开放 A 点停车线识别，单位 mm。 */
+#define APP_H723_TASK2_REARM_DISTANCE_MM 5200.0f
+/* A 点停车线检测掩码：要求 8 路灰度中的中央 2~5 路同时检测到黑色。 */
+#define APP_H723_TASK2_STOP_BLACK_MASK 0x3CU
+/* 启动后中央四路持续离开黑线达到该时间，才确认车辆已经驶离 A 点，单位 ms。 */
+#define APP_H723_TASK2_DEPART_CLEAR_MS 30U
+/* 接近阶段中央四路持续检测到黑线达到该时间，才确认停车，单位 ms。 */
+#define APP_H723_TASK2_STOP_CONFIRM_MS 30U
+/* 运行期间允许连续丢失巡迹线的最长时间，超时进入故障停车，单位 ms。 */
+#define APP_H723_TASK2_LINE_LOST_TIMEOUT_MS 100U
+/* 任务二从启动到完成允许的最长运行时间，超时进入故障停车，单位 ms。 */
+#define APP_H723_TASK2_RUN_TIMEOUT_MS 20000U
+
 #define APP_H723_M2006_FEEDBACK_TIMEOUT_MS 50U
 #define APP_H723_M2006_POSITION_TRACKER_MAX_GAP_MS APP_H723_M2006_FEEDBACK_TIMEOUT_MS
 #define APP_H723_M2006_CURRENT_LIMIT_A APP_H723_M2006_C610_MAX_CURRENT_A

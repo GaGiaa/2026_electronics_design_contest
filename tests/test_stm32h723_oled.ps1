@@ -83,6 +83,7 @@ foreach ($line in @(
 foreach ($line in @(
     '#define APP_H723_OLED_I2C_ADDRESS 0x3CU',
     '#define APP_H723_OLED_TASK_PERIOD_MS 100U',
+    '#define APP_H723_OLED_REFRESH_PERIOD_MS 1000U',
     '#define APP_H723_OLED_I2C_TIMEOUT_MS'
 )) {
     Require-Text $appConfig ([regex]::Escape($line)) "Missing OLED configuration: $line"
@@ -109,6 +110,12 @@ foreach ($line in @(
     'oled;',
     'initialized',
     'last_hal_status',
+    'i2c_error_code',
+    'i2c_state',
+    'i2c_isr',
+    'gpio_pd_idr',
+    'i2c_recovery_count',
+    'i2c_recovery_status',
     'update_count',
     'error_count'
 )) {
@@ -130,7 +137,20 @@ foreach ($line in @(
     'render_runtime_page',
     'REMOTE CONTROL',
     'TASK MENU',
+    'TASK 2',
+    'STATE:%s',
+    'DIST:%lum',
+    'TIME:%lu.%03lus',
     'g_h723_debug.control',
+    'g_h723_debug.task2',
+    'g_h723_debug.oled.i2c_error_code',
+    'g_h723_debug.oled.i2c_recovery_count',
+    'hi2c4.ErrorCode',
+    'I2C4->ISR',
+    'GPIOD->IDR',
+    'HAL_I2C_DeInit\s*\(\s*&hi2c4\s*\)',
+    'MX_I2C4_Init\s*\(\s*\)',
+    'APP_H723_OLED_REFRESH_PERIOD_MS',
     'g_h723_debug.oled.error_count\+\+',
     's_service_initialized = false'
 )) {

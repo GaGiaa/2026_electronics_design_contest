@@ -96,6 +96,16 @@ typedef struct {
 } h723_debug_control_t;
 
 typedef struct {
+    uint32_t phase;
+    uint32_t fault;
+    uint32_t running;
+    uint32_t stop_mark;
+    uint32_t elapsed_ms;
+    float distance_mm;
+    float base_speed_mm_s;
+} h723_debug_task2_t;
+
+typedef struct {
     uint32_t rx_count;
     uint32_t tx_count;
     uint32_t tx_error_count;
@@ -309,6 +319,13 @@ typedef struct {
     uint32_t initialized;
     uint32_t init_attempt_count;
     uint32_t last_hal_status;
+    /* I2C4 transfer diagnostics, sampled after each OLED service attempt. */
+    uint32_t i2c_error_code;
+    uint32_t i2c_state;
+    uint32_t i2c_isr;
+    uint32_t gpio_pd_idr;
+    uint32_t i2c_recovery_count;
+    uint32_t i2c_recovery_status;
     uint32_t update_count;
     uint32_t error_count;
 } h723_debug_oled_t;
@@ -318,6 +335,7 @@ typedef struct {
     h723_debug_uart8_t uart8;
     h723_debug_crsf_t crsf;
     h723_debug_control_t control;
+    h723_debug_task2_t task2;
     h723_debug_chassis_t chassis;
     h723_debug_line_follow_t line_follow;
     h723_debug_fdcan_t fdcan;
