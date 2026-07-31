@@ -87,8 +87,8 @@ foreach ($line in @('PD0     ------> FDCAN1_RX', 'PD1     ------> FDCAN1_TX', 'H
 if ($appConfig -notmatch '#define\s+APP_VOFA_HEALTH_TELEMETRY_ENABLE\s+0U') {
     throw 'APP_VOFA_HEALTH_TELEMETRY_ENABLE must default to 0U.'
 }
-if ($appConfig -notmatch '#define\s+APP_JY901S_VOFA_TELEMETRY_ENABLE\s+1U') {
-    throw 'APP_JY901S_VOFA_TELEMETRY_ENABLE must be enabled for the current JY901S calibration telemetry configuration.'
+if ($appConfig -notmatch '#define\s+APP_JY901S_VOFA_TELEMETRY_ENABLE\s+0U') {
+    throw 'APP_JY901S_VOFA_TELEMETRY_ENABLE must default to 0U.'
 }
 
 foreach ($removedLine in @('USART6.', 'PC6.Signal=USART6_TX', 'PC7.Signal=USART6_RX')) {
