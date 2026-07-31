@@ -709,3 +709,49 @@ after checking the buzzer current. Use a transistor or MOSFET driver when the
 load exceeds the STM32 GPIO rating. Static checks and software-only Keil builds
 were run; Flash, SWD, oscilloscope, audible buzzer, and other physical
 acceptance tests remain outstanding.
+
+## H723 巡线位置式 PID Watch 与 VOFA 调试（2026-07-31）
+
+本轮新增 `g_h723_debug.line_follow` 运行时调试接口，服务于 SE 按下、SB
+中档、SC 中档的灰度巡线模式。灰度任务周期为 `10 ms`，底盘任务周期为
+`1 ms`；巡线位置式 PID 只在灰度 `sequence` 变化时调用，因此实际 PID
+计算频率约为 `100 Hz`，初始化 `dt_s=0.010 s`。重复灰度快照沿用上一次
+转向修正；ADC 超时、线强度低于 `800` 或快照无效时复位 PID 并输出零目标。
+
+Keil Watch 可直接修改以下字段，并在下一次 PID 计算前生效：
+
+- `pid_kp`、`pid_ki`、`pid_kd`
+- `pid_output_limit_mm_s`
+- `pid_deadband`
+- `reset_pid_request`，写入 `1` 后清除 PID 状态并自动恢复为 `0`
+
+默认参数为 `Kp=35.0`、`Ki=0`、`Kd=0`、输出限幅
+`APP_H723_LINE_FOLLOW_MAX_TURN_SPEED_MM_S`、死区 `0`。非有限参数、负增益、
+负死区或非正输出限幅会被拒绝，上一组合法参数继续使用；`params_valid` 和
+`params_rejected_count` 用于观察校验结果。快照还提供 `line_position`、
+`error`、`integral`、`p_out`、`i_out`、`d_out`、`raw_output`、`pid_output`、
+`turn_correction_mm_s`、基础速度、左右轮目标速度、`line_strength`、
+`sequence` 和 `pid_update_count`。
+
+新增 `APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE=0U`，周期为 `10 ms`。
+启用后 UART8 发送 13 通道 JustFloat，顺序为：
+
+1. `line_position`
+2. `error`
+3. `p_out`
+4. `i_out`
+5. `d_out`
+6. `raw_output`
+7. `pid_output`
+8. `turn_correction_mm_s`
+9. `base_speed_mm_s`
+10. `left_target_speed_mm_s`
+11. `right_target_speed_mm_s`
+12. `line_strength`
+13. `sequence`
+
+该遥测已加入 UART8 遥测互斥编译检查，只用于调试观察，不改变 CRSF
+安全门、M2006 速度环或 CAN 输出。本轮已通过巡线 PID 静态检查、底盘遥测、
+VOFA JustFloat、debug layout 检查和 Keil 纯软件构建；构建日志为
+`0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、UART/VOFA 实物、
+CAN、电机或灰度传感器硬件验收。

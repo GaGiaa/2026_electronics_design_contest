@@ -51,6 +51,39 @@ typedef struct {
 } h723_debug_chassis_t;
 
 typedef struct {
+    /* Keil Watch inputs. Values are applied before the next PID calculation. */
+    float pid_kp;
+    float pid_ki;
+    float pid_kd;
+    float pid_output_limit_mm_s;
+    float pid_deadband;
+    uint32_t reset_pid_request;
+    /* Runtime status and PID calculation snapshot. */
+    uint32_t params_valid;
+    uint32_t params_rejected_count;
+    uint32_t active;
+    uint32_t line_valid;
+    uint32_t adc_timeout_mask;
+    uint32_t line_strength;
+    uint32_t sequence;
+    uint32_t pid_update_count;
+    float pid_dt_s;
+    float target_position;
+    float line_position;
+    float error;
+    float integral;
+    float p_out;
+    float i_out;
+    float d_out;
+    float raw_output;
+    float pid_output;
+    float turn_correction_mm_s;
+    float base_speed_mm_s;
+    float left_target_speed_mm_s;
+    float right_target_speed_mm_s;
+} h723_debug_line_follow_t;
+
+typedef struct {
     uint32_t mode;
     uint32_t remote_takeover;
     uint32_t buttons_enabled;
@@ -278,6 +311,7 @@ typedef struct {
     h723_debug_crsf_t crsf;
     h723_debug_control_t control;
     h723_debug_chassis_t chassis;
+    h723_debug_line_follow_t line_follow;
     h723_debug_fdcan_t fdcan;
     /* Index 0/1/2 maps to M2006 CAN ID 1/2/3. */
     h723_m2006_debug_t m2006[3];

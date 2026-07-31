@@ -52,6 +52,7 @@ static uint32_t s_single_motor_last_position_pid_ms;
 #endif
 static app_line_follow_state_t s_line_follow;
 static app_line_follow_output_t s_line_follow_output;
+static uint32_t s_line_follow_debug_last_sequence;
 
 static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan);
 
@@ -154,6 +155,78 @@ static const PID_Position_Param_Config s_line_follow_pid_params = {
     .deadband = APP_H723_LINE_FOLLOW_PID_DEADBAND,
 };
 
+static bool h723_line_follow_pid_params_are_valid(float kp, float ki, float kd,
+                                                  float output_limit, float deadband)
+{
+    return isfinite(kp) && isfinite(ki) && isfinite(kd) && isfinite(output_limit) &&
+           isfinite(deadband) && kp >= 0.0f && ki >= 0.0f && kd >= 0.0f &&
+           output_limit > 0.0f && deadband >= 0.0f;
+}
+
+static void h723_line_follow_apply_debug_params(void)
+{
+    volatile h723_debug_line_follow_t *debug = &g_h723_debug.line_follow;
+    const float kp = debug->pid_kp;
+    const float ki = debug->pid_ki;
+    const float kd = debug->pid_kd;
+    const float output_limit = debug->pid_output_limit_mm_s;
+    const float deadband = debug->pid_deadband;
+
+    if (h723_line_follow_pid_params_are_valid(kp, ki, kd, output_limit, deadband)) {
+        s_line_follow.pid.params.kp = kp;
+        s_line_follow.pid.params.ki = ki;
+        s_line_follow.pid.params.kd = kd;
+        s_line_follow.pid.params.output_limit = output_limit;
+        s_line_follow.pid.params.deadband = deadband;
+        debug->params_valid = 1U;
+    } else {
+        debug->params_valid = 0U;
+        debug->params_rejected_count++;
+    }
+
+    if (debug->reset_pid_request != 0U) {
+        app_line_follow_reset(&s_line_follow);
+        s_line_follow_debug_last_sequence = 0U;
+        debug->reset_pid_request = 0U;
+    }
+}
+
+static void h723_line_follow_publish_debug(void)
+{
+    volatile h723_debug_line_follow_t *debug = &g_h723_debug.line_follow;
+    const PID_Position *pid = &s_line_follow.pid;
+    const bool active = s_line_follow_output.active;
+
+    debug->active = active ? 1U : 0U;
+    debug->line_valid = s_line_follow_output.line_valid ? 1U : 0U;
+    debug->adc_timeout_mask = g_h723_debug.grayscale.adc_timeout_mask;
+    debug->line_strength = g_h723_debug.grayscale.line_strength;
+    debug->sequence = g_h723_debug.grayscale.sequence;
+    debug->line_position = g_h723_debug.grayscale.line_position;
+    debug->base_speed_mm_s = s_command.base_speed_mm_s;
+    debug->turn_correction_mm_s = s_line_follow_output.turn_correction_mm_s;
+    debug->left_target_speed_mm_s =
+        s_command.left_target_rpm * APP_H723_OUTPUT_RPM_TO_MM_S;
+    debug->right_target_speed_mm_s =
+        s_command.right_target_rpm * APP_H723_OUTPUT_RPM_TO_MM_S;
+    debug->pid_dt_s = pid->dt_s;
+    debug->target_position = 0.0f;
+    debug->error = pid->last_error;
+    debug->integral = pid->integral;
+    debug->p_out = pid->p_out;
+    debug->i_out = pid->i_out;
+    debug->d_out = pid->d_out;
+    debug->raw_output = pid->p_out + pid->i_out + pid->d_out;
+    debug->pid_output = pid->output;
+
+    if (!active) {
+        s_line_follow_debug_last_sequence = 0U;
+    } else if (s_line_follow_output.sequence != s_line_follow_debug_last_sequence) {
+        s_line_follow_debug_last_sequence = s_line_follow_output.sequence;
+        debug->pid_update_count++;
+    }
+}
+
 static float h723_clamp_current(float value)
 {
     if (value > APP_H723_M2006_CURRENT_LIMIT_A) { return APP_H723_M2006_CURRENT_LIMIT_A; }
@@ -193,6 +266,20 @@ void h723_chassis_service_init(void)
     app_line_follow_init(&s_line_follow, &s_line_follow_pid_params,
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
     (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
+    s_line_follow_debug_last_sequence = 0U;
+    g_h723_debug.line_follow.pid_kp = APP_H723_LINE_FOLLOW_PID_KP;
+    g_h723_debug.line_follow.pid_ki = APP_H723_LINE_FOLLOW_PID_KI;
+    g_h723_debug.line_follow.pid_kd = APP_H723_LINE_FOLLOW_PID_KD;
+    g_h723_debug.line_follow.pid_output_limit_mm_s =
+        APP_H723_LINE_FOLLOW_MAX_TURN_SPEED_MM_S;
+    g_h723_debug.line_follow.pid_deadband = APP_H723_LINE_FOLLOW_PID_DEADBAND;
+    g_h723_debug.line_follow.reset_pid_request = 0U;
+    g_h723_debug.line_follow.params_valid = 1U;
+    g_h723_debug.line_follow.params_rejected_count = 0U;
+    g_h723_debug.line_follow.pid_dt_s =
+        (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f;
+    g_h723_debug.line_follow.target_position = 0.0f;
+    g_h723_debug.line_follow.pid_update_count = 0U;
     g_h723_debug.single_motor.default_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.selected_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.enable = 0U;
@@ -594,6 +681,7 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.control.selected_task = s_control_output.selected_task;
     g_h723_debug.control.task_request_available =
         s_control_output.task_request_available ? 1U : 0U;
+    h723_line_follow_apply_debug_params();
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
     g_h723_debug.chassis.mode = 2U;
     g_h723_debug.chassis.actuation_enabled = g_h723_debug.single_motor.enable;
@@ -650,6 +738,7 @@ void h723_chassis_service_step(uint32_t now_ms)
         output_current_A[index] = debug->commanded_current_A;
     }
 #endif
+    h723_line_follow_publish_debug();
     h723_balance_service_step(now_ms, output_current_A);
     g_h723_debug.chassis.left_target_output_speed_rpm = s_command.left_target_rpm;
     g_h723_debug.chassis.right_target_output_speed_rpm = s_command.right_target_rpm;
