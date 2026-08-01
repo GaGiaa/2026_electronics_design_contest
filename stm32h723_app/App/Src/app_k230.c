@@ -1,6 +1,5 @@
 #include "app_k230.h"
 
-#include <math.h>
 #include <string.h>
 
 static uint16_t h723_k230_crc16_ccitt_false(const uint8_t *data, uint32_t length)
@@ -77,29 +76,8 @@ bool app_k230_parser_feed(app_k230_parser_t *parser, uint8_t byte,
     }
 
     sample->valid = parser->frame[2] == APP_K230_VALID_TRUE;
-    sample->pixel_x = h723_k230_read_float_le(&parser->frame[3]);
-    sample->ball_position_mm = app_k230_pixel_to_ball_mm(sample->pixel_x, 0.0f);
+    sample->distance_mm = sample->valid ? h723_k230_read_float_le(&parser->frame[3]) : 0.0f;
     sample->last_frame_ms = now_ms;
     ++sample->valid_frame_count;
     return true;
-}
-
-float app_k230_pixel_to_ball_mm(float pixel_x, float pipe_tilt_deg)
-{
-    const float delta = (pixel_x - APP_K230_PX_CENTER) / APP_K230_PX_PER_MM;
-    const float sin_phi = sinf(pipe_tilt_deg * 0.01745329252f);
-    const float correction = 1.0f + delta * sin_phi / APP_K230_CAMERA_HEIGHT_MM;
-    float position_mm;
-
-    if (correction > -0.001f && correction < 0.001f) {
-        return 0.0f;
-    }
-    position_mm = delta / correction;
-    if (position_mm > APP_K230_BALL_TRAVEL_MAX_MM) {
-        return APP_K230_BALL_TRAVEL_MAX_MM;
-    }
-    if (position_mm < -APP_K230_BALL_TRAVEL_MAX_MM) {
-        return -APP_K230_BALL_TRAVEL_MAX_MM;
-    }
-    return position_mm;
 }

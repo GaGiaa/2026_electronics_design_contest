@@ -340,9 +340,7 @@ typedef struct {
 } h723_debug_bno055_t;
 
 typedef struct {
-    float pixel_x;
-    float ball_position_mm;
-    float pipe_tilt_deg;
+    float distance_mm;
     uint32_t valid;
     uint32_t valid_frame_count;
     uint32_t crc_error_count;

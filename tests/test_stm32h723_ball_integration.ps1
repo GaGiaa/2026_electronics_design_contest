@@ -49,15 +49,6 @@ foreach ($line in @(
 )) { Require-Text $chassis $line "Missing ball-control chassis integration: $line" }
 
 foreach ($line in @(
-    'app_k230_pixel_to_ball_mm',
-    'ball_sample.pixel_x',
-    'ball_sample.ball_position_mm',
-    'input.feedback_position_deg - s_balance.zero_offset_deg',
-    '(155.0f - motor_position_deg) * 0.0747f',
-    'input.feedback_valid'
-)) { Require-Text $chassis $line "Missing vision perspective correction integration: $line" }
-
-foreach ($line in @(
     'hold_position_mm',
     'hold_motor_position_deg',
     'target_motor_position_deg',

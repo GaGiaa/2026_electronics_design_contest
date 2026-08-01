@@ -1009,3 +1009,16 @@ CAN、电机或灰度传感器硬件验收。
 - Verification after the rollback passed: all 43 `tests/test_stm32h723_*.ps1`
   scripts passed, `git diff --check` passed, and the Keil software-only build
   produced `stm32h723_app.axf` with `0 Error(s), 0 Warning(s)`.
+
+## H723 K230 Perspective Rollback (2026-08-01)
+
+- Reverted merge commit `9348f858bd5e496cb37789251f2b6afc2697edb9` with the
+  current revert operation. The K230 payload is restored to `distance_mm`;
+  pixel-X parsing, perspective conversion, pipe-tilt calculation, and related
+  pixel diagnostics are no longer part of the active control path.
+- The active path is again K230 UART2 `distance_mm` -> 50 Hz ball-position PID
+  -> ID3 output-axis position target -> `app_balance` cascade control.
+- This rollback removes the coordinate-frame mismatch between the `20/125/230`
+  mm position map and the former `-120..120` pixel-conversion output range.
+- No Flash, SWD/GDB, UART, CAN, motor, K230, or physical operation was performed
+  during this rollback.
