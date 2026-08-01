@@ -288,6 +288,17 @@ updates, and exiting/resetting the mode clears the PID state. The line-follow
 debug snapshot exposes mode, base speed, line position, validity, turn
 correction, and final left/right target RPM values.
 
+## Static Ball Position Tuned Defaults
+
+The default stationary `g_h723_debug.ball_position` Watch values now match the
+latest tuning snapshot: enabled with `target_mm=125`, `Kp=2.0`, `Ki=0.0`,
+`Kd=0.8`, `output_limit_deg=360`, `pid_deadband_mm=0.5`,
+`engage_error_mm=0.5`, `release_error_mm=0.5`, and `position_sign=1.0`.
+The breakaway pulse is disabled by default; its retained configuration is
+`10 deg`, `200 ms`, `1 mm`, `60 ms`, and `500 ms`.
+The three-point hold mapping remains `{20, 125, 230} mm` to `{134, 134, 134}
+deg` until measured values are supplied through Watch.
+
 ## Remote Dynamic Ball Line Follow
 
 With `SE` pressed, `SB` in the middle position, and `SC` high, the chassis

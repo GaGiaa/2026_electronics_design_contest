@@ -189,21 +189,21 @@ void app_ball_position_control_config_default(app_ball_position_control_config_t
         .max_age_ms = 100U,
         .safe_motor_position_deg = 134.0f,
         .pid_params = {
-            .kp = 0.02f,
+            .kp = 2.0f,
             .ki = 0.0f,
-            .kd = 0.0f,
-            .output_limit = 3.0f,
-            .deadband = 1.0f,
+            .kd = 0.8f,
+            .output_limit = 360.0f,
+            .deadband = 0.5f,
         },
-        .output_limit_deg = 3.0f,
+        .output_limit_deg = 360.0f,
         .sign = 1.0f,
-        .deadband_mm = 1.0f,
+        .deadband_mm = 0.5f,
         .hold_position_mm = {20.0f, 125.0f, 230.0f},
         .hold_motor_position_deg = {134.0f, 134.0f, 134.0f},
-        .engage_error_mm = 6.0f,
-        .release_error_mm = 2.0f,
-        .breakaway_enable = true,
-        .breakaway_pulse_deg = 1.0f,
+        .engage_error_mm = 0.5f,
+        .release_error_mm = 0.5f,
+        .breakaway_enable = false,
+        .breakaway_pulse_deg = 10.0f,
         .breakaway_stall_time_ms = 200U,
         .breakaway_min_motion_mm = 1.0f,
         .breakaway_duration_ms = 60U,
@@ -319,12 +319,11 @@ void app_ball_position_control_step(app_ball_position_control_t *control,
                 const float abs_error_mm = fabsf(input->target_mm - input->measured_mm);
                 /* Keep hysteresis active, but prevent integral wind-up inside its band. */
                 if (abs_error_mm < control->config.engage_error_mm) {
-                    (void)PID_Position_Calc_NoIntegral(&control->pid,
-                                                       input->target_mm,
-                                                       input->measured_mm);
+                    (void)PID_Position_Calc_DerivativeOnMeasurement_NoIntegral(
+                        &control->pid, input->target_mm, input->measured_mm);
                 } else {
-                    (void)PID_Position_Calc(&control->pid, input->target_mm,
-                                            input->measured_mm);
+                    (void)PID_Position_Calc_DerivativeOnMeasurement(
+                        &control->pid, input->target_mm, input->measured_mm);
                 }
                 pid_offset_deg = control->config.sign * control->pid.output;
                 app_ball_position_update_breakaway(

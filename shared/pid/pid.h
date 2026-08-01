@@ -64,9 +64,10 @@ typedef struct {
     float d_out;
     float output;
     bool has_last_error;
+    float last_feedback;
+    bool has_last_feedback;
 #if (PID_POSITION_CONFIG_VARIANT == PID_POSITION_VARIANT_ADVANCED)
     float last_target;
-    float last_feedback;
     float filtered_derivative;
     float filtered_output;
     bool has_last_sample;
@@ -80,6 +81,14 @@ float PID_Incremental_Calc(PID_Incremental *pid, float target, float feedback);
 void PID_Position_Init(PID_Position *pid, const PID_Position_Param_Config *params, float dt_s);
 void PID_Position_Reset(PID_Position *pid);
 float PID_Position_Calc(PID_Position *pid, float target, float feedback);
+/* Calculate position PID with the derivative taken from feedback only. */
+float PID_Position_Calc_DerivativeOnMeasurement(PID_Position *pid,
+                                                float target,
+                                                float feedback);
+/* Calculate with measurement derivative while reusing the existing integral. */
+float PID_Position_Calc_DerivativeOnMeasurement_NoIntegral(PID_Position *pid,
+                                                           float target,
+                                                           float feedback);
 /* Calculate while reusing the existing integral without accumulating it. */
 float PID_Position_Calc_NoIntegral(PID_Position *pid, float target, float feedback);
 

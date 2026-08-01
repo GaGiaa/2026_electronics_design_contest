@@ -320,6 +320,98 @@ static void test_invalid_configuration_faults(void)
     assert(control.fault == APP_BALL_POSITION_FAULT_INVALID_CONFIG);
 }
 
+static void test_derivative_on_measurement_ignores_target_step(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+
+    config.pid_params.kp = 0.0f;
+    config.pid_params.kd = 0.1f;
+    config.output_limit_deg = 100.0f;
+    config.pid_params.output_limit = 100.0f;
+    config.breakaway_enable = false;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+
+    input.now_ms = 20U;
+    input.target_mm = 140.0f;
+    app_ball_position_control_step(&control, &input, &output);
+
+    assert(fabsf(output.d_out_deg) < 0.0001f);
+}
+
+static void test_derivative_on_measurement_follows_feedback_change(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+
+    config.pid_params.kp = 0.0f;
+    config.pid_params.kd = 0.1f;
+    config.output_limit_deg = 100.0f;
+    config.pid_params.output_limit = 100.0f;
+    config.breakaway_enable = false;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+
+    input.now_ms = 20U;
+    input.measured_mm = 110.0f;
+    app_ball_position_control_step(&control, &input, &output);
+
+    assert(fabsf(output.d_out_deg + 50.0f) < 0.0001f);
+}
+
+static void test_derivative_history_clears_after_invalid_vision(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+
+    config.pid_params.kp = 0.0f;
+    config.pid_params.kd = 0.1f;
+    config.output_limit_deg = 100.0f;
+    config.pid_params.output_limit = 100.0f;
+    config.breakaway_enable = false;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+
+    input.now_ms = 20U;
+    input.vision_valid = false;
+    app_ball_position_control_step(&control, &input, &output);
+
+    input.now_ms = 40U;
+    input.vision_valid = true;
+    input.measured_mm = 110.0f;
+    app_ball_position_control_step(&control, &input, &output);
+
+    assert(fabsf(output.d_out_deg) < 0.0001f);
+}
+
+static void test_default_configuration_matches_tuned_watch_values(void)
+{
+    app_ball_position_control_config_t config;
+
+    app_ball_position_control_config_default(&config);
+
+    assert(fabsf(config.pid_params.kp - 2.0f) < 0.0001f);
+    assert(fabsf(config.pid_params.ki) < 0.0001f);
+    assert(fabsf(config.pid_params.kd - 0.8f) < 0.0001f);
+    assert(fabsf(config.output_limit_deg - 360.0f) < 0.0001f);
+    assert(fabsf(config.deadband_mm - 0.5f) < 0.0001f);
+    assert(fabsf(config.engage_error_mm - 0.5f) < 0.0001f);
+    assert(fabsf(config.release_error_mm - 0.5f) < 0.0001f);
+    assert(!config.breakaway_enable);
+    assert(fabsf(config.breakaway_pulse_deg - 10.0f) < 0.0001f);
+    assert(config.breakaway_stall_time_ms == 200U);
+    assert(fabsf(config.breakaway_min_motion_mm - 1.0f) < 0.0001f);
+    assert(config.breakaway_duration_ms == 60U);
+    assert(config.breakaway_cooldown_ms == 500U);
+}
+
 int main(void)
 {
     test_positive_error_requests_positive_motor_offset();
@@ -333,5 +425,9 @@ int main(void)
     test_stale_vision_resets_pid_and_holds_last_safe_position();
     test_first_fault_uses_safe_motor_position();
     test_invalid_configuration_faults();
+    test_derivative_on_measurement_ignores_target_step();
+    test_derivative_on_measurement_follows_feedback_change();
+    test_derivative_history_clears_after_invalid_vision();
+    test_default_configuration_matches_tuned_watch_values();
     return 0;
 }
