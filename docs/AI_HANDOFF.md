@@ -857,3 +857,10 @@ Keil Watch 可直接修改以下字段，并在下一次 PID 计算前生效：
 VOFA JustFloat、debug layout 检查和 Keil 纯软件构建；构建日志为
 `0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、UART/VOFA 实物、
 CAN、电机或灰度传感器硬件验收。
+# H723 任务3 ID3 角度流程（2026-08-01）
+
+- 任务3已从占位拒绝流程改为 ID3 位置闭环流程：选择任务3后目标为 `143.11 deg`，等待 B1；B1 后目标为 `128.84 deg` 并开始累计计时，达到 `wait_time_s` 后目标切换为 `150.99 deg`，累计计时达到 `finish_display_time_s` 后进入结束显示。
+- 结束显示期间 OLED 保持 `TASK 3`、阶段和累计 `TIME`，不显示 `finish_display_time_s` 设定值；再次按 B1 后才正式结束并释放任务菜单，B2/B3 不推进任务3。
+- Keil Watch 可配置 `g_h723_debug.task3.start_position_deg`、`first_target_position_deg`、`final_target_position_deg`、`wait_time_s` 和 `finish_display_time_s`。流程使用现有机械归零后的 ID3 `app_balance` 位置闭环，不重复实现 CAN 电流控制。
+- 新增 `App/Inc/app_task3.h`、`App/Src/app_task3.c`，并登记到 Keil 工程；新增任务3单元测试及服务构建清单。
+- 验证：全部 `tests/test_stm32h723_*.ps1` 共 39 个脚本通过，包含任务3、位置服务、OLED、调试布局和 Keil 工程检查；未执行 Flash、SWD/GDB、CAN、电机或其他硬件验收。

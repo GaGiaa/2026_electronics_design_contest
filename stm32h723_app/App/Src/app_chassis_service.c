@@ -15,6 +15,7 @@
 #include "app_m2006.h"
 #include "app_single_motor.h"
 #include "app_task2.h"
+#include "app_task3.h"
 #include "app_task4.h"
 #include "app_task56.h"
 #include "app_task_menu.h"
@@ -66,11 +67,33 @@ static uint32_t s_line_follow_debug_last_sequence;
 static uint32_t s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
 static app_task2_state_t s_task2;
 static app_task2_output_t s_task2_output;
+static app_task3_t s_task3;
+static app_task3_output_t s_task3_output;
 static app_task4_state_t s_task4;
 static app_task4_output_t s_task4_output;
 static app_task56_state_t s_task56;
 static app_task56_output_t s_task56_output;
 static uint32_t s_task56_task_id;
+
+static app_task3_config_t h723_task3_config_from_debug(void)
+{
+    return (app_task3_config_t){
+        .start_position_deg = g_h723_debug.task3.start_position_deg,
+        .first_target_position_deg = g_h723_debug.task3.first_target_position_deg,
+        .final_target_position_deg = g_h723_debug.task3.final_target_position_deg,
+        .wait_time_s = g_h723_debug.task3.wait_time_s,
+        .finish_display_time_s = g_h723_debug.task3.finish_display_time_s,
+    };
+}
+
+static void h723_task3_publish_debug(void)
+{
+    g_h723_debug.task3.phase = (uint32_t)s_task3_output.phase;
+    g_h723_debug.task3.running = s_task3_output.running ? 1U : 0U;
+    g_h723_debug.task3.config_valid = s_task3_output.config_valid ? 1U : 0U;
+    g_h723_debug.task3.elapsed_ms = s_task3_output.elapsed_ms;
+    g_h723_debug.task3.target_position_deg = s_task3_output.target_position_deg;
+}
 
 static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan);
 
@@ -402,6 +425,8 @@ void h723_chassis_service_init(void)
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
     app_task2_init(&s_task2);
     (void)memset(&s_task2_output, 0, sizeof(s_task2_output));
+    app_task3_init(&s_task3);
+    (void)memset(&s_task3_output, 0, sizeof(s_task3_output));
     app_task4_init(&s_task4);
     (void)memset(&s_task4_output, 0, sizeof(s_task4_output));
     app_task56_init(&s_task56);
@@ -419,6 +444,16 @@ void h723_chassis_service_init(void)
     g_h723_debug.task2_line_follow.reset_pid_request = 0U;
     g_h723_debug.task2_line_follow.params_valid = 1U;
     g_h723_debug.task2_line_follow.params_rejected_count = 0U;
+    g_h723_debug.task3.start_position_deg = APP_H723_TASK3_START_POSITION_DEG;
+    g_h723_debug.task3.first_target_position_deg = APP_H723_TASK3_FIRST_TARGET_POSITION_DEG;
+    g_h723_debug.task3.final_target_position_deg = APP_H723_TASK3_FINAL_TARGET_POSITION_DEG;
+    g_h723_debug.task3.wait_time_s = APP_H723_TASK3_WAIT_TIME_S;
+    g_h723_debug.task3.finish_display_time_s = APP_H723_TASK3_FINISH_DISPLAY_TIME_S;
+    g_h723_debug.task3.phase = APP_TASK3_PHASE_IDLE;
+    g_h723_debug.task3.running = 0U;
+    g_h723_debug.task3.config_valid = 1U;
+    g_h723_debug.task3.elapsed_ms = 0U;
+    g_h723_debug.task3.target_position_deg = 0.0f;
     g_h723_debug.task456_line_follow.pid_kp = APP_H723_TASK456_LINE_FOLLOW_PID_KP;
     g_h723_debug.task456_line_follow.pid_ki = APP_H723_TASK456_LINE_FOLLOW_PID_KI;
     g_h723_debug.task456_line_follow.pid_kd = APP_H723_TASK456_LINE_FOLLOW_PID_KD;
@@ -683,7 +718,8 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
         .feedback_position_deg = app_m2006_position_tracker_output_degrees(&s_position_tracker[index]),
         .feedback_output_speed_rpm = s_feedback[index].output_speed_rpm,
         .feedback_current_a = s_feedback[index].current_a,
-        .requested_target_position_deg = g_h723_debug.balance.target_position_deg,
+        .requested_target_position_deg = s_task3_output.running ?
+            s_task3_output.target_position_deg : g_h723_debug.balance.target_position_deg,
         .allow_extended_position_range =
             g_h723_debug.balance.allow_extended_position_range != 0U,
         .rehome_request = g_h723_debug.balance.rehome_request != 0U,
@@ -694,6 +730,9 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
 #if (APP_H723_TILT_CONTROL_ENABLE == 1U)
     input.requested_target_position_deg = h723_tilt_service_step(now_ms, index);
 #endif
+    if (s_task3_output.running) {
+        input.requested_target_position_deg = s_task3_output.target_position_deg;
+    }
     app_balance_step(&s_balance, &input, &result);
     if (result.rehome_request_consumed) {
         g_h723_debug.balance.rehome_request = 0U;
@@ -904,12 +943,16 @@ void h723_chassis_service_step(uint32_t now_ms)
     uint32_t index;
     h723_app_buttons_snapshot_t button_snapshot;
     uint32_t requested_task = 0U;
+    app_task3_config_t task3_config;
     bool task2_controls_chassis = false;
     bool task2_was_running = false;
     bool task4_controls_chassis = false;
     bool task4_was_running = false;
     bool task56_controls_chassis = false;
     bool task56_was_running = false;
+    bool task3_was_active = false;
+    bool task3_was_finished_waiting = false;
+    bool task3_started_this_cycle = false;
     bool task_controls_chassis = false;
     while (s_crsf_read_index != s_crsf_write_index) {
         (void)app_crsf_parser_feed(&s_crsf_parser, s_crsf_ring[s_crsf_read_index], now_ms, &s_crsf_input);
@@ -922,6 +965,7 @@ void h723_chassis_service_step(uint32_t now_ms)
     s_command = s_control_output.chassis;
     if (s_control_output.remote_takeover) {
         app_task2_abort(&s_task2);
+        app_task3_abort(&s_task3);
         app_task4_abort(&s_task4);
         app_task56_abort(&s_task56);
         s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
@@ -944,15 +988,34 @@ void h723_chassis_service_step(uint32_t now_ms)
             s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK456;
             app_line_follow_reset(&s_line_follow);
         } else if (requested_task == 3U) {
-            /* Task 3 has no executor: release the menu without issuing motion. */
             app_task2_abort(&s_task2);
             app_task4_abort(&s_task4);
             app_task56_abort(&s_task56);
+            task3_config = h723_task3_config_from_debug();
+            app_task3_start(&s_task3, &task3_config, now_ms);
+            task3_started_this_cycle = true;
             s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
             app_line_follow_reset(&s_line_follow);
-            app_task_menu_finish_execution();
         }
     }
+    task3_was_active = s_task3.phase != APP_TASK3_PHASE_IDLE &&
+                       s_task3.phase != APP_TASK3_PHASE_FAULT;
+    if (!s_control_output.remote_takeover && task3_was_active) {
+        task3_was_finished_waiting =
+            s_task3.phase == APP_TASK3_PHASE_FINISHED_WAIT_KEY;
+        app_task3_step(&s_task3, &(app_task3_input_t){
+            .now_ms = now_ms,
+            .confirm_pressed = !task3_started_this_cycle &&
+                               s_control_output.confirm_button_pressed,
+        }, &s_task3_output);
+        if (task3_was_finished_waiting &&
+            s_control_output.confirm_button_pressed) {
+            app_task_menu_finish_execution();
+        }
+    } else if (s_task3.phase == APP_TASK3_PHASE_FAULT) {
+        app_task_menu_finish_execution();
+    }
+    h723_task3_publish_debug();
     task2_was_running = !s_control_output.remote_takeover &&
                         (s_task2.phase == APP_TASK2_PHASE_RUNNING);
     task4_was_running = !s_control_output.remote_takeover &&
@@ -1016,6 +1079,11 @@ void h723_chassis_service_step(uint32_t now_ms)
             (s_task56.phase == APP_TASK56_PHASE_STOPPED)) {
             app_task_menu_finish_execution();
         }
+    } else if (!s_control_output.remote_takeover && task3_was_active) {
+        s_command.mode = APP_CHASSIS_MODE_TASK_MENU;
+        s_command.manual_active = false;
+        s_command.left_target_rpm = 0.0f;
+        s_command.right_target_rpm = 0.0f;
     } else {
         app_task2_get_output(&s_task2, &s_task2_output);
         app_task4_get_output(&s_task4, &s_task4_output);
@@ -1064,6 +1132,8 @@ void h723_chassis_service_step(uint32_t now_ms)
         s_control_output.task_request_available ? 1U : 0U;
     if (s_control_output.selected_task == 2U) {
         g_h723_debug.control.active_task_elapsed_ms = s_task2_output.elapsed_ms;
+    } else if (s_control_output.selected_task == 3U) {
+        g_h723_debug.control.active_task_elapsed_ms = s_task3_output.elapsed_ms;
     } else if (s_control_output.selected_task == 4U) {
         g_h723_debug.control.active_task_elapsed_ms = s_task4_output.elapsed_ms;
     } else if ((s_control_output.selected_task == 5U) ||

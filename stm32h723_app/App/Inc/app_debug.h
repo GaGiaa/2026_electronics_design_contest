@@ -140,6 +140,19 @@ typedef struct {
 } h723_debug_task56_t;
 
 typedef struct {
+    float start_position_deg;
+    float first_target_position_deg;
+    float final_target_position_deg;
+    float wait_time_s;
+    float finish_display_time_s;
+    uint32_t phase;
+    uint32_t running;
+    uint32_t config_valid;
+    uint32_t elapsed_ms;
+    float target_position_deg;
+} h723_debug_task3_t;
+
+typedef struct {
     uint32_t rx_count;
     uint32_t tx_count;
     uint32_t tx_error_count;
@@ -406,6 +419,7 @@ typedef struct {
     h723_debug_crsf_t crsf;
     h723_debug_control_t control;
     h723_debug_task2_t task2;
+    h723_debug_task3_t task3;
     h723_debug_task4_t task4;
     h723_debug_task56_t task56;
     h723_debug_chassis_t chassis;
