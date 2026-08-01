@@ -61,11 +61,30 @@ static void test_black_count_below_stop_threshold_keeps_running(void)
     assert(output.base_speed_mm_s == APP_H723_TASK2_SPEED_MM_S);
 }
 
-static void test_stop_line_immediately_latches_zero_speed(void)
+static void test_stop_line_during_startup_guard_is_ignored(void)
 {
     app_task2_state_t state;
     app_task2_output_t output;
     app_task2_input_t input = input_at(100U, APP_H723_TASK2_STOP_BLACK_COUNT);
+
+    app_task2_init(&state);
+    app_task2_start(&state, 100U);
+    app_task2_step(&state, &input);
+    app_task2_get_output(&state, &output);
+
+    assert(output.phase == APP_TASK2_PHASE_RUNNING);
+    assert(output.running);
+    assert(output.follow_line);
+    assert(!output.stop);
+    assert(output.base_speed_mm_s == APP_H723_TASK2_SPEED_MM_S);
+}
+
+static void test_stop_line_after_startup_guard_latches_zero_speed(void)
+{
+    app_task2_state_t state;
+    app_task2_output_t output;
+    app_task2_input_t input = input_at(100U + APP_H723_TASK2_STARTUP_IGNORE_STOP_MS,
+                                       APP_H723_TASK2_STOP_BLACK_COUNT);
 
     app_task2_init(&state);
     app_task2_start(&state, 100U);
@@ -77,7 +96,7 @@ static void test_stop_line_immediately_latches_zero_speed(void)
     assert(!output.follow_line);
     assert(output.stop);
     assert(output.base_speed_mm_s == 0.0f);
-    assert(output.elapsed_ms == 0U);
+    assert(output.elapsed_ms == APP_H723_TASK2_STARTUP_IGNORE_STOP_MS);
 }
 
 static void test_abort_returns_to_idle(void)
@@ -96,7 +115,8 @@ int main(void)
     test_initial_state_is_idle();
     test_start_enters_fixed_speed_line_follow();
     test_black_count_below_stop_threshold_keeps_running();
-    test_stop_line_immediately_latches_zero_speed();
+    test_stop_line_during_startup_guard_is_ignored();
+    test_stop_line_after_startup_guard_latches_zero_speed();
     test_abort_returns_to_idle();
     return 0;
 }

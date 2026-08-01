@@ -41,7 +41,8 @@ void app_task2_step(app_task2_state_t *state, const app_task2_input_t *input)
     }
 
     state->last_step_ms = input->now_ms;
-    if (input->black_count >= APP_H723_TASK2_STOP_BLACK_COUNT) {
+    if ((input->now_ms - state->start_ms) >= APP_H723_TASK2_STARTUP_IGNORE_STOP_MS &&
+        input->black_count >= APP_H723_TASK2_STOP_BLACK_COUNT) {
         state->phase = APP_TASK2_PHASE_STOPPED;
         state->finish_ms = input->now_ms;
     }

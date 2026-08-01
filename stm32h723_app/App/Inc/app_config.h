@@ -314,6 +314,7 @@
 
 /* 任务二固定循迹速度，单位 mm/s。 */
 #define APP_H723_TASK2_SPEED_MM_S 360.0f
+#define APP_H723_TASK2_STARTUP_IGNORE_STOP_MS 10000U
 /* 黑线计数达到该阈值时立即停车。 */
 #define APP_H723_TASK2_STOP_BLACK_COUNT 4U
 
