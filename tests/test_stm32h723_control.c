@@ -122,10 +122,25 @@ static void test_remote_modes_and_timeout_are_safe(void)
     assert(output.chassis.right_target_rpm == 0.0f);
 }
 
+static void test_no_receiver_starts_in_task_mode(void)
+{
+    app_chassis_control_state_t state;
+    app_chassis_control_output_t output;
+    app_crsf_input_t input = make_input();
+
+    app_chassis_control_init(&state);
+    input.valid = false;
+    step(&state, &input, 0U, 0U, &output);
+    assert(!output.remote_takeover);
+    assert(output.mode == APP_CHASSIS_MODE_TASK_MENU);
+    assert(output.buttons_enabled);
+}
+
 int main(void)
 {
     test_menu_uses_button_mapping_and_confirm_request();
     test_se_takes_over_and_masks_buttons_until_release();
     test_remote_modes_and_timeout_are_safe();
+    test_no_receiver_starts_in_task_mode();
     return 0;
 }
