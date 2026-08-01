@@ -28,13 +28,13 @@ foreach ($pattern in @(
     'g_h723_debug\.ball_position\.pid_p_out_deg',
     'g_h723_debug\.ball_position\.pid_i_out_deg',
     'g_h723_debug\.ball_position\.pid_d_out_deg',
-    'g_h723_debug\.ball_position\.pid_output_deg',
-    'g_h723_debug\.ball_position\.target_tilt_deg',
+    'g_h723_debug\.ball_position\.pid_offset_deg',
+    'g_h723_debug\.ball_position\.target_motor_position_deg',
     '\(float\)g_h723_debug\.ball_position\.vision_age_ms',
     '\(float\)g_h723_debug\.ball_position\.vision_valid',
     '\(float\)g_h723_debug\.ball_position\.state',
     '\(float\)g_h723_debug\.ball_position\.fault',
-    '\(float\)g_h723_debug\.pipe_startup\.calibration_valid'
+    '\(float\)g_h723_debug\.pipe_startup\.id3_allowed'
 )) {
     if ($telemetry -notmatch $pattern) {
         throw "Missing ball-position VOFA telemetry behavior: $pattern"

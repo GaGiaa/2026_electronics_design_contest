@@ -30,6 +30,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "app_config.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -109,7 +111,9 @@ int main(void)
   MX_USART2_UART_Init();
   MX_UART7_Init();
   MX_UART8_Init();
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
   MX_UART9_Init();
+#endif
   MX_ADC1_Init();
   MX_USART1_UART_Init();
   MX_I2C4_Init();

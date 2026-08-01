@@ -21,7 +21,6 @@
 #define H723_VOFA_CHASSIS_CHANNEL_COUNT 6U
 #define H723_VOFA_LINE_FOLLOW_PID_CHANNEL_COUNT 13U
 #define H723_VOFA_BUTTON_CHANNEL_COUNT 3U
-#define H723_VOFA_TILT_CONTROL_CHANNEL_COUNT 13U
 #define H723_VOFA_BALL_POSITION_CHANNEL_COUNT 13U
 
 static volatile app_telemetry_tx_guard_t s_uart8_tx_guard;
@@ -41,7 +40,6 @@ static void h723_uart8_publish_hal_state(void)
     (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE == 1U) || \
     (APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE == 1U) || \
     (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U) || \
-    (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE == 1U) || \
     (APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE == 1U)
 static bool h723_uart8_try_transmit(uint8_t *frame, uint16_t frame_size, uint32_t now_ms)
 {
@@ -100,7 +98,8 @@ static uint8_t s_bno055_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_BNO055_CHANNEL
 static uint32_t s_last_bno055_telemetry_ms;
 #endif
 
-#if (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U) && \
+    (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
 static uint8_t s_jy901s_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_JY901S_CHANNEL_COUNT)];
 static uint32_t s_last_jy901s_telemetry_ms;
 #endif
@@ -136,12 +135,6 @@ static uint8_t s_button_frame[VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_BUTTON_CHANNEL
 static uint32_t s_last_button_telemetry_ms;
 #endif
 
-#if (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE == 1U)
-static uint8_t s_tilt_control_frame[
-    VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_TILT_CONTROL_CHANNEL_COUNT)];
-static uint32_t s_last_tilt_control_telemetry_ms;
-#endif
-
 #if (APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE == 1U)
 static uint8_t s_ball_position_frame[
     VOFA_JUSTFLOAT_FRAME_SIZE(H723_VOFA_BALL_POSITION_CHANNEL_COUNT)];
@@ -154,7 +147,7 @@ void h723_app_telemetry_init(void)
     app_telemetry_tx_guard_init(&s_uart8_tx_guard);
     g_h723_debug.uart8.telemetry_enabled =
         (APP_VOFA_HEALTH_TELEMETRY_ENABLE << 0U) |
-        (APP_JY901S_VOFA_TELEMETRY_ENABLE << 1U) |
+        ((APP_H723_JY901S_SERVICE_ENABLE * APP_JY901S_VOFA_TELEMETRY_ENABLE) << 1U) |
         (APP_BNO055_VOFA_TELEMETRY_ENABLE << 2U) |
         (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE << 3U) |
         (APP_H723_SINGLE_MOTOR_VOFA_TELEMETRY_ENABLE << 4U) |
@@ -162,7 +155,6 @@ void h723_app_telemetry_init(void)
         (APP_H723_CHASSIS_VOFA_TELEMETRY_ENABLE << 6U) |
         (APP_H723_LINE_FOLLOW_PID_VOFA_TELEMETRY_ENABLE << 7U) |
         (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE << 8U) |
-        (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE << 9U) |
         (APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE << 10U);
     g_h723_debug.uart8.last_hal_status = HAL_OK;
     g_h723_debug.uart8.tx_in_flight = 0U;
@@ -177,7 +169,8 @@ void h723_app_telemetry_init(void)
 #if (APP_BNO055_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_bno055_telemetry_ms = h723_app_time_now_ms();
 #endif
-#if (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U) && \
+    (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_jy901s_telemetry_ms = h723_app_time_now_ms();
 #endif
 #if (APP_GRAYSCALE_VOFA_TELEMETRY_ENABLE == 1U)
@@ -198,9 +191,6 @@ void h723_app_telemetry_init(void)
 #endif
 #if (APP_H723_BUTTON_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_button_telemetry_ms = h723_app_time_now_ms();
-#endif
-#if (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE == 1U)
-    s_last_tilt_control_telemetry_ms = h723_app_time_now_ms();
 #endif
 #if (APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE == 1U)
     s_last_ball_position_telemetry_ms = h723_app_time_now_ms();
@@ -235,7 +225,8 @@ void h723_app_telemetry_step(void)
     }
 #endif
 
-#if (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U) && \
+    (APP_JY901S_VOFA_TELEMETRY_ENABLE == 1U)
     if (g_h723_debug.jy901s.sample_valid != 0U &&
 #if (APP_JY901S_VOFA_CALIBRATED_ENABLE == 1U)
         g_h723_debug.jy901s.calibration_valid != 0U &&
@@ -460,35 +451,6 @@ void h723_app_telemetry_step(void)
     }
 #endif
 
-#if (APP_H723_TILT_CONTROL_VOFA_TELEMETRY_ENABLE == 1U)
-    if ((now_ms - s_last_tilt_control_telemetry_ms) >=
-        APP_H723_TILT_CONTROL_VOFA_TELEMETRY_INTERVAL_MS) {
-        const float channels[H723_VOFA_TILT_CONTROL_CHANNEL_COUNT] = {
-            g_h723_debug.tilt.target_tilt_deg,
-            g_h723_debug.tilt.tilt_deg,
-            g_h723_debug.tilt.error_deg,
-            g_h723_debug.tilt.pid_p_out_deg_s,
-            g_h723_debug.tilt.pid_i_out_deg_s,
-            g_h723_debug.tilt.pid_d_out_deg_s,
-            g_h723_debug.tilt.pid_rate_deg_s,
-            g_h723_debug.tilt.motor_target_position_deg,
-            g_h723_debug.balance.feedback_position_deg,
-            g_h723_debug.balance.active_target_position_deg,
-            g_h723_debug.balance.target_output_speed_rpm,
-            g_h723_debug.balance.commanded_current_a,
-            (float)g_h723_debug.tilt.imu_sample_age_ms,
-        };
-        s_last_tilt_control_telemetry_ms = now_ms;
-        (void)vofa_justfloat_encode(
-            s_tilt_control_frame, sizeof(s_tilt_control_frame), channels,
-            H723_VOFA_TILT_CONTROL_CHANNEL_COUNT);
-        if (!h723_uart8_try_transmit(s_tilt_control_frame,
-                                     sizeof(s_tilt_control_frame), now_ms)) {
-            return;
-        }
-    }
-#endif
-
 #if (APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE == 1U)
     if ((now_ms - s_last_ball_position_telemetry_ms) >=
         APP_H723_BALL_POSITION_VOFA_TELEMETRY_INTERVAL_MS) {
@@ -499,13 +461,13 @@ void h723_app_telemetry_step(void)
             g_h723_debug.ball_position.pid_p_out_deg,
             g_h723_debug.ball_position.pid_i_out_deg,
             g_h723_debug.ball_position.pid_d_out_deg,
-            g_h723_debug.ball_position.pid_output_deg,
-            g_h723_debug.ball_position.target_tilt_deg,
+            g_h723_debug.ball_position.pid_offset_deg,
+            g_h723_debug.ball_position.target_motor_position_deg,
             (float)g_h723_debug.ball_position.vision_age_ms,
             (float)g_h723_debug.ball_position.vision_valid,
             (float)g_h723_debug.ball_position.state,
             (float)g_h723_debug.ball_position.fault,
-            (float)g_h723_debug.pipe_startup.calibration_valid,
+            (float)g_h723_debug.pipe_startup.id3_allowed,
         };
         s_last_ball_position_telemetry_ms = now_ms;
         (void)vofa_justfloat_encode(

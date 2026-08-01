@@ -19,28 +19,24 @@ typedef enum {
 typedef enum {
     APP_BALL_POSITION_FAULT_NONE = 0U,
     APP_BALL_POSITION_FAULT_INVALID_CONFIG = 1U,
-    APP_BALL_POSITION_FAULT_NOT_CALIBRATED = 2U,
-    APP_BALL_POSITION_FAULT_ID3_NOT_READY = 3U,
-    APP_BALL_POSITION_FAULT_VISION_INVALID = 4U,
-    APP_BALL_POSITION_FAULT_VISION_STALE = 5U,
-    APP_BALL_POSITION_FAULT_INVALID_INPUT = 6U,
+    APP_BALL_POSITION_FAULT_ID3_NOT_READY = 2U,
+    APP_BALL_POSITION_FAULT_VISION_INVALID = 3U,
+    APP_BALL_POSITION_FAULT_VISION_STALE = 4U,
+    APP_BALL_POSITION_FAULT_INVALID_INPUT = 5U,
 } app_ball_position_control_fault_t;
 
 typedef struct {
     uint32_t period_ms;
     uint32_t max_age_ms;
+    float safe_motor_position_deg;
     PID_Position_Param_Config pid_params;
     float output_limit_deg;
     float sign;
     float deadband_mm;
     float hold_position_mm[APP_BALL_POSITION_HOLD_MAP_POINT_COUNT];
-    float hold_tilt_deg[APP_BALL_POSITION_HOLD_MAP_POINT_COUNT];
+    float hold_motor_position_deg[APP_BALL_POSITION_HOLD_MAP_POINT_COUNT];
     float engage_error_mm;
     float release_error_mm;
-    float breakaway_positive_tilt_deg;
-    float breakaway_negative_tilt_deg;
-    float velocity_gain_deg_per_mm_s;
-    float velocity_filter_alpha;
 } app_ball_position_control_config_t;
 
 typedef struct {
@@ -50,9 +46,6 @@ typedef struct {
     float measured_mm;
     bool vision_valid;
     uint32_t vision_age_ms;
-    uint32_t vision_frame_count;
-    uint32_t vision_sample_ms;
-    bool calibration_ready;
     bool id3_ready;
 } app_ball_position_control_input_t;
 
@@ -66,14 +59,11 @@ typedef struct {
     float p_out_deg;
     float i_out_deg;
     float d_out_deg;
-    float output_deg;
-    float target_tilt_deg;
+    float pid_offset_deg;
     float integral;
     bool drive_active;
-    float hold_tilt_deg;
-    float breakaway_tilt_deg;
-    float velocity_mm_s;
-    float velocity_damping_tilt_deg;
+    float hold_motor_position_deg;
+    float target_motor_position_deg;
 } app_ball_position_control_output_t;
 
 typedef struct {
@@ -84,16 +74,8 @@ typedef struct {
     uint32_t last_update_ms;
     bool has_last_update;
     bool drive_active;
-    float error_mm;
-    bool has_vision_history;
-    uint32_t last_vision_frame_count;
-    uint32_t last_vision_sample_ms;
-    float last_vision_measured_mm;
-    float filtered_velocity_mm_s;
-    float hold_tilt_deg;
-    float breakaway_tilt_deg;
-    float velocity_damping_tilt_deg;
-    float target_tilt_deg;
+    float hold_motor_position_deg;
+    float target_motor_position_deg;
 } app_ball_position_control_t;
 
 void app_ball_position_control_config_default(app_ball_position_control_config_t *config);

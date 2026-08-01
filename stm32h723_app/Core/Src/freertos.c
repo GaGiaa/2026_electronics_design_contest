@@ -34,7 +34,9 @@
 #if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
 #include "app_bno055_service.h"
 #endif
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
 #include "app_jy901s_service.h"
+#endif
 #include "app_k230_service.h"
 #include "app_grayscale_service.h"
 #include "app_oled.h"
@@ -68,12 +70,14 @@ static const osThreadAttr_t chassisTask_attributes = {
   .priority = (osPriority_t)osPriorityHigh,
 };
 
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
 static osThreadId_t jy901sTaskHandle;
 static const osThreadAttr_t jy901sTask_attributes = {
   .name = "jy901sTask",
   .stack_size = 1024 * 2,
   .priority = (osPriority_t)osPriorityAboveNormal,
 };
+#endif
 
 static osThreadId_t grayscaleTaskHandle;
 static const osThreadAttr_t grayscaleTask_attributes = {
@@ -126,7 +130,9 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE BEGIN FunctionPrototypes */
 
 void startChassisTask(void *argument);
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
 void startJy901sTask(void *argument);
+#endif
 void startGrayscaleTask(void *argument);
 #if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
 void startBno055Task(void *argument);
@@ -190,8 +196,10 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_THREADS */
   chassisTaskHandle = osThreadNew(startChassisTask, NULL, &chassisTask_attributes);
   configASSERT(chassisTaskHandle != NULL);
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
   jy901sTaskHandle = osThreadNew(startJy901sTask, NULL, &jy901sTask_attributes);
   configASSERT(jy901sTaskHandle != NULL);
+#endif
   grayscaleTaskHandle = osThreadNew(startGrayscaleTask, NULL, &grayscaleTask_attributes);
   configASSERT(grayscaleTaskHandle != NULL);
 #if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
@@ -277,6 +285,7 @@ void startButtonTask(void *argument)
   }
 }
 
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
 void startJy901sTask(void *argument)
 {
   uint32_t next_wake_tick = osKernelGetTickCount();
@@ -289,6 +298,7 @@ void startJy901sTask(void *argument)
     (void)osDelayUntil(next_wake_tick);
   }
 }
+#endif
 
 void startGrayscaleTask(void *argument)
 {

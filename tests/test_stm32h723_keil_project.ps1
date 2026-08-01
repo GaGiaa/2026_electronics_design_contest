@@ -36,7 +36,6 @@ foreach ($line in @(
     '<FilePath>../App/Src/app_crsf.c</FilePath>',
     '<FilePath>../App/Src/app_m2006.c</FilePath>',
     '<FilePath>../App/Src/app_balance.c</FilePath>',
-    '<FilePath>../App/Src/app_tilt_control.c</FilePath>',
     '<FilePath>../App/Src/app_ball_position_control.c</FilePath>',
     '<FilePath>../App/Src/app_pipe_startup.c</FilePath>',
     '<FilePath>../App/Src/app_chassis.c</FilePath>',

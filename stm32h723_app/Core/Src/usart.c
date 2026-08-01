@@ -24,7 +24,11 @@
 
 #include "app_chassis_service.h"
 
+#include "app_config.h"
+
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
 #include "app_jy901s_service.h"
+#endif
 
 #include "app_k230_service.h"
 
@@ -43,9 +47,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
   if (huart->Instance == UART7) {
     h723_chassis_on_uart7_rx_event(size);
   }
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
   if (huart->Instance == UART9) {
     h723_jy901s_on_uart9_rx_event(size);
   }
+#endif
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
@@ -56,9 +62,11 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
   if (huart->Instance == UART7) {
     h723_chassis_on_uart7_error();
   }
+#if (APP_H723_JY901S_SERVICE_ENABLE == 1U)
   if (huart->Instance == UART9) {
     h723_jy901s_on_uart9_error();
   }
+#endif
   h723_app_telemetry_on_uart_error(huart);
 }
 

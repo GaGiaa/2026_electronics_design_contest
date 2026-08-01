@@ -48,28 +48,23 @@ foreach ($line in @(
 )) { Require-Text $chassis $line "Missing ball-control chassis integration: $line" }
 
 foreach ($line in @(
-    'ball_input.vision_frame_count = ball_sample.valid_frame_count;',
-    'ball_input.vision_sample_ms = ball_sample.last_frame_ms;',
     'hold_position_mm',
-    'breakaway_negative_tilt_deg',
-    'velocity_gain_deg_per_mm_s',
-    'output->velocity_damping_tilt_deg'
+    'hold_motor_position_deg',
+    'target_motor_position_deg'
 )) { Require-Text ($chassis + "`n" + $debug) $line "Missing ball-control tuning integration: $line" }
 
 foreach ($line in @(
     'h723_debug_ball_position_t',
     'h723_debug_pipe_startup_t',
-    'calibration_target_position_deg',
+    'startup_target_position_deg',
     'id3_output_speed_rpm',
     'h723_debug_ball_position_t ball_position;',
     'h723_debug_pipe_startup_t pipe_startup;'
 )) { Require-Text $debug $line "Missing ball-control debug field: $line" }
 
-foreach ($line in @(
-    'CALIBRATE PIPE',
-    'B1:CAPTURE',
-    'B2:SKIP'
-)) { Require-Text $oled $line "Missing pipe calibration OLED prompt: $line" }
+foreach ($line in @('MOVE PIPE', 'TARGET:%.0f', 'WAIT:SETTLE')) {
+    Require-Text $oled $line "Missing pipe startup OLED prompt: $line"
+}
 
 foreach ($line in @(
     '<FilePath>../App/Src/app_ball_position_control.c</FilePath>',

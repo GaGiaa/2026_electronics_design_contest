@@ -261,39 +261,6 @@ typedef struct {
 } h723_debug_balance_t;
 
 typedef struct {
-    /* Keil Watch inputs. capture_zero_request is consumed as a one-shot command. */
-    uint32_t enable;
-    float target_tilt_deg;
-    uint32_t capture_zero_request;
-    float pid_kp;
-    float pid_ki;
-    float pid_kd;
-    float derivative_filter_N;
-    float pid_deadband_deg;
-    float max_position_rate_deg_s;
-    /* Runtime state and 100 Hz outer-loop snapshot. */
-    uint32_t state;
-    uint32_t fault;
-    uint32_t capture_zero_consumed;
-    uint32_t zero_captured_valid;
-    uint32_t new_imu_sample;
-    uint32_t motor_target_clamped;
-    uint32_t imu_sample_age_ms;
-    float raw_pitch_deg;
-    float captured_zero_deg;
-    float tilt_deg;
-    float error_deg;
-    float pid_rate_deg_s;
-    float pid_p_out_deg_s;
-    float pid_i_out_deg_s;
-    float pid_d_out_deg_s;
-    float pid_integral;
-    float measured_tilt_rate_deg_s;
-    float filtered_tilt_rate_deg_s;
-    float motor_target_position_deg;
-} h723_debug_tilt_t;
-
-typedef struct {
     int16_t acceleration_raw[3];
     int16_t temperature_raw;
     int16_t angular_rate_raw[3];
@@ -394,14 +361,11 @@ typedef struct {
     float pid_kd;
     float output_limit_deg;
     float pid_deadband_mm;
+    float position_sign;
     float hold_position_mm[3];
-    float hold_tilt_deg[3];
+    float hold_motor_position_deg[3];
     float engage_error_mm;
     float release_error_mm;
-    float breakaway_positive_tilt_deg;
-    float breakaway_negative_tilt_deg;
-    float velocity_gain_deg_per_mm_s;
-    float velocity_filter_alpha;
     /* Runtime state. */
     uint32_t state;
     uint32_t fault;
@@ -414,14 +378,11 @@ typedef struct {
     float pid_p_out_deg;
     float pid_i_out_deg;
     float pid_d_out_deg;
-    float pid_output_deg;
-    float target_tilt_deg;
+    float pid_offset_deg;
     float pid_integral;
     uint32_t drive_active;
-    float hold_tilt_output_deg;
-    float breakaway_tilt_output_deg;
-    float velocity_mm_s;
-    float velocity_damping_tilt_deg;
+    float hold_motor_position_output_deg;
+    float target_motor_position_deg;
     uint32_t active_profile;
 } h723_debug_ball_position_t;
 
@@ -457,12 +418,10 @@ typedef struct {
 typedef struct {
     uint32_t state;
     uint32_t fault;
-    uint32_t calibration_valid;
     uint32_t id3_allowed;
     uint32_t other_motors_allowed;
-    uint32_t calibration_position_stable;
-    float captured_pitch_deg;
-    float calibration_target_position_deg;
+    uint32_t startup_position_stable;
+    float startup_target_position_deg;
     float id3_position_deg;
     float id3_output_speed_rpm;
 } h723_debug_pipe_startup_t;
@@ -500,7 +459,6 @@ typedef struct {
     h723_m2006_debug_t m2006[3];
     h723_debug_single_motor_t single_motor;
     h723_debug_balance_t balance;
-    h723_debug_tilt_t tilt;
     h723_debug_jy901s_t jy901s;
     h723_debug_grayscale_t grayscale;
     h723_debug_buttons_t buttons;
