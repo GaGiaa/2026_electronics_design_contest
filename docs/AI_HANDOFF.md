@@ -994,3 +994,18 @@ CAN、电机或灰度传感器硬件验收。
 - 已通过 K230 UART2 单元测试、UART2 静态集成测试和钢球控制集成静态测试。全量测试、
   Keil 纯软件构建及硬件验收状态以本轮最终验证结果为准；未执行 Flash、烧录、SWD/GDB、
   K230 实物通信、UART/VOFA 实物接收或电机联动验收。
+
+## H723 Reverted Commits (2026-08-01)
+
+- Reverted merge commit `994d00a17456e663bd4912c642a969a94354d906` with
+  revert commit `9f4c845`. The dynamic ball-position PID additions were
+  removed while the later K230 perspective-correction record was retained.
+- Reverted merge commit `d9bb017149765be6ce2d1cb6b0d3693f8fe3bbbb` with
+  revert commit `dfded67`. The encoder-distance Task 4 speed-planning
+  changes, related tests, debug fields, editor tasks, and handoff section
+  were removed.
+- This rollback only changes software history. No Flash, SWD/GDB, UART,
+  CAN, motor, K230, steel-ball, or other physical operation was performed.
+- Verification after the rollback passed: all 43 `tests/test_stm32h723_*.ps1`
+  scripts passed, `git diff --check` passed, and the Keil software-only build
+  produced `stm32h723_app.axf` with `0 Error(s), 0 Warning(s)`.
