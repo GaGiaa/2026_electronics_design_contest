@@ -55,6 +55,24 @@ static void test_stop_and_reverse_remain_bounded(void)
     assert(fabsf(output.planned_speed_mm_s + 500.0f) < 1.0f);
 }
 
+static void test_target_crossing_preserves_jerk_limit(void)
+{
+    app_speed_profile_t profile;
+    const app_speed_profile_config_t config = make_config();
+    app_speed_profile_output_t output = {0};
+    const float dt_s = 0.01f;
+
+    app_speed_profile_init(&profile, &config);
+    profile.planned_speed_mm_s = 99.9f;
+    profile.planned_accel_mm_s2 = 100.0f;
+
+    app_speed_profile_step(&profile, 100.0f, dt_s, &output);
+
+    assert(output.valid);
+    assert(fabsf(output.planned_accel_mm_s2 - 100.0f) <=
+           config.max_jerk_mm_s3 * dt_s + 0.001f);
+}
+
 static void test_invalid_parameters_hold_zero(void)
 {
     app_speed_profile_t profile;
@@ -72,6 +90,7 @@ int main(void)
 {
     test_jerk_and_acceleration_are_limited();
     test_stop_and_reverse_remain_bounded();
+    test_target_crossing_preserves_jerk_limit();
     test_invalid_parameters_hold_zero();
     return 0;
 }

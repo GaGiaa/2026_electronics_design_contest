@@ -103,13 +103,8 @@ void app_speed_profile_step(app_speed_profile_t *profile,
     profile->planned_accel_mm_s2 = app_speed_profile_clamp(
         profile->planned_accel_mm_s2, profile->config.max_accel_mm_s2);
     next_speed = profile->planned_speed_mm_s + profile->planned_accel_mm_s2 * dt_s;
-    if ((requested - profile->planned_speed_mm_s) * (requested - next_speed) <= 0.0f) {
-        profile->planned_speed_mm_s = requested;
-        profile->planned_accel_mm_s2 = 0.0f;
-    } else {
-        profile->planned_speed_mm_s = app_speed_profile_clamp(
-            next_speed, profile->config.max_speed_mm_s);
-    }
+    profile->planned_speed_mm_s = app_speed_profile_clamp(
+        next_speed, profile->config.max_speed_mm_s);
 
     output->valid = true;
     output->requested_speed_mm_s = requested;
