@@ -65,6 +65,12 @@ foreach ($path in @(
     'g_h723_debug.pipe_startup.startup_target_position_deg',
     'g_h723_debug.pipe_startup.id3_position_deg',
     'g_h723_debug.pipe_startup.id3_output_speed_rpm',
+    'g_h723_debug.ball_position.breakaway_enable',
+    'g_h723_debug.ball_position.breakaway_params_valid',
+    'debug->breakaway_active',
+    'debug->breakaway_trigger_count',
+    'debug->breakaway_stall_elapsed_ms',
+    'debug->breakaway_offset_deg',
     'g_h723_debug.bno055.angle_deg'
 )) {
     if ($source -notmatch [regex]::Escape($path)) { throw "Missing grouped debug access: $path" }

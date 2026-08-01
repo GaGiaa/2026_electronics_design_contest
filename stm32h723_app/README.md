@@ -113,6 +113,8 @@ K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使
 
 钢珠位置 PID 固定为 50 Hz（20 ms）。静态环由 `g_h723_debug.ball_position.enable` 显式启用；动态遥控循迹模式使用独立的 `g_h723_debug.ball_position_dynamic` 配置。两者均直接输出 `target_motor_position_deg`，不依赖 JY901S。三点保持表和 PID 偏移的调参方式见前文“ID 3 钢珠位置直驱”。
 
+静态环默认启用防静摩擦脉冲：当误差达到驱动阈值且视觉坐标连续 `200 ms` 内位移小于 `1 mm` 时，沿目标方向叠加默认 `1 deg`、持续 `60 ms` 的 ID3 位置脉冲，随后冷却 `500 ms`。可在 `g_h723_debug.ball_position` 调整 `breakaway_enable`、脉冲幅值、停滞判定、持续时间和冷却时间；`breakaway_active`、`breakaway_trigger_count`、`breakaway_stall_elapsed_ms` 和 `breakaway_offset_deg` 用于观察运行状态。动态 SC 高模式强制关闭该脉冲，避免把静态调参带入行驶控制。
+
 `APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE=1U` 时，UART8 按 50 Hz 发送固定 13 通道 VOFA+ JustFloat 帧：`target_mm`、`measured_mm`、`error_mm`、P/I/D、`pid_offset_deg`、`target_motor_position_deg`、`vision_age_ms`、`vision_valid`、位置环 `state`、`fault` 与 `pipe_startup.id3_allowed`。保持电机位置仍可通过 `g_h723_debug.ball_position.hold_motor_position_output_deg` 在 Watch 观察。当前配置为 `1U`；该模式与其他 UART8 VOFA 遥测编译期互斥，只读调试快照。
 
 ## CubeMX Regeneration
@@ -305,15 +307,15 @@ than the stationary `g_h723_debug.ball_position.enable` path. Set the desired
 K230-frame coordinate with `ball_position_dynamic.target_mm`; tune
 `pid_kp`, `pid_ki`, `pid_kd`, `output_limit_deg`, and `pid_deadband_mm`
 independently. `position_sign` must be exactly `-1.0f` or `1.0f`; it defaults
-to `-1.0f`. Static and dynamic position loops have separate PID, hysteresis,
-and vision-velocity histories. The physical hold-angle, breakaway, and velocity
-damping calibration remains shared. `g_h723_debug.ball_position.active_profile`
+to `1.0f`. Static and dynamic position loops have separate PID, hysteresis,
+and measurement histories. The static loop's breakaway pulse is disabled for
+this dynamic instance. `g_h723_debug.ball_position.active_profile`
 is `1` for the dynamic loop and `0` for the stationary loop, so the existing
 13-channel ball-position VOFA frame continues to show whichever loop is active.
 
-The dynamic loop remains subject to the same ID3 homing, pipe pitch-calibration,
-IMU, K230 validity, and 100 ms vision-age gates. A failed gate clears the active
-position PID and requests zero tilt. Initial vehicle testing must be performed
+The dynamic loop remains subject to the same ID3 homing, K230 validity, and
+100 ms vision-age gates. A failed gate clears the active position PID and holds
+the last safe motor-position target. Initial vehicle testing must be performed
 with the chassis lifted and the ball retained, beginning with low speed and low
 PID gain; this software was not flashed or physically accepted during development.
 

@@ -6,6 +6,7 @@
 - 保持映射由 `hold_position_mm[0..2]` 和 `hold_motor_position_deg[0..2]` 三点线性插值得到，再叠加 `pid_offset_deg`。默认坐标为 `{20, 125, 230} mm`，三点保持电机位置均为 `134 deg`，仅用于安全起步；实物调试必须在车架悬空且钢珠取出或固定时逐点实测填表。视觉失效、帧龄超过 `100 ms`、参数非法或 ID 3 不可用时清 PID 并保持最后有效 ID3 目标；尚无有效目标时保持 `134 deg`。
 - ID 3 首次机械归零后自动移动至 `134 deg`。满足位置误差不超过 `1 deg`、输出轴速度绝对值不超过 `5 RPM` 并连续 `200 ms` 后直接进入 `READY`；不显示人工标定页，也不消费 PC5/PC4。移动超时、反馈失效或归零状态丢失只锁定 ID 3 为零电流，ID 1/2 和其他底盘功能保持可用。
 - `APP_H723_JY901S_SERVICE_ENABLE=0U` 为默认。默认构建不调用 `MX_UART9_Init()`、不创建 JY901S 任务，也不向 JY901S 服务分发 UART9 DMA/错误回调；源码、CubeMX 配置和 Keil 项仍保留，供未来独立恢复。JY901S VOFA 不能在服务关闭时开启。
+- 静态 `g_h723_debug.ball_position` 默认启用防静摩擦脉冲：误差达到驱动阈值且连续 `200 ms` 位移小于 `1 mm` 时，沿目标方向叠加 `1 deg`、持续 `60 ms` 的 ID3 位置脉冲，冷却时间为 `500 ms`。SC 高动态位置环强制关闭该功能；脉冲状态和触发计数通过静态调试快照观察，UART8 13 通道协议不变。
 - UART8 钢珠 VOFA 仍为 13 通道，但第 7--9 通道改为 PID 电机位置偏移、保持电机位置和最终 ID3 目标，最后一通道为 `pipe_startup.id3_allowed`。本轮未执行 Flash、烧录、SWD/GDB、UART、K230、JY901S、CAN、电机或钢珠实物操作；历史中的倾角闭环记录仅作演进参考，不是当前运行路径。
 
 ## H723 合并任务菜单、循迹与定时任务（2026-08-01）
@@ -848,9 +849,10 @@ other physical acceptance operation was performed.
   300 mm/s^2, and 1500 mm/s^3. Its unit test covers acceleration, braking,
   reversal, jerk/acceleration bounds, and invalid parameters.
 - Dynamic ball tuning is in `g_h723_debug.ball_position_dynamic`: target mm,
-  PID gains, tilt limit, deadband, and `position_sign` (-1 or +1). This set is
-  independent from the static Watch PID. Both controllers reset at a profile
-  transition, while hold-angle/friction/velocity compensation remains shared.
+  PID gains, motor-position limit, deadband, and `position_sign` (-1 or +1).
+  This set is independent from the static Watch PID. Both controllers reset at
+  a profile transition; the static breakaway pulse is explicitly disabled in
+  the dynamic instance.
   `g_h723_debug.ball_position` and the existing 13-channel UART8 ball VOFA
   frame publish the currently active controller; `active_profile=1` means
   dynamic.

@@ -80,5 +80,7 @@ float PID_Incremental_Calc(PID_Incremental *pid, float target, float feedback);
 void PID_Position_Init(PID_Position *pid, const PID_Position_Param_Config *params, float dt_s);
 void PID_Position_Reset(PID_Position *pid);
 float PID_Position_Calc(PID_Position *pid, float target, float feedback);
+/* Calculate while reusing the existing integral without accumulating it. */
+float PID_Position_Calc_NoIntegral(PID_Position *pid, float target, float feedback);
 
 #endif

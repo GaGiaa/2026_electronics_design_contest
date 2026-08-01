@@ -25,6 +25,12 @@ static app_ball_position_control_config_t make_config(void)
         .hold_motor_position_deg = {120.0f, 134.0f, 148.0f},
         .engage_error_mm = 6.0f,
         .release_error_mm = 2.0f,
+        .breakaway_enable = true,
+        .breakaway_pulse_deg = 1.0f,
+        .breakaway_stall_time_ms = 200U,
+        .breakaway_min_motion_mm = 1.0f,
+        .breakaway_duration_ms = 60U,
+        .breakaway_cooldown_ms = 500U,
     };
 }
 
@@ -125,6 +131,118 @@ static void test_deadband_and_offset_limit(void)
     assert(fabsf(output.target_motor_position_deg - 123.0f) < 0.0001f);
 }
 
+static void test_integral_freezes_inside_engage_release_hysteresis_band(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+    float integral_before_hysteresis;
+
+    config.pid_params.kp = 0.0f;
+    config.pid_params.ki = 1.0f;
+    config.breakaway_enable = false;
+    app_ball_position_control_init(&control, &config);
+
+    app_ball_position_control_step(&control, &input, &output);
+    integral_before_hysteresis = output.integral;
+    assert(output.drive_active);
+    assert(integral_before_hysteresis > 0.0f);
+
+    input.now_ms = 20U;
+    input.measured_mm = 116.0f; /* 4 mm error: inside the 2..6 mm hysteresis band. */
+    app_ball_position_control_step(&control, &input, &output);
+
+    assert(output.drive_active);
+    assert(fabsf(output.integral - integral_before_hysteresis) < 0.0001f);
+}
+
+static void test_breakaway_pulse_triggers_after_stall_and_expires(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+
+    config.pid_params.kp = 0.0f;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+    assert(!output.breakaway_active);
+    for (input.now_ms = 20U; input.now_ms <= 180U; input.now_ms += 20U) {
+        app_ball_position_control_step(&control, &input, &output);
+        assert(!output.breakaway_active);
+    }
+    input.now_ms = 200U;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(output.breakaway_active);
+    assert(output.breakaway_trigger_count == 1U);
+    assert(fabsf(output.breakaway_offset_deg - 1.0f) < 0.0001f);
+    assert(fabsf(output.pid_offset_deg - 1.0f) < 0.0001f);
+
+    input.now_ms = 220U;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(output.breakaway_active);
+    input.now_ms = 240U;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(output.breakaway_active);
+    input.now_ms = 260U;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(!output.breakaway_active);
+    assert(output.breakaway_trigger_count == 1U);
+    assert(fabsf(output.pid_offset_deg) < 0.0001f);
+
+    input.now_ms = 400U;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(!output.breakaway_active);
+    assert(output.breakaway_trigger_count == 1U);
+}
+
+static void test_breakaway_pulse_follows_position_sign_and_motion_resets_stall(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+
+    config.pid_params.kp = 0.0f;
+    config.sign = -1.0f;
+    input.target_mm = 80.0f;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+    input.now_ms = 20U;
+    input.measured_mm = 102.0f;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(output.breakaway_stall_elapsed_ms == 0U);
+    for (input.now_ms = 40U; input.now_ms <= 220U; input.now_ms += 20U) {
+        app_ball_position_control_step(&control, &input, &output);
+    }
+    assert(output.breakaway_active);
+    assert(fabsf(output.breakaway_offset_deg - 1.0f) < 0.0001f);
+}
+
+static void test_breakaway_resets_on_invalid_vision_without_integral_change(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+    float integral;
+
+    config.pid_params.kp = 0.0f;
+    config.pid_params.ki = 0.2f;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+    integral = output.integral;
+    input.now_ms = 20U;
+    input.vision_valid = false;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(output.reset);
+    assert(!output.breakaway_active);
+    assert(output.breakaway_stall_elapsed_ms == 0U);
+    assert(fabsf(output.integral) < 0.0001f);
+    assert(fabsf(integral) > 0.0f);
+}
+
 static void test_stale_vision_resets_pid_and_holds_last_safe_position(void)
 {
     app_ball_position_control_t control;
@@ -194,6 +312,12 @@ static void test_invalid_configuration_faults(void)
     app_ball_position_control_init(&control, &config);
     assert(control.state == APP_BALL_POSITION_STATE_FAULT);
     assert(control.fault == APP_BALL_POSITION_FAULT_INVALID_CONFIG);
+
+    config = make_config();
+    config.breakaway_pulse_deg = NAN;
+    app_ball_position_control_init(&control, &config);
+    assert(control.state == APP_BALL_POSITION_STATE_FAULT);
+    assert(control.fault == APP_BALL_POSITION_FAULT_INVALID_CONFIG);
 }
 
 int main(void)
@@ -202,6 +326,10 @@ int main(void)
     test_hold_map_interpolates_motor_position();
     test_updates_at_50_hz_only();
     test_deadband_and_offset_limit();
+    test_integral_freezes_inside_engage_release_hysteresis_band();
+    test_breakaway_pulse_triggers_after_stall_and_expires();
+    test_breakaway_pulse_follows_position_sign_and_motion_resets_stall();
+    test_breakaway_resets_on_invalid_vision_without_integral_change();
     test_stale_vision_resets_pid_and_holds_last_safe_position();
     test_first_fault_uses_safe_motor_position();
     test_invalid_configuration_faults();

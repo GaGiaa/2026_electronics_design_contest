@@ -37,6 +37,13 @@ typedef struct {
     float hold_motor_position_deg[APP_BALL_POSITION_HOLD_MAP_POINT_COUNT];
     float engage_error_mm;
     float release_error_mm;
+    /* 防静摩擦脉冲配置：用于钢珠停滞时短时推动 ID3 电机位置。 */
+    bool breakaway_enable;             /* 是否启用防静摩擦脉冲。 */
+    float breakaway_pulse_deg;         /* 脉冲位置偏移幅值，单位：ID3 输出轴 deg。 */
+    uint32_t breakaway_stall_time_ms;  /* 连续停滞判定时间，单位：ms。 */
+    float breakaway_min_motion_mm;     /* 判定停滞允许的最大位移，单位：mm。 */
+    uint32_t breakaway_duration_ms;    /* 单次脉冲持续时间，单位：ms。 */
+    uint32_t breakaway_cooldown_ms;    /* 两次脉冲之间的最小间隔，单位：ms。 */
 } app_ball_position_control_config_t;
 
 typedef struct {
@@ -64,6 +71,10 @@ typedef struct {
     bool drive_active;
     float hold_motor_position_deg;
     float target_motor_position_deg;
+    bool breakaway_active;
+    uint32_t breakaway_trigger_count;
+    uint32_t breakaway_stall_elapsed_ms;
+    float breakaway_offset_deg;
 } app_ball_position_control_output_t;
 
 typedef struct {
@@ -76,6 +87,14 @@ typedef struct {
     bool drive_active;
     float hold_motor_position_deg;
     float target_motor_position_deg;
+    bool has_last_measured;
+    float last_measured_mm;
+    uint32_t breakaway_stall_elapsed_ms;
+    uint32_t breakaway_pulse_elapsed_ms;
+    uint32_t breakaway_cooldown_remaining_ms;
+    uint32_t breakaway_trigger_count;
+    bool breakaway_active;
+    float breakaway_offset_deg;
 } app_ball_position_control_t;
 
 void app_ball_position_control_config_default(app_ball_position_control_config_t *config);

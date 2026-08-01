@@ -50,7 +50,15 @@ foreach ($line in @(
 foreach ($line in @(
     'hold_position_mm',
     'hold_motor_position_deg',
-    'target_motor_position_deg'
+    'target_motor_position_deg',
+    'breakaway_enable',
+    'breakaway_pulse_deg',
+    'breakaway_stall_time_ms',
+    'breakaway_min_motion_mm',
+    'breakaway_duration_ms',
+    'breakaway_cooldown_ms',
+    'breakaway_trigger_count',
+    'breakaway_stall_elapsed_ms'
 )) { Require-Text ($chassis + "`n" + $debug) $line "Missing ball-control tuning integration: $line" }
 
 foreach ($line in @(

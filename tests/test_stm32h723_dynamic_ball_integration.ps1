@@ -34,7 +34,8 @@ foreach ($line in @(
     'app_speed_profile_step',
     'APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_BALL',
     's_ball_position_dynamic_control',
-    'g_h723_debug.ball_position_dynamic'
+    'g_h723_debug.ball_position_dynamic',
+    's_ball_position_dynamic_config.breakaway_enable = false'
 )) { Require-Text $service $line "Missing dynamic ball chassis integration: $line" }
 
 Require-Text $project '<FilePath>../App/Src/app_speed_profile.c</FilePath>' `

@@ -366,6 +366,13 @@ typedef struct {
     float hold_motor_position_deg[3];
     float engage_error_mm;
     float release_error_mm;
+    uint32_t breakaway_enable;
+    float breakaway_pulse_deg;
+    uint32_t breakaway_stall_time_ms;
+    float breakaway_min_motion_mm;
+    uint32_t breakaway_duration_ms;
+    uint32_t breakaway_cooldown_ms;
+    uint32_t breakaway_params_valid;
     /* Runtime state. */
     uint32_t state;
     uint32_t fault;
@@ -384,6 +391,10 @@ typedef struct {
     float hold_motor_position_output_deg;
     float target_motor_position_deg;
     uint32_t active_profile;
+    uint32_t breakaway_active;
+    uint32_t breakaway_trigger_count;
+    uint32_t breakaway_stall_elapsed_ms;
+    float breakaway_offset_deg;
 } h723_debug_ball_position_t;
 
 typedef struct {

@@ -394,6 +394,7 @@ void h723_chassis_service_init(void)
     app_ball_position_control_config_default(&s_ball_position_dynamic_config);
     s_ball_position_dynamic_config.period_ms = APP_H723_BALL_POSITION_PERIOD_MS;
     s_ball_position_dynamic_config.max_age_ms = APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS;
+    s_ball_position_dynamic_config.breakaway_enable = false;
     app_ball_position_control_init(&s_ball_position_dynamic_control,
                                    &s_ball_position_dynamic_config);
     s_ball_position_dynamic_active = false;
@@ -497,6 +498,19 @@ void h723_chassis_service_init(void)
     }
     g_h723_debug.ball_position.engage_error_mm = s_ball_position_config.engage_error_mm;
     g_h723_debug.ball_position.release_error_mm = s_ball_position_config.release_error_mm;
+    g_h723_debug.ball_position.breakaway_enable =
+        s_ball_position_config.breakaway_enable ? 1U : 0U;
+    g_h723_debug.ball_position.breakaway_pulse_deg =
+        s_ball_position_config.breakaway_pulse_deg;
+    g_h723_debug.ball_position.breakaway_stall_time_ms =
+        s_ball_position_config.breakaway_stall_time_ms;
+    g_h723_debug.ball_position.breakaway_min_motion_mm =
+        s_ball_position_config.breakaway_min_motion_mm;
+    g_h723_debug.ball_position.breakaway_duration_ms =
+        s_ball_position_config.breakaway_duration_ms;
+    g_h723_debug.ball_position.breakaway_cooldown_ms =
+        s_ball_position_config.breakaway_cooldown_ms;
+    g_h723_debug.ball_position.breakaway_params_valid = 1U;
     g_h723_debug.ball_position_dynamic.target_mm = 0.0f;
     g_h723_debug.ball_position_dynamic.pid_kp =
         s_ball_position_dynamic_config.pid_params.kp;
@@ -672,7 +686,14 @@ static bool h723_ball_position_params_are_valid(
         !isfinite(debug->engage_error_mm) || !isfinite(debug->release_error_mm) ||
         debug->engage_error_mm < debug->release_error_mm ||
         debug->release_error_mm < 0.0f || !isfinite(debug->position_sign) ||
-        (debug->position_sign != -1.0f && debug->position_sign != 1.0f)) {
+        (debug->position_sign != -1.0f && debug->position_sign != 1.0f) ||
+        debug->breakaway_enable > 1U ||
+        !isfinite(debug->breakaway_pulse_deg) ||
+        debug->breakaway_pulse_deg <= 0.0f ||
+        debug->breakaway_stall_time_ms == 0U ||
+        !isfinite(debug->breakaway_min_motion_mm) ||
+        debug->breakaway_min_motion_mm < 0.0f ||
+        debug->breakaway_duration_ms == 0U) {
         return false;
     }
     for (index = 0U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
@@ -693,8 +714,10 @@ static void h723_ball_position_apply_debug_params(void)
     uint32_t index;
 
     if (!h723_ball_position_params_are_valid(debug)) {
+        debug->breakaway_params_valid = 0U;
         return;
     }
+    debug->breakaway_params_valid = 1U;
     s_ball_position_config.pid_params.kp = debug->pid_kp;
     s_ball_position_config.pid_params.ki = debug->pid_ki;
     s_ball_position_config.pid_params.kd = debug->pid_kd;
@@ -708,6 +731,12 @@ static void h723_ball_position_apply_debug_params(void)
     s_ball_position_config.engage_error_mm = debug->engage_error_mm;
     s_ball_position_config.release_error_mm = debug->release_error_mm;
     s_ball_position_config.sign = debug->position_sign;
+    s_ball_position_config.breakaway_enable = debug->breakaway_enable != 0U;
+    s_ball_position_config.breakaway_pulse_deg = debug->breakaway_pulse_deg;
+    s_ball_position_config.breakaway_stall_time_ms = debug->breakaway_stall_time_ms;
+    s_ball_position_config.breakaway_min_motion_mm = debug->breakaway_min_motion_mm;
+    s_ball_position_config.breakaway_duration_ms = debug->breakaway_duration_ms;
+    s_ball_position_config.breakaway_cooldown_ms = debug->breakaway_cooldown_ms;
     s_ball_position_control.config = s_ball_position_config;
     s_ball_position_control.pid.params.kp = debug->pid_kp;
     s_ball_position_control.pid.params.ki = debug->pid_ki;
@@ -741,6 +770,7 @@ static void h723_ball_position_dynamic_apply_debug_params(void)
     debug->params_valid = 1U;
     /* The physical hold/friction calibration remains shared; PID state does not. */
     s_ball_position_dynamic_config = s_ball_position_config;
+    s_ball_position_dynamic_config.breakaway_enable = false;
     s_ball_position_dynamic_config.pid_params.kp = debug->pid_kp;
     s_ball_position_dynamic_config.pid_params.ki = debug->pid_ki;
     s_ball_position_dynamic_config.pid_params.kd = debug->pid_kd;
@@ -859,6 +889,10 @@ static void h723_ball_position_publish_debug(const app_k230_sample_t *sample,
     debug->hold_motor_position_output_deg = output->hold_motor_position_deg;
     debug->target_motor_position_deg = output->target_motor_position_deg;
     debug->active_profile = dynamic_profile ? 1U : 0U;
+    debug->breakaway_active = output->breakaway_active ? 1U : 0U;
+    debug->breakaway_trigger_count = output->breakaway_trigger_count;
+    debug->breakaway_stall_elapsed_ms = output->breakaway_stall_elapsed_ms;
+    debug->breakaway_offset_deg = output->breakaway_offset_deg;
 }
 
 static float h723_ball_position_service_step(uint32_t now_ms)

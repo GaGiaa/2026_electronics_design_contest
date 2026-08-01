@@ -194,7 +194,8 @@ void PID_Position_Reset(PID_Position *pid)
 #endif
 }
 
-float PID_Position_Calc(PID_Position *pid, float target, float feedback)
+static float pid_position_calc(PID_Position *pid, float target, float feedback,
+                               bool integrate)
 {
     float error;
 
@@ -224,8 +225,9 @@ float PID_Position_Calc(PID_Position *pid, float target, float feedback)
                                                           raw_derivative,
                                                           pid->params.derivative_filter_N,
                                                           pid->dt_s);
-        if (!pid_has_positive_limit(pid->params.integral_separation_threshold) ||
-            pid_absf(error) <= pid->params.integral_separation_threshold) {
+        if (integrate &&
+            (!pid_has_positive_limit(pid->params.integral_separation_threshold) ||
+             pid_absf(error) <= pid->params.integral_separation_threshold)) {
             pid->integral += error * pid->dt_s;
         }
         if (pid_has_positive_limit(pid->params.I_Outlimit)) {
@@ -240,7 +242,7 @@ float PID_Position_Calc(PID_Position *pid, float target, float feedback)
         if (pid_has_positive_limit(pid->params.output_limit)) {
             pid->output = App_Math_ClampFloat(raw_output, -pid->params.output_limit,
                                               pid->params.output_limit);
-            if (pid->params.ki != 0.0f) {
+            if (integrate && pid->params.ki != 0.0f) {
                 pid->integral += anti_windup_gain * (pid->output - raw_output) / pid->params.ki * pid->dt_s;
                 if (pid_has_positive_limit(pid->params.I_Outlimit)) {
                     pid->integral = App_Math_ClampFloat(pid->integral, -pid->params.I_Outlimit,
@@ -264,7 +266,9 @@ float PID_Position_Calc(PID_Position *pid, float target, float feedback)
     {
         float derivative;
 
-    pid->integral += error * pid->dt_s;
+    if (integrate) {
+        pid->integral += error * pid->dt_s;
+    }
     derivative = pid->has_last_error ? ((error - pid->last_error) / pid->dt_s) : 0.0f;
     pid->p_out = pid->params.kp * error;
     pid->i_out = pid->params.ki * pid->integral;
@@ -279,4 +283,14 @@ float PID_Position_Calc(PID_Position *pid, float target, float feedback)
     pid->last_error = error;
     pid->has_last_error = true;
     return pid->output;
+}
+
+float PID_Position_Calc(PID_Position *pid, float target, float feedback)
+{
+    return pid_position_calc(pid, target, feedback, true);
+}
+
+float PID_Position_Calc_NoIntegral(PID_Position *pid, float target, float feedback)
+{
+    return pid_position_calc(pid, target, feedback, false);
 }

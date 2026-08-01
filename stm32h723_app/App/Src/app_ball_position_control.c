@@ -17,7 +17,13 @@ static bool app_ball_position_config_is_valid(
         !isfinite(config->deadband_mm) || config->deadband_mm < 0.0f ||
         !isfinite(config->engage_error_mm) || !isfinite(config->release_error_mm) ||
         config->engage_error_mm < config->release_error_mm ||
-        config->release_error_mm < 0.0f) {
+        config->release_error_mm < 0.0f ||
+        !isfinite(config->breakaway_pulse_deg) ||
+        config->breakaway_pulse_deg <= 0.0f ||
+        config->breakaway_stall_time_ms == 0U ||
+        !isfinite(config->breakaway_min_motion_mm) ||
+        config->breakaway_min_motion_mm < 0.0f ||
+        config->breakaway_duration_ms == 0U) {
         return false;
     }
 
@@ -68,11 +74,94 @@ static void app_ball_position_publish(const app_ball_position_control_t *control
     output->p_out_deg = control->pid.p_out;
     output->i_out_deg = control->pid.i_out;
     output->d_out_deg = control->pid.d_out;
-    output->pid_offset_deg = control->config.sign * control->pid.output;
+    output->pid_offset_deg = control->config.sign * control->pid.output +
+                             control->breakaway_offset_deg;
     output->integral = control->pid.integral;
     output->drive_active = control->drive_active;
     output->hold_motor_position_deg = control->hold_motor_position_deg;
     output->target_motor_position_deg = control->target_motor_position_deg;
+    output->breakaway_active = control->breakaway_active;
+    output->breakaway_trigger_count = control->breakaway_trigger_count;
+    output->breakaway_stall_elapsed_ms = control->breakaway_stall_elapsed_ms;
+    output->breakaway_offset_deg = control->breakaway_offset_deg;
+}
+
+static void app_ball_position_clear_breakaway(app_ball_position_control_t *control)
+{
+    control->has_last_measured = false;
+    control->last_measured_mm = 0.0f;
+    control->breakaway_stall_elapsed_ms = 0U;
+    control->breakaway_pulse_elapsed_ms = 0U;
+    control->breakaway_cooldown_remaining_ms = 0U;
+    control->breakaway_active = false;
+    control->breakaway_offset_deg = 0.0f;
+}
+
+static uint32_t app_ball_position_add_time(uint32_t elapsed_ms,
+                                           uint32_t delta_ms)
+{
+    if (UINT32_MAX - elapsed_ms < delta_ms) {
+        return UINT32_MAX;
+    }
+    return elapsed_ms + delta_ms;
+}
+
+static void app_ball_position_update_breakaway(
+    app_ball_position_control_t *control,
+    const app_ball_position_control_input_t *input,
+    uint32_t elapsed_ms,
+    float error_mm)
+{
+    const app_ball_position_control_config_t *config = &control->config;
+    float motion_mm = 0.0f;
+
+    if (!config->breakaway_enable || !control->drive_active ||
+        fabsf(error_mm) < config->engage_error_mm) {
+        app_ball_position_clear_breakaway(control);
+        return;
+    }
+
+    if (control->has_last_measured) {
+        motion_mm = fabsf(input->measured_mm - control->last_measured_mm);
+        if (motion_mm <= config->breakaway_min_motion_mm) {
+            control->breakaway_stall_elapsed_ms = app_ball_position_add_time(
+                control->breakaway_stall_elapsed_ms, elapsed_ms);
+        } else {
+            control->breakaway_stall_elapsed_ms = 0U;
+        }
+    }
+    control->last_measured_mm = input->measured_mm;
+    control->has_last_measured = true;
+
+    if (control->breakaway_cooldown_remaining_ms > elapsed_ms) {
+        control->breakaway_cooldown_remaining_ms -= elapsed_ms;
+    } else {
+        control->breakaway_cooldown_remaining_ms = 0U;
+    }
+
+    if (control->breakaway_active) {
+        control->breakaway_pulse_elapsed_ms = app_ball_position_add_time(
+            control->breakaway_pulse_elapsed_ms, elapsed_ms);
+        if (control->breakaway_pulse_elapsed_ms >= config->breakaway_duration_ms) {
+            control->breakaway_active = false;
+            control->breakaway_pulse_elapsed_ms = 0U;
+            control->breakaway_offset_deg = 0.0f;
+        }
+    }
+
+    if (!control->breakaway_active &&
+        control->breakaway_cooldown_remaining_ms == 0U &&
+        control->breakaway_stall_elapsed_ms >= config->breakaway_stall_time_ms) {
+        const float error_direction = error_mm >= 0.0f ? 1.0f : -1.0f;
+
+        control->breakaway_active = true;
+        control->breakaway_pulse_elapsed_ms = 0U;
+        control->breakaway_stall_elapsed_ms = 0U;
+        control->breakaway_cooldown_remaining_ms = config->breakaway_cooldown_ms;
+        control->breakaway_trigger_count++;
+        control->breakaway_offset_deg = control->config.sign * error_direction *
+                                        config->breakaway_pulse_deg;
+    }
 }
 
 static void app_ball_position_hold(app_ball_position_control_t *control,
@@ -83,6 +172,7 @@ static void app_ball_position_hold(app_ball_position_control_t *control,
     PID_Position_Reset(&control->pid);
     control->has_last_update = false;
     control->drive_active = false;
+    app_ball_position_clear_breakaway(control);
     control->state = state;
     control->fault = fault;
     output->reset = true;
@@ -112,6 +202,12 @@ void app_ball_position_control_config_default(app_ball_position_control_config_t
         .hold_motor_position_deg = {134.0f, 134.0f, 134.0f},
         .engage_error_mm = 6.0f,
         .release_error_mm = 2.0f,
+        .breakaway_enable = true,
+        .breakaway_pulse_deg = 1.0f,
+        .breakaway_stall_time_ms = 200U,
+        .breakaway_min_motion_mm = 1.0f,
+        .breakaway_duration_ms = 60U,
+        .breakaway_cooldown_ms = 500U,
     };
 }
 
@@ -154,6 +250,8 @@ void app_ball_position_control_reset(app_ball_position_control_t *control)
     control->drive_active = false;
     control->hold_motor_position_deg = control->config.safe_motor_position_deg;
     control->target_motor_position_deg = control->config.safe_motor_position_deg;
+    app_ball_position_clear_breakaway(control);
+    control->breakaway_trigger_count = 0U;
 }
 
 void app_ball_position_control_step(app_ball_position_control_t *control,
@@ -201,6 +299,8 @@ void app_ball_position_control_step(app_ball_position_control_t *control,
         output->update_due = update_due;
         if (update_due) {
             float pid_offset_deg = 0.0f;
+            const uint32_t elapsed_ms = control->has_last_update ?
+                (uint32_t)(input->now_ms - control->last_update_ms) : 0U;
 
             if (!control->drive_active &&
                 fabsf(input->target_mm - input->measured_mm) >=
@@ -216,10 +316,24 @@ void app_ball_position_control_step(app_ball_position_control_t *control,
             control->hold_motor_position_deg =
                 app_ball_position_hold_motor_position(control, input->measured_mm);
             if (control->drive_active) {
-                (void)PID_Position_Calc(&control->pid, input->target_mm,
-                                        input->measured_mm);
+                const float abs_error_mm = fabsf(input->target_mm - input->measured_mm);
+                /* Keep hysteresis active, but prevent integral wind-up inside its band. */
+                if (abs_error_mm < control->config.engage_error_mm) {
+                    (void)PID_Position_Calc_NoIntegral(&control->pid,
+                                                       input->target_mm,
+                                                       input->measured_mm);
+                } else {
+                    (void)PID_Position_Calc(&control->pid, input->target_mm,
+                                            input->measured_mm);
+                }
                 pid_offset_deg = control->config.sign * control->pid.output;
+                app_ball_position_update_breakaway(
+                    control, input, elapsed_ms,
+                    input->target_mm - input->measured_mm);
+            } else {
+                app_ball_position_clear_breakaway(control);
             }
+            pid_offset_deg += control->breakaway_offset_deg;
             control->target_motor_position_deg =
                 control->hold_motor_position_deg + pid_offset_deg;
             control->last_update_ms = input->now_ms;
