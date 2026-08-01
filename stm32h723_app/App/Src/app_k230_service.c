@@ -33,7 +33,9 @@ static void h723_k230_start_receive(void)
 
 static void h723_k230_publish_debug(uint32_t now_ms)
 {
-    g_h723_debug.ball_vision.distance_mm = s_sample.distance_mm;
+    g_h723_debug.ball_vision.pixel_x = s_sample.pixel_x;
+    g_h723_debug.ball_vision.ball_position_mm = s_sample.ball_position_mm;
+    g_h723_debug.ball_vision.pipe_tilt_deg = 0.0f;
     g_h723_debug.ball_vision.valid = s_sample.valid ? 1U : 0U;
     g_h723_debug.ball_vision.valid_frame_count = s_sample.valid_frame_count;
     g_h723_debug.ball_vision.crc_error_count = s_sample.crc_error_count;

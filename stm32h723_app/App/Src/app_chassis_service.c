@@ -868,6 +868,7 @@ static void h723_pipe_startup_update(uint32_t now_ms, uint32_t button_mask)
 static void h723_ball_position_publish_debug(const app_k230_sample_t *sample,
                                              uint32_t sample_age_ms,
                                              bool dynamic_profile,
+                                             float pipe_tilt_deg,
                                              const app_ball_position_control_output_t *output)
 {
     volatile h723_debug_ball_position_t *debug = &g_h723_debug.ball_position;
@@ -878,7 +879,7 @@ static void h723_ball_position_publish_debug(const app_k230_sample_t *sample,
     debug->vision_valid = output->valid ? 1U : 0U;
     debug->vision_frame_count = sample != NULL ? sample->valid_frame_count : 0U;
     debug->vision_age_ms = sample_age_ms;
-    debug->measured_mm = sample != NULL ? sample->distance_mm : 0.0f;
+    debug->measured_mm = sample != NULL ? sample->ball_position_mm : 0.0f;
     debug->error_mm = output->error_mm;
     debug->pid_p_out_deg = output->p_out_deg;
     debug->pid_i_out_deg = output->i_out_deg;
@@ -893,9 +894,19 @@ static void h723_ball_position_publish_debug(const app_k230_sample_t *sample,
     debug->breakaway_trigger_count = output->breakaway_trigger_count;
     debug->breakaway_stall_elapsed_ms = output->breakaway_stall_elapsed_ms;
     debug->breakaway_offset_deg = output->breakaway_offset_deg;
+    if (sample != NULL) {
+        g_h723_debug.ball_vision.pixel_x = sample->pixel_x;
+        g_h723_debug.ball_vision.ball_position_mm = sample->ball_position_mm;
+        g_h723_debug.ball_vision.pipe_tilt_deg = pipe_tilt_deg;
+        g_h723_debug.ball_vision.valid = sample->valid ? 1U : 0U;
+        g_h723_debug.ball_vision.valid_frame_count = sample->valid_frame_count;
+        g_h723_debug.ball_vision.frame_age_ms = sample_age_ms;
+    }
 }
 
-static float h723_ball_position_service_step(uint32_t now_ms)
+static float h723_ball_position_service_step(uint32_t now_ms,
+                                             float motor_position_deg,
+                                             bool motor_feedback_valid)
 {
     app_k230_sample_t ball_sample = {0};
     app_ball_position_control_input_t ball_input;
@@ -907,6 +918,8 @@ static float h723_ball_position_service_step(uint32_t now_ms)
                                      APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_BALL;
     const bool startup_position_move = s_pipe_startup_snapshot.state ==
         APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION;
+    const float pipe_tilt_deg = s_balance.zero_valid && motor_feedback_valid ?
+        (155.0f - motor_position_deg) * 0.0747f : 0.0f;
     const bool ball_enabled = dynamic_profile ||
                               (!dynamic_profile &&
                                g_h723_debug.ball_position.enable != 0U);
@@ -925,13 +938,16 @@ static float h723_ball_position_service_step(uint32_t now_ms)
     ball_input.target_mm = dynamic_profile ?
         g_h723_debug.ball_position_dynamic.target_mm :
         g_h723_debug.ball_position.target_mm;
-    ball_input.measured_mm = ball_sample.distance_mm;
+    ball_sample.ball_position_mm = app_k230_pixel_to_ball_mm(
+        ball_sample.pixel_x, pipe_tilt_deg);
+    ball_input.measured_mm = ball_sample.ball_position_mm;
     ball_input.vision_valid = ball_snapshot_available && ball_sample.valid;
     ball_input.vision_age_ms = ball_sample_age_ms;
     ball_input.id3_ready = s_pipe_startup_snapshot.id3_allowed && s_balance.zero_valid;
     app_ball_position_control_step(ball_control, &ball_input,
                                     &s_ball_position_output);
     h723_ball_position_publish_debug(&ball_sample, ball_sample_age_ms, dynamic_profile,
+                                     pipe_tilt_deg,
                                      &s_ball_position_output);
     if (startup_position_move) {
         return APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_DEG;
@@ -958,7 +974,9 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
     app_balance_step_output_t result;
     volatile h723_m2006_debug_t *debug = &g_h723_debug.m2006[index];
 
-    input.requested_target_position_deg = h723_ball_position_service_step(now_ms);
+    input.requested_target_position_deg = h723_ball_position_service_step(
+        now_ms, input.feedback_position_deg - s_balance.zero_offset_deg,
+        input.feedback_valid);
     if (s_pipe_startup_snapshot.state ==
         APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION) {
         /* The startup pose takes precedence over all Watch and ball-loop requests. */

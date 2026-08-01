@@ -330,6 +330,22 @@ the last safe motor-position target. Initial vehicle testing must be performed
 with the chassis lifted and the ball retained, beginning with low speed and low
 PID gain; this software was not flashed or physically accepted during development.
 
+## K230 Pixel Coordinate Conversion
+
+USART2 keeps the existing 9-byte K230 frame and CRC-16 protocol, but the
+little-endian float payload is now the camera X coordinate `pixel_x`, not a
+physical distance. `app_k230_pixel_to_ball_mm()` converts it to the pipe
+coordinate using the 993.0 pixel center, 6.575 pixel/mm scale, 24.5 mm camera
+height, and a +/-120 mm physical limit. The chassis service applies perspective
+correction using the current ID3 actual relative angle and
+`pipe_tilt_deg = (155.0 - motor_deg) * 0.0747`.
+
+The position controllers continue to consume millimetres through
+`ball_position_mm`. `g_h723_debug.ball_vision` exposes the raw pixel,
+corrected position, pipe tilt, validity, age, parser errors, and DMA state.
+K230 diagnostic VOFA uses five channels in this order: `pixel_x`,
+`ball_position_mm`, `pipe_tilt_deg`, `valid`, and `frame_age_ms`.
+
 This checkout explicitly sets `APP_H723_CHASSIS_ACTUATION_ENABLE=1U`; nonzero
 current commands are therefore possible once every CRSF, switch, and feedback
 safety gate is satisfied. Optional chassis VOFA telemetry is controlled by

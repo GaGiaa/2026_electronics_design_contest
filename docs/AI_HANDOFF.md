@@ -162,8 +162,8 @@
 - `stm32h723_app` 新增默认关闭的 `APP_H723_K230_UART2_TEST_ENABLE=0U`。启用后，USART2 使用
   `PD5=TX`、`PD6=RX`、234000 bit/s、8-N-1、DMA1 Stream3 RX 和 ReceiveToIdle DMA；K230 TX 接 PD6，
   两端必须共地并确认 3.3 V TTL 电平。`k230Task` 以 5 ms 周期从软件环形缓冲解析数据，不阻塞 UART 中断。
-- K230 帧固定为 9 字节：`A5 5A`、`valid`（0 或 1）、小端 `float32 distance_mm`、小端
-  `CRC-16/CCITT-FALSE`。CRC 覆盖前 7 字节。合法无效帧发布 `distance_mm=0.0f` 和 `valid=0`；CRC 或格式错误帧
+- K230 帧固定为 9 字节：`A5 5A`、`valid`（0 或 1）、小端 `float32 pixel_x`、小端
+  `CRC-16/CCITT-FALSE`。CRC 覆盖前 7 字节。合法无效帧保留原始 `pixel_x` 和 `valid=0`；CRC 或格式错误帧
   保留既有测量快照并递增错误计数。当前只提供测量测试，不接入水管倾角执行器或位置 PID。
 - 测试宏同时开启 UART8 三通道 JustFloat，每 20 ms 输出 `distance_mm`、`valid`、`frame_age_ms`；它与健康、JY901S、
   灰度和单电机 UART8 遥测编译期互斥。`g_h723_debug.ball_vision` 供 Keil Watch 观察距离、帧年龄、DMA 状态与
@@ -1009,3 +1009,18 @@ CAN、电机或灰度传感器硬件验收。
   全部 `tests\test_stm32h723_*.ps1` 以及 `git diff --check`。
 - 本轮未执行 Flash、烧录、SWD/GDB、CAN、电机、UART8/VOFA 或其他实物验收；提高比例增益后，
   首次实物调试仍须车架悬空并从低目标位移、低电流限制开始确认反馈方向和响应。
+
+## H723 K230 像素坐标透视修正（2026-08-01）
+
+- K230 UART2 的 9 字节协议保持不变，但 payload 的 float32 语义改为摄像头像素 X 坐标，
+  原始值发布为 `app_k230_sample_t.pixel_x`。CRC 合法的 `valid=0` 帧仍保留原始像素，
+  但钢球位置控制继续由 `valid` 和帧龄安全门禁止驱动。
+- `app_k230_pixel_to_ball_mm()` 使用像素中心 `993.0`、比例 `6.575 px/mm`、相机高度
+  `24.5 mm` 和最大行程 `±120 mm` 做透视修正。底盘服务使用当前周期 ID3 实际归零后角度，
+  按 `(155.0 - motor_deg) * 0.0747` 计算水管倾角，再得到 `ball_position_mm`。
+- `g_h723_debug.ball_vision` 现在同时提供 `pixel_x`、`ball_position_mm`、`pipe_tilt_deg`、
+  有效帧计数、帧龄、CRC/格式/UART/环形缓冲错误和 DMA 状态。K230 测试 VOFA 为五通道：
+  原始像素、修正毫米位置、水管倾角、有效标志和帧龄。
+- 已通过 K230 UART2 单元测试、UART2 静态集成测试和钢球控制集成静态测试。全量测试、
+  Keil 纯软件构建及硬件验收状态以本轮最终验证结果为准；未执行 Flash、烧录、SWD/GDB、
+  K230 实物通信、UART/VOFA 实物接收或电机联动验收。

@@ -17,7 +17,7 @@
 #define H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT 9U
 #define H723_VOFA_SINGLE_MOTOR_MAX_CHANNEL_COUNT H723_VOFA_SINGLE_MOTOR_POSITION_CHANNEL_COUNT
 #define H723_VOFA_BNO055_CHANNEL_COUNT 10U
-#define H723_VOFA_K230_CHANNEL_COUNT 3U
+#define H723_VOFA_K230_CHANNEL_COUNT 5U
 #define H723_VOFA_CHASSIS_CHANNEL_COUNT 6U
 #define H723_VOFA_LINE_FOLLOW_PID_CHANNEL_COUNT 13U
 #define H723_VOFA_BUTTON_CHANNEL_COUNT 3U
@@ -366,7 +366,9 @@ void h723_app_telemetry_step(void)
 #if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
     if ((now_ms - s_last_k230_telemetry_ms) >= APP_H723_K230_UART2_TEST_VOFA_INTERVAL_MS) {
         const float channels[H723_VOFA_K230_CHANNEL_COUNT] = {
-            g_h723_debug.ball_vision.distance_mm,
+            g_h723_debug.ball_vision.pixel_x,
+            g_h723_debug.ball_vision.ball_position_mm,
+            g_h723_debug.ball_vision.pipe_tilt_deg,
             (float)g_h723_debug.ball_vision.valid,
             (float)g_h723_debug.ball_vision.frame_age_ms
         };
