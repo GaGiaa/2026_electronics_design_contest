@@ -977,3 +977,14 @@ CAN、电机或灰度传感器硬件验收。
   纯软件构建，日志为 `0 Error(s), 0 Warning(s)`。当前工作区将
   `APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE` 设为 `1U` 以便现场观察；发布配置应改回 `0U`。
   未执行 Flash、烧录、K230、UART8/VOFA、CAN、电机或钢珠实物验收。
+
+## H723 单电机位置环比例增益移植（2026-08-01）
+
+- 选择性移植提交 `b2a7aef523d62990e55a676809fa266764d42a1d` 的功能改动，将
+  `APP_H723_SINGLE_MOTOR_POSITION_PID_KP` 从 `2.0f` 调整为 `20.0f`；积分、微分、
+  输出限幅、调试开关和 UART8 VOFA 开关保持不变。
+- 同步更新 H723 IOC 静态配置测试和单电机调试 README，避免测试与默认参数说明继续引用旧增益。
+- 验证命令：`tests\test_stm32h723_single_motor.ps1`、`tests\test_stm32h723_ioc.ps1`、
+  全部 `tests\test_stm32h723_*.ps1` 以及 `git diff --check`。
+- 本轮未执行 Flash、烧录、SWD/GDB、CAN、电机、UART8/VOFA 或其他实物验收；提高比例增益后，
+  首次实物调试仍须车架悬空并从低目标位移、低电流限制开始确认反馈方向和响应。
