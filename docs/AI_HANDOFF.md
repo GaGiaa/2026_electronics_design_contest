@@ -857,3 +857,34 @@ Keil Watch 可直接修改以下字段，并在下一次 PID 计算前生效：
 VOFA JustFloat、debug layout 检查和 Keil 纯软件构建；构建日志为
 `0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、UART/VOFA 实物、
 CAN、电机或灰度传感器硬件验收。
+
+## H723 钢珠位置闭环与水管 pitch 上电校准（2026-08-01）
+
+- 新增 `App/app_ball_position_control` 纯 C 位置式 PID。控制周期固定为 `25 ms`（40 Hz），误差为
+  `target_mm - measured_mm`，默认符号为 `-1`：目标坐标增大时请求负水管倾角，目标坐标减小时请求正水管倾角。
+  默认 `Kp=0.02 deg/mm`、`Ki=0`、`Kd=0`、死区 `1 mm`、目标倾角限幅 `+/-3 deg`，
+  由 `g_h723_debug.ball_position` 在 Keil Watch 调整；`enable` 默认 `0U`。
+- 新增 `App/app_pipe_startup` 状态机。ID 3 首次归零成功后进入 OLED `CALIBRATE PIPE` 页面；PC5/B1
+  在 JY901S 样本有效且不超时的条件下捕获当前 pitch，PC4/B2 放弃并锁定 ID 3 零电流，PA6 忽略。
+  `READY` 或 `ID3_LOCKED` 均返回原遥控器/任务页面；放弃、归零失败和未归零只影响 ID 3，其他两电机仍可运行。
+- `APP_H723_K230_UART2_ENABLE=1U` 使 UART2 K230 接收链路默认启用；原
+  `APP_H723_K230_UART2_TEST_ENABLE=0U` 仅保留测试 VOFA 遥测。K230 服务新增序列保护快照接口，位置环
+  使用最新有效距离，帧龄超过 `100 ms`、视觉无效、ID 3 未校准或反馈故障时清 PID 并请求 0 度校准倾角。
+- 位置环只生成 `target_tilt_deg`，仍经 JY901S 5 ms 倾角环和 `app_balance` 的归零、70--210 deg 范围、
+  速度/电流/CAN 安全保护；新增 `g_h723_debug.ball_position` 和 `pipe_startup` Watch 快照以及 Keil 工程源文件登记。
+- 已通过位置 PID、启动状态机、K230 UART2 静态和球控集成静态测试；随后重新执行全部 42 个
+  `tests\test_stm32h723_*.ps1`，均通过。`git diff --check` 无差异错误；以
+  `D:\Keil_v5\UV4\UV4.exe -r .\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx -j0`
+  完成 H723 纯软件重建，日志为 `0 Error(s), 0 Warning(s)`。
+- 尚未执行 Flash、烧录、SWD/GDB、UART/VOFA 实物、K230 识别、CAN、电机、机械限位或 OLED 实物验收。
+
+## H723 钢珠位置 PID VOFA 遥测（2026-08-01）
+
+- 新增默认关闭的 `APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE=0U`。打开后 UART8 以
+  `25 ms` 间隔发送 13 通道 VOFA+ JustFloat：目标/反馈/误差 mm、P/I/D、PID 输出、目标倾角、
+  视觉帧龄/有效性、位置环状态/故障和启动校准有效性。
+- 该模式复用既有 UART8 DMA 发送、发送超时恢复和 `g_h723_debug` 快照，只读且不改变位置 PID、
+  JY901S 倾角环、归零、电流或 CAN 输出；它与所有其他 UART8 VOFA 模式编译期互斥。
+- 已通过新增的 `tests\test_stm32h723_ball_position_vofa.ps1`、全部 43 个 H723 测试脚本、
+  文档检查和 `git diff --check`。默认关闭及临时启用该开关的两次 Keil 纯软件构建均为
+  `0 Error(s), 0 Warning(s)`；未执行 UART8/VOFA 或其他实物验收。

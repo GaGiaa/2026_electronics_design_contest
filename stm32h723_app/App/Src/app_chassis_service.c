@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "app_balance.h"
+#include "app_ball_position_control.h"
 #include "app_chassis.h"
 #include "app_buttons.h"
 #include "app_config.h"
@@ -13,6 +14,7 @@
 #include "app_line_follow.h"
 #include "app_jy901s_service.h"
 #include "app_m2006.h"
+#include "app_pipe_startup.h"
 #include "app_single_motor.h"
 #include "app_task2.h"
 #include "app_task4.h"
@@ -20,6 +22,7 @@
 #include "app_task_menu.h"
 #include "app_time.h"
 #include "app_tilt_control.h"
+#include "app_k230_service.h"
 #include "fdcan.h"
 #include "usart.h"
 
@@ -46,6 +49,12 @@ static app_balance_t s_balance;
 #if (APP_H723_TILT_CONTROL_ENABLE == 1U)
 static app_tilt_control_t s_tilt_control;
 #endif
+static app_ball_position_control_t s_ball_position_control;
+static app_ball_position_control_config_t s_ball_position_config;
+static app_ball_position_control_output_t s_ball_position_output;
+static app_pipe_startup_t s_pipe_startup;
+static app_pipe_startup_snapshot_t s_pipe_startup_snapshot;
+static bool s_pipe_button_release_required;
 #endif
 #if (APP_H723_SINGLE_MOTOR_PID_DEBUG_ENABLE == 1U)
 static float s_position_origin_deg[3];
@@ -398,6 +407,15 @@ void h723_chassis_service_init(void)
     app_tilt_control_init(&s_tilt_control, &s_tilt_control_config);
 #endif
 #endif
+    app_ball_position_control_config_default(&s_ball_position_config);
+    s_ball_position_config.period_ms = APP_H723_BALL_POSITION_PERIOD_MS;
+    s_ball_position_config.max_age_ms = APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS;
+    app_ball_position_control_init(&s_ball_position_control, &s_ball_position_config);
+    app_pipe_startup_init(&s_pipe_startup);
+    (void)memset(&s_pipe_startup_snapshot, 0, sizeof(s_pipe_startup_snapshot));
+    s_pipe_startup_snapshot.state = APP_PIPE_STARTUP_STATE_WAIT_HOME;
+    s_pipe_startup_snapshot.other_motors_allowed = true;
+    s_pipe_button_release_required = false;
     app_line_follow_init(&s_line_follow, &s_line_follow_common_pid_params,
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
     app_task2_init(&s_task2);
@@ -476,6 +494,13 @@ void h723_chassis_service_init(void)
     g_h723_debug.tilt.derivative_filter_N = APP_H723_TILT_CONTROL_DERIVATIVE_FILTER_N;
     g_h723_debug.tilt.pid_deadband_deg = APP_H723_TILT_CONTROL_PID_DEADBAND_DEG;
     g_h723_debug.tilt.max_position_rate_deg_s = APP_H723_TILT_CONTROL_MAX_POSITION_RATE_DEG_S;
+    g_h723_debug.ball_position.enable = 0U;
+    g_h723_debug.ball_position.target_mm = 0.0f;
+    g_h723_debug.ball_position.pid_kp = s_ball_position_config.pid_params.kp;
+    g_h723_debug.ball_position.pid_ki = s_ball_position_config.pid_params.ki;
+    g_h723_debug.ball_position.pid_kd = s_ball_position_config.pid_params.kd;
+    g_h723_debug.ball_position.output_limit_deg = s_ball_position_config.output_limit_deg;
+    g_h723_debug.ball_position.pid_deadband_mm = s_ball_position_config.deadband_mm;
     s_single_motor_last_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     s_single_motor_last_enable = 0U;
     s_single_motor_last_control_mode = APP_SINGLE_MOTOR_CONTROL_MODE_SPEED;
@@ -612,6 +637,102 @@ static void h723_tilt_apply_debug_params(void)
     }
 }
 
+static bool h723_ball_position_params_are_valid(float kp, float ki, float kd,
+                                                float output_limit_deg,
+                                                float deadband_mm)
+{
+    return isfinite(kp) && isfinite(ki) && isfinite(kd) &&
+           isfinite(output_limit_deg) && isfinite(deadband_mm) &&
+           kp >= 0.0f && ki >= 0.0f && kd >= 0.0f &&
+           output_limit_deg > 0.0f && deadband_mm >= 0.0f;
+}
+
+static void h723_ball_position_apply_debug_params(void)
+{
+    volatile h723_debug_ball_position_t *debug = &g_h723_debug.ball_position;
+
+    if (!h723_ball_position_params_are_valid(debug->pid_kp, debug->pid_ki,
+                                             debug->pid_kd,
+                                             debug->output_limit_deg,
+                                             debug->pid_deadband_mm)) {
+        return;
+    }
+    s_ball_position_config.pid_params.kp = debug->pid_kp;
+    s_ball_position_config.pid_params.ki = debug->pid_ki;
+    s_ball_position_config.pid_params.kd = debug->pid_kd;
+    s_ball_position_config.output_limit_deg = debug->output_limit_deg;
+    s_ball_position_config.deadband_mm = debug->pid_deadband_mm;
+    s_ball_position_control.config = s_ball_position_config;
+    s_ball_position_control.pid.params.kp = debug->pid_kp;
+    s_ball_position_control.pid.params.ki = debug->pid_ki;
+    s_ball_position_control.pid.params.kd = debug->pid_kd;
+    s_ball_position_control.pid.params.output_limit = debug->output_limit_deg;
+    s_ball_position_control.pid.params.deadband = debug->pid_deadband_mm;
+}
+
+#if (APP_H723_BALANCE_ENABLE == 1U)
+static void h723_pipe_startup_update(uint32_t now_ms, uint32_t button_mask)
+{
+    h723_jy901s_control_snapshot_t imu_snapshot = {0};
+    app_pipe_startup_input_t input;
+    uint32_t sample_age_ms = UINT_MAX;
+    const app_pipe_startup_state_t previous_state = s_pipe_startup_snapshot.state;
+    const bool snapshot_available = h723_jy901s_service_get_snapshot(
+        &imu_snapshot, now_ms, &sample_age_ms);
+
+    input.balance_zero_valid = s_balance.zero_valid;
+    input.imu_pitch_valid = snapshot_available && imu_snapshot.sample_valid &&
+                            imu_snapshot.calibration_valid;
+    input.imu_pitch_fresh = input.imu_pitch_valid &&
+                            sample_age_ms <= APP_H723_TILT_CONTROL_SAMPLE_MAX_AGE_MS;
+    input.imu_pitch_deg = imu_snapshot.vehicle_pitch_deg;
+    input.buttons = button_mask;
+    app_pipe_startup_step(&s_pipe_startup, &input, &s_pipe_startup_snapshot);
+    if (previous_state == APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED &&
+        s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_READY) {
+        /* Let app_tilt_control consume the one-shot on its next 5 ms sample. */
+        g_h723_debug.tilt.capture_zero_request = 1U;
+    }
+    g_h723_debug.pipe_startup.state = (uint32_t)s_pipe_startup_snapshot.state;
+    g_h723_debug.pipe_startup.calibration_valid =
+        s_pipe_startup_snapshot.calibration_valid ? 1U : 0U;
+    g_h723_debug.pipe_startup.id3_allowed =
+        s_pipe_startup_snapshot.id3_allowed ? 1U : 0U;
+    g_h723_debug.pipe_startup.other_motors_allowed =
+        s_pipe_startup_snapshot.other_motors_allowed ? 1U : 0U;
+    g_h723_debug.pipe_startup.captured_pitch_deg =
+        s_pipe_startup_snapshot.captured_pitch_deg;
+}
+#else
+static void h723_pipe_startup_update(uint32_t now_ms, uint32_t button_mask)
+{
+    (void)now_ms;
+    (void)button_mask;
+}
+#endif
+
+static void h723_ball_position_publish_debug(const app_k230_sample_t *sample,
+                                             uint32_t sample_age_ms,
+                                             const app_ball_position_control_output_t *output)
+{
+    volatile h723_debug_ball_position_t *debug = &g_h723_debug.ball_position;
+
+    debug->state = (uint32_t)output->state;
+    debug->fault = (uint32_t)output->fault;
+    debug->update_due = output->update_due ? 1U : 0U;
+    debug->vision_valid = output->valid ? 1U : 0U;
+    debug->vision_frame_count = sample != NULL ? sample->valid_frame_count : 0U;
+    debug->vision_age_ms = sample_age_ms;
+    debug->measured_mm = sample != NULL ? sample->distance_mm : 0.0f;
+    debug->error_mm = output->error_mm;
+    debug->pid_p_out_deg = output->p_out_deg;
+    debug->pid_i_out_deg = output->i_out_deg;
+    debug->pid_d_out_deg = output->d_out_deg;
+    debug->pid_output_deg = output->output_deg;
+    debug->target_tilt_deg = output->target_tilt_deg;
+    debug->pid_integral = output->integral;
+}
+
 static void h723_tilt_publish_debug(const app_tilt_control_output_t *output,
                                     uint32_t sample_age_ms)
 {
@@ -641,14 +762,39 @@ static void h723_tilt_publish_debug(const app_tilt_control_output_t *output,
 static float h723_tilt_service_step(uint32_t now_ms, uint32_t motor_index)
 {
     h723_jy901s_control_snapshot_t imu_snapshot = {0};
+    app_k230_sample_t ball_sample = {0};
+    app_ball_position_control_input_t ball_input;
     uint32_t sample_age_ms = UINT_MAX;
+    uint32_t ball_sample_age_ms = UINT_MAX;
     app_tilt_control_output_t output;
     const bool snapshot_available = h723_jy901s_service_get_snapshot(&imu_snapshot, now_ms,
                                                                         &sample_age_ms);
+    const bool ball_snapshot_available = h723_k230_service_get_snapshot(
+        &ball_sample, now_ms, &ball_sample_age_ms);
+    const bool ball_enabled = g_h723_debug.ball_position.enable != 0U;
+    float target_tilt_deg = g_h723_debug.tilt.target_tilt_deg;
+
+    h723_ball_position_apply_debug_params();
+    ball_input.now_ms = now_ms;
+    ball_input.enabled = ball_enabled;
+    ball_input.target_mm = g_h723_debug.ball_position.target_mm;
+    ball_input.measured_mm = ball_sample.distance_mm;
+    ball_input.vision_valid = ball_snapshot_available && ball_sample.valid;
+    ball_input.vision_age_ms = ball_sample_age_ms;
+    ball_input.calibration_ready = s_pipe_startup_snapshot.calibration_valid;
+    ball_input.id3_ready = s_pipe_startup_snapshot.id3_allowed && s_balance.zero_valid;
+    app_ball_position_control_step(&s_ball_position_control, &ball_input,
+                                   &s_ball_position_output);
+    if (ball_enabled) {
+        target_tilt_deg = s_ball_position_output.target_tilt_deg;
+    }
+    h723_ball_position_publish_debug(&ball_sample, ball_sample_age_ms,
+                                    &s_ball_position_output);
+
     const app_tilt_control_input_t input = {
         .now_ms = now_ms,
-        .enabled = g_h723_debug.tilt.enable != 0U,
-        .target_tilt_deg = g_h723_debug.tilt.target_tilt_deg,
+        .enabled = (g_h723_debug.tilt.enable != 0U) || ball_enabled,
+        .target_tilt_deg = target_tilt_deg,
         .capture_zero_request = g_h723_debug.tilt.capture_zero_request != 0U,
         .balance_zero_valid = s_balance.zero_valid,
         .motor_feedback_valid = h723_m2006_feedback_is_fresh(motor_index, now_ms),
@@ -725,6 +871,12 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
     h723_update_m2006_debug(index, now_ms, result.target_output_speed_rpm);
     output_current_A[index] = APP_H723_CHASSIS_ACTUATION_ENABLE == 1U ?
                               result.commanded_current_a : 0.0f;
+    if (!s_pipe_startup_snapshot.id3_allowed &&
+        s_pipe_startup_snapshot.state != APP_PIPE_STARTUP_STATE_WAIT_HOME) {
+        /* Homing is allowed in WAIT_HOME; calibration and skip never energize ID 3. */
+        output_current_A[index] = 0.0f;
+        PID_Incremental_Reset(&s_balance.speed_pid);
+    }
     debug->pid_raw_output_A = s_balance.speed_pid.raw_output;
     debug->pid_p_out_A = s_balance.speed_pid.p_out;
     debug->pid_i_out_A = s_balance.speed_pid.i_out;
@@ -916,6 +1068,18 @@ void h723_chassis_service_step(uint32_t now_ms)
         s_crsf_read_index = (uint16_t)((s_crsf_read_index + 1U) % H723_CRSF_RING_SIZE);
     }
     h723_app_buttons_snapshot_copy(&button_snapshot);
+    h723_pipe_startup_update(now_ms, button_snapshot.stable_high_mask);
+    if (s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED) {
+        /* Prevent the calibration keys from entering the normal task menu. */
+        s_pipe_button_release_required = true;
+        button_snapshot.stable_high_mask = 0U;
+    } else if (s_pipe_button_release_required) {
+        /* Do not turn the capture/skip press into an accidental task confirmation. */
+        if (button_snapshot.stable_high_mask == 0U) {
+            s_pipe_button_release_required = false;
+        }
+        button_snapshot.stable_high_mask = 0U;
+    }
     app_chassis_control_step(&s_control_state, &s_crsf_input,
                              button_snapshot.stable_high_mask, now_ms,
                              &s_control_output);
@@ -1054,7 +1218,9 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.chassis.right_target_output_speed_rpm = s_command.right_target_rpm;
     g_h723_debug.control.mode = (uint32_t)s_control_output.mode;
     g_h723_debug.control.remote_takeover = s_control_output.remote_takeover ? 1U : 0U;
-    g_h723_debug.control.buttons_enabled = s_control_output.buttons_enabled ? 1U : 0U;
+    g_h723_debug.control.buttons_enabled =
+        (s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED) ?
+        0U : (s_control_output.buttons_enabled ? 1U : 0U);
     g_h723_debug.control.se_pressed = s_control_output.se_pressed ? 1U : 0U;
     g_h723_debug.control.sb_state = s_control_output.sb_state;
     g_h723_debug.control.sc_state = s_control_output.sc_state;

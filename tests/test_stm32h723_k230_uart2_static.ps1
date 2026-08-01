@@ -28,6 +28,7 @@ foreach ($line in @(
 )) { Require-Text $ioc $line "Missing UART2 CubeMX configuration: $line" }
 
 foreach ($line in @(
+    '#define APP_H723_K230_UART2_ENABLE 1U',
     '#define APP_H723_K230_UART2_TEST_ENABLE 0U',
     '#define APP_H723_K230_UART2_TEST_VOFA_INTERVAL_MS 20U',
     'APP_H723_K230_UART2_TEST_ENABLE == 1U'
@@ -36,7 +37,7 @@ foreach ($line in @(
 foreach ($line in @(
     'h723_k230_service_init',
     'h723_k230_service_step',
-    'APP_H723_K230_UART2_TEST_ENABLE'
+    'APP_H723_K230_UART2_ENABLE'
 )) { Require-Text $freertos $line "K230 FreeRTOS integration missing: $line" }
 
 foreach ($line in @(

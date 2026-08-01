@@ -9,7 +9,7 @@
 - UART8：`PE0` RX、`PE1` TX、8-N-1、1 Mbit/s，TX 使用 `DMA1_Stream1`，用于可选 VOFA+ 健康遥测。
 - UART7：`PE7` RX、`PE8` TX、8-N-1、420000 bit/s，RX 使用 `DMA1_Stream0` 的 ReceiveToIdle DMA，接收 CRSF 遥控器数据；本轮不实现 CRSF 回传。
 - USART1：`PB6` TX、`PB7` RX、8-N-1、115200 bit/s，不使用 DMA；保留给默认停用的 BNO055 原生 UART 服务。
-- USART2：`PD5` TX、`PD6` RX、8-N-1、234000 bit/s，RX 使用 `DMA1_Stream3` 的 ReceiveToIdle DMA，供默认关闭的 K230 钢珠位置测试链路使用。
+- USART2：`PD5` TX、`PD6` RX、8-N-1、234000 bit/s，RX 使用 `DMA1_Stream3` 的 ReceiveToIdle DMA，默认接入 K230 钢珠位置反馈链路。
 - M2006 总线使用 1 Mbit/s，接收 ID `0x201..0x203`，每 1 ms 发送标准帧 `0x200`。`APP_H723_M2006_FDCAN_INSTANCE` 可选择 `1U=FDCAN1 (PD0/PD1)`、`2U=FDCAN2 (PB12/PB13)` 或 `3U=FDCAN3 (PF6/PF7)`；当前默认值为 `2U`。硬件必须接到所选实例对应的引脚；若实际接线位于 FDCAN1 或 FDCAN3，需同步修改该宏并重新编译。
 - FreeRTOS CMSIS-RTOS v2：`chassisTask` 为高优先级 1 ms 绝对节拍任务，负责 CRSF、混控、反馈时效、增量 PID 和 CAN 组控；默认任务仍执行 UART8 遥测。
 
@@ -124,12 +124,12 @@ ReceiveToIdle。车体坐标约定为 `X=前、Y=左、Z=上`。`App/Src/app_jy9
 固定偏置通过 `APP_JY901S_*_OFFSET_DEG` 配置。校准只保存在 RAM，不写 Flash。
 
 当前 `APP_JY901S_VOFA_CALIBRATED_ENABLE` 为 `1U`，现有 JY901S 十通道 VOFA 输出切换到车体坐标和校准结果；
-设为 `0U` 时恢复原始数据。详细操作和验收步骤见
-[`docs/STM32H723_JY901S.md`](../docs/STM32H723_JY901S.md)。当前校准结果尚未接入底盘 PID。
+设为 `0U` 时恢复原始数据。ID 3 首次归零后必须先在 OLED 校准页捕获 pitch 零位，之后才允许倾角或钢珠位置环接管。详细操作和验收步骤见
+[`docs/STM32H723_JY901S.md`](../docs/STM32H723_JY901S.md)。该零位作为 ID 3 倾角闭环的启动安全门，并由既有倾角环消耗。
 
-## K230 UART2 Position Test
+## K230 UART2 钢珠位置闭环
 
-`APP_H723_K230_UART2_TEST_ENABLE` 默认是 `0U`。设为 `1U` 后，`k230Task` 每 5 ms
+`APP_H723_K230_UART2_ENABLE` 默认是 `1U`，`k230Task` 每 5 ms
 解析 USART2 ReceiveToIdle DMA 接收的字节；K230 应以约 50 Hz 连续发送固定 9 字节帧：
 
 | 偏移 | 长度 | 字段 |
@@ -142,10 +142,27 @@ ReceiveToIdle。车体坐标约定为 `X=前、Y=左、Z=上`。`App/Src/app_jy9
 `valid=0` 时 STM32 发布 `distance_mm=0.0f`；CRC 或格式错误帧不会覆盖最后一帧合法数据。
 K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使用 3.3 V TTL 电平。
 
-测试宏开启时 UART8 每 `APP_H723_K230_UART2_TEST_VOFA_INTERVAL_MS`（默认 20 ms）发送
+仅当测试遥测宏 `APP_H723_K230_UART2_TEST_ENABLE=1U` 时，UART8 每 `APP_H723_K230_UART2_TEST_VOFA_INTERVAL_MS`（默认 20 ms）发送
 三通道 VOFA+ JustFloat：`distance_mm`、`valid`（`0.0f` 或 `1.0f`）、`frame_age_ms`。该模式与健康、JY901S、
 灰度及单电机 UART8 遥测编译期互斥；UART8 保持 `PE1` TX、1 Mbit/s。Keil Watch 可观察
 `g_h723_debug.ball_vision` 的距离、帧年龄、DMA 状态和 CRC/格式/UART/环形缓冲错误计数。
+
+钢珠位置 PID 固定为 40 Hz（25 ms），由 `g_h723_debug.ball_position.enable` 显式启用；
+目标 `target_mm` 和反馈 `measured_mm` 均为 K230 坐标系的 mm。位置误差为
+`target_mm - measured_mm`，正误差请求负水管倾角，负误差请求正水管倾角。默认参数为
+`Kp=0.02 deg/mm`、`Ki=0`、`Kd=0`、死区 `1 mm`、目标倾角限幅 `+/-3 deg`，均可在 Watch 修改。
+视觉无效、帧龄超过 `100 ms`、ID 3 未校准或反馈故障时，位置 PID 清积分并请求校准零倾角；
+现有 JY901S 5 ms 倾角环、ID 3 归零、70--210 deg 位置范围、速度/电流/CAN 保护继续生效。
+
+将 `APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE` 设为 `1U` 后，UART8 按 40 Hz
+发送 13 通道 VOFA+ JustFloat 帧：`target_mm`、`measured_mm`、`error_mm`、P/I/D、
+`pid_output_deg`、`target_tilt_deg`、`vision_age_ms`、`vision_valid`、位置环 `state`、
+`fault` 与 `pipe_startup.calibration_valid`。该开关默认 `0U`，与全部其他 UART8 VOFA
+遥测模式编译期互斥，仅读取 `g_h723_debug`，不会改变位置 PID、倾角环或电机输出。
+
+每次上电首次归零成功后 OLED 显示 `CALIBRATE PIPE`。PC5（B1）记录当前有效 pitch，
+PC4（B2）放弃并锁定 ID 3 零电流，PA6 忽略。校准或放弃后返回原遥控器/任务页面；放弃只锁定
+ID 3，底盘两电机保持可用。ID 3 归零失败或尚未完成时同样只禁止 ID 3，不影响无关电机。
 
 ## CubeMX Regeneration
 

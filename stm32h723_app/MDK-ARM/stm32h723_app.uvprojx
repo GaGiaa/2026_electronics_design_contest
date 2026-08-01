@@ -647,6 +647,16 @@
               <FilePath>../App/Src/app_k230_service.c</FilePath>
             </File>
             <File>
+              <FileName>app_ball_position_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_ball_position_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pipe_startup.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_pipe_startup.c</FilePath>
+            </File>
+            <File>
               <FileName>app_time.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_time.c</FilePath>

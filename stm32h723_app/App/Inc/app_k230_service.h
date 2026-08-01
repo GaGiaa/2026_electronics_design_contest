@@ -1,13 +1,21 @@
 #ifndef APP_K230_SERVICE_H
 #define APP_K230_SERVICE_H
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#include "app_k230.h"
 
 /** 初始化 K230 UART2 DMA 接收和协议解析状态。仅在任务上下文调用一次。 */
 void h723_k230_service_init(void);
 
 /** 解析 UART2 软件环形缓冲中的全部字节，并发布 Watch 测量快照。 */
 void h723_k230_service_step(uint32_t now_ms);
+
+/** Copy the latest parser snapshot and calculate its age in task context. */
+bool h723_k230_service_get_snapshot(app_k230_sample_t *sample,
+                                    uint32_t now_ms,
+                                    uint32_t *sample_age_ms);
 
 /** UART2 ReceiveToIdle DMA 回调入口；仅复制接收字节并重新启动 DMA。 */
 void h723_k230_on_uart2_rx_event(uint16_t size);

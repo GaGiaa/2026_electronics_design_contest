@@ -90,7 +90,7 @@ static const osThreadAttr_t bno055Task_attributes = {
   .priority = (osPriority_t)osPriorityAboveNormal,
 };
 #endif
-#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+#if (APP_H723_K230_UART2_ENABLE == 1U)
 static osThreadId_t k230TaskHandle;
 static const osThreadAttr_t k230Task_attributes = {
   .name = "k230Task",
@@ -131,7 +131,7 @@ void startGrayscaleTask(void *argument);
 #if (APP_H723_BNO055_SERVICE_ENABLE == 1U)
 void startBno055Task(void *argument);
 #endif
-#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+#if (APP_H723_K230_UART2_ENABLE == 1U)
 void startK230Task(void *argument);
 #endif
 void startOledTask(void *argument);
@@ -198,7 +198,7 @@ void MX_FREERTOS_Init(void) {
   bno055TaskHandle = osThreadNew(startBno055Task, NULL, &bno055Task_attributes);
   configASSERT(bno055TaskHandle != NULL);
 #endif
-#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+#if (APP_H723_K230_UART2_ENABLE == 1U)
   k230TaskHandle = osThreadNew(startK230Task, NULL, &k230Task_attributes);
   configASSERT(k230TaskHandle != NULL);
 #endif
@@ -318,7 +318,7 @@ void startBno055Task(void *argument)
 }
 #endif
 
-#if (APP_H723_K230_UART2_TEST_ENABLE == 1U)
+#if (APP_H723_K230_UART2_ENABLE == 1U)
 void startK230Task(void *argument)
 {
   uint32_t next_wake_tick = osKernelGetTickCount();

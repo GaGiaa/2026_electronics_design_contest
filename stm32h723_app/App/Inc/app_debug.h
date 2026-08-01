@@ -385,6 +385,40 @@ typedef struct {
 } h723_debug_ball_vision_t;
 
 typedef struct {
+    /* Keil Watch inputs. Target and feedback share the K230 millimetre frame. */
+    uint32_t enable;
+    float target_mm;
+    float pid_kp;
+    float pid_ki;
+    float pid_kd;
+    float output_limit_deg;
+    float pid_deadband_mm;
+    /* Runtime state. */
+    uint32_t state;
+    uint32_t fault;
+    uint32_t update_due;
+    uint32_t vision_valid;
+    uint32_t vision_frame_count;
+    uint32_t vision_age_ms;
+    float measured_mm;
+    float error_mm;
+    float pid_p_out_deg;
+    float pid_i_out_deg;
+    float pid_d_out_deg;
+    float pid_output_deg;
+    float target_tilt_deg;
+    float pid_integral;
+} h723_debug_ball_position_t;
+
+typedef struct {
+    uint32_t state;
+    uint32_t calibration_valid;
+    uint32_t id3_allowed;
+    uint32_t other_motors_allowed;
+    float captured_pitch_deg;
+} h723_debug_pipe_startup_t;
+
+typedef struct {
     uint32_t enabled;
     uint32_t initialized;
     uint32_t init_attempt_count;
@@ -423,6 +457,8 @@ typedef struct {
     h723_debug_buttons_t buttons;
     h723_debug_bno055_t bno055;
     h723_debug_ball_vision_t ball_vision;
+    h723_debug_ball_position_t ball_position;
+    h723_debug_pipe_startup_t pipe_startup;
     h723_debug_oled_t oled;
 } h723_debug_t;
 

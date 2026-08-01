@@ -1,4 +1,5 @@
 #include "app_oled.h"
+#include "app_pipe_startup.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -289,6 +290,32 @@ static board_oled_status_t render_runtime_page(void)
     status = board_oled_set_cursor(0U, 0U);
     if (status != BOARD_OLED_STATUS_OK) {
         return status;
+    }
+    if (g_h723_debug.pipe_startup.state ==
+        (uint32_t)APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED) {
+        status = board_oled_write_string("CALIBRATE PIPE");
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_set_cursor(0U, 2U);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        if (g_h723_debug.jy901s.sample_valid != 0U &&
+            g_h723_debug.jy901s.calibration_valid != 0U &&
+            g_h723_debug.jy901s.sample_age_ms <= APP_H723_TILT_CONTROL_SAMPLE_MAX_AGE_MS) {
+            (void)snprintf(line, sizeof(line), "PITCH:%.2f",
+                           (double)g_h723_debug.jy901s.vehicle_angle_deg[1]);
+        } else {
+            (void)snprintf(line, sizeof(line), "IMU:WAIT");
+        }
+        status = board_oled_write_string(line);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_set_cursor(0U, 4U);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_write_string("B1:CAPTURE");
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_set_cursor(0U, 6U);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_write_string("B2:SKIP");
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        return board_oled_update();
     }
     if (g_h723_debug.control.remote_takeover) {
         title = "REMOTE CONTROL";
