@@ -421,7 +421,37 @@ typedef struct {
     float breakaway_tilt_output_deg;
     float velocity_mm_s;
     float velocity_damping_tilt_deg;
+    uint32_t active_profile;
 } h723_debug_ball_position_t;
+
+typedef struct {
+    /* Keil Watch inputs used automatically in REMOTE_LINE_FOLLOW_BALL mode. */
+    float target_mm;
+    float pid_kp;
+    float pid_ki;
+    float pid_kd;
+    float output_limit_deg;
+    float pid_deadband_mm;
+    float position_sign;
+    /* Runtime validation status. */
+    uint32_t params_valid;
+    uint32_t params_rejected_count;
+} h723_debug_ball_position_dynamic_t;
+
+typedef struct {
+    /* Keil Watch inputs for the remote dynamic line-follow base speed. */
+    float max_speed_mm_s;
+    float max_accel_mm_s2;
+    float max_jerk_mm_s3;
+    uint32_t reset_request;
+    /* Runtime planner snapshot. */
+    uint32_t active;
+    uint32_t params_valid;
+    uint32_t params_rejected_count;
+    float requested_speed_mm_s;
+    float planned_speed_mm_s;
+    float planned_accel_mm_s2;
+} h723_debug_speed_profile_t;
 
 typedef struct {
     uint32_t state;
@@ -471,6 +501,8 @@ typedef struct {
     h723_debug_bno055_t bno055;
     h723_debug_ball_vision_t ball_vision;
     h723_debug_ball_position_t ball_position;
+    h723_debug_ball_position_dynamic_t ball_position_dynamic;
+    h723_debug_speed_profile_t speed_profile;
     h723_debug_pipe_startup_t pipe_startup;
     h723_debug_oled_t oled;
 } h723_debug_t;

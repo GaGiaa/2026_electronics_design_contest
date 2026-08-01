@@ -154,7 +154,7 @@ foreach ($line in @(
     }
 }
 foreach ($line in @(
-    '#define APP_H723_CHASSIS_MAX_OUTPUT_RPM 550.0f',
+    '#define APP_H723_CHASSIS_MAX_OUTPUT_RPM 150.0f',
     '#define APP_H723_M2006_PID_KP 0.25f',
     '#define APP_H723_M2006_PID_KI 5.0f',
     '#define APP_H723_M2006_PID_KD 0.0f',

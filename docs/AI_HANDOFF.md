@@ -791,6 +791,32 @@ build generated `stm32h723_app.axf` with `0 Error(s), 1 Warning(s)` in
 No Flash, SWD/GDB, CAN, UART/VOFA hardware, motor, grayscale sensor, OLED, or
 other physical acceptance operation was performed.
 
+## H723 Remote Dynamic Ball Line Follow (2026-08-01)
+
+- `SE` remote takeover with `SB=middle` and `SC=high` now selects
+  `APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_BALL`. It reuses the grayscale
+  line-follow controller and automatically enables a separate 40 Hz ball
+  position-controller instance. `SC=middle` remains the original remote
+  line-follow mode, and all task line-follow behavior is unchanged.
+- `app_speed_profile` is a HAL-free 1 kHz jerk-limited speed planner. It limits
+  the forward-stick request with `max_speed_mm_s`, `max_accel_mm_s2`, and
+  `max_jerk_mm_s3` in `g_h723_debug.speed_profile`. Defaults are 350 mm/s,
+  300 mm/s^2, and 1500 mm/s^3. Its unit test covers acceleration, braking,
+  reversal, jerk/acceleration bounds, and invalid parameters.
+- Dynamic ball tuning is in `g_h723_debug.ball_position_dynamic`: target mm,
+  PID gains, tilt limit, deadband, and `position_sign` (-1 or +1). This set is
+  independent from the static Watch PID. Both controllers reset at a profile
+  transition, while hold-angle/friction/velocity compensation remains shared.
+  `g_h723_debug.ball_position` and the existing 13-channel UART8 ball VOFA
+  frame publish the currently active controller; `active_profile=1` means
+  dynamic.
+- The change passed speed-profile, control-state, ball-position, dynamic static
+  integration, debug-layout, line-follow service, and Keil-project checks.
+  Keil software-only rebuild was invoked successfully. Flash, SWD/GDB, UART8,
+  K230, CAN, motor, steel-ball, and moving-chassis physical acceptance have not
+  been performed. Begin physical validation with the chassis raised, ball
+  restrained, low speed, and low position gain.
+
 ## H723 Passive Buzzer Test (2026-07-31)
 
 The H723 application now contains an optional passive buzzer hardware test.

@@ -333,15 +333,47 @@ Chassis switch mapping in the current control state machine is:
 - SE pressed, SB low: remote idle and three motor outputs at zero current.
 - SE pressed, SB middle and SC low: manual chassis mode.
 - SE pressed, SB middle and SC middle: gray line-follow mode.
+- SE pressed, SB middle and SC high: dynamic ball line-follow mode.
 - All other switch combinations: remote idle and three motor outputs at zero current.
 
 Line follow uses the 65 mm wheel diameter. The normalized forward stick value
-maps to -300..+300 mm/s, allowing forward and reverse line following. A
+maps to -350..+350 mm/s, allowing forward and reverse line following. A
 line-strength value below 800, any ADC timeout, or a missing gray sample stops
 the output. The gray sequence prevents repeated PID
 updates, and exiting/resetting the mode clears the PID state. The line-follow
 debug snapshot exposes mode, base speed, line position, validity, turn
 correction, and final left/right target RPM values.
+
+## Remote Dynamic Ball Line Follow
+
+With `SE` pressed, `SB` in the middle position, and `SC` high, the chassis
+uses the normal grayscale line-follow controller while the forward-stick speed
+is planned at 1 kHz before it reaches the line-follow base-speed input. The
+planner limits speed, acceleration, and jerk, so stick changes, release, and
+forward/reverse transitions do not create an instantaneous wheel-speed step.
+
+`g_h723_debug.speed_profile` exposes `max_speed_mm_s`, `max_accel_mm_s2`, and
+`max_jerk_mm_s3` as Watch inputs. `requested_speed_mm_s`,
+`planned_speed_mm_s`, and `planned_accel_mm_s2` show the active trajectory.
+Defaults are `350 mm/s`, `300 mm/s^2`, and `1500 mm/s^3` respectively.
+Writing `reset_request=1` clears the trajectory state.
+
+This mode automatically selects `g_h723_debug.ball_position_dynamic` rather
+than the stationary `g_h723_debug.ball_position.enable` path. Set the desired
+K230-frame coordinate with `ball_position_dynamic.target_mm`; tune
+`pid_kp`, `pid_ki`, `pid_kd`, `output_limit_deg`, and `pid_deadband_mm`
+independently. `position_sign` must be exactly `-1.0f` or `1.0f`; it defaults
+to `-1.0f`. Static and dynamic position loops have separate PID, hysteresis,
+and vision-velocity histories. The physical hold-angle, breakaway, and velocity
+damping calibration remains shared. `g_h723_debug.ball_position.active_profile`
+is `1` for the dynamic loop and `0` for the stationary loop, so the existing
+13-channel ball-position VOFA frame continues to show whichever loop is active.
+
+The dynamic loop remains subject to the same ID3 homing, pipe pitch-calibration,
+IMU, K230 validity, and 100 ms vision-age gates. A failed gate clears the active
+position PID and requests zero tilt. Initial vehicle testing must be performed
+with the chassis lifted and the ball retained, beginning with low speed and low
+PID gain; this software was not flashed or physically accepted during development.
 
 This checkout explicitly sets `APP_H723_CHASSIS_ACTUATION_ENABLE=1U`; nonzero
 current commands are therefore possible once every CRSF, switch, and feedback

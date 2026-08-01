@@ -101,8 +101,15 @@ static void test_remote_modes_and_timeout_are_safe(void)
     assert(output.mode == APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW);
     assert(output.chassis.third_motor_target_rpm == 0.0f);
 
-    input.channels[APP_H723_CRSF_SB_CHANNEL_INDEX] = 172U;
+    input.channels[APP_H723_CRSF_SC_CHANNEL_INDEX] = 1811U;
     step(&state, &input, 0U, 3U, &output);
+    assert(output.mode == APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_BALL);
+    assert(output.chassis.manual_active);
+    assert(fabsf(output.chassis.base_speed_mm_s -
+                 APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S) < 0.0001f);
+
+    input.channels[APP_H723_CRSF_SB_CHANNEL_INDEX] = 172U;
+    step(&state, &input, 0U, 4U, &output);
     assert(output.mode == APP_CHASSIS_MODE_REMOTE_IDLE);
     assert(output.chassis.left_target_rpm == 0.0f);
     assert(output.chassis.right_target_rpm == 0.0f);

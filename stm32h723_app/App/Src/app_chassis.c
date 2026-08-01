@@ -64,10 +64,11 @@ void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis
                                     APP_H723_MM_S_TO_OUTPUT_RPM * APP_H723_RIGHT_SIGN;
         return;
     } else {
-        command->manual_active = false;
-        command->mode = APP_CHASSIS_MODE_REMOTE_IDLE;
-        command->left_target_rpm = 0.0f;
-        command->right_target_rpm = 0.0f;
+        command->mode = APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_BALL;
+        command->left_target_rpm = command->base_speed_mm_s *
+                                   APP_H723_MM_S_TO_OUTPUT_RPM * APP_H723_LEFT_SIGN;
+        command->right_target_rpm = command->base_speed_mm_s *
+                                    APP_H723_MM_S_TO_OUTPUT_RPM * APP_H723_RIGHT_SIGN;
         return;
     }
 

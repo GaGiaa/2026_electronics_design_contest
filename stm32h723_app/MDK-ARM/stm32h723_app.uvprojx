@@ -652,6 +652,11 @@
               <FilePath>../App/Src/app_ball_position_control.c</FilePath>
             </File>
             <File>
+              <FileName>app_speed_profile.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_speed_profile.c</FilePath>
+            </File>
+            <File>
               <FileName>app_pipe_startup.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_pipe_startup.c</FilePath>
