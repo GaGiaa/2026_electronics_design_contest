@@ -27,12 +27,12 @@ static uint32_t app_chassis_switch_state(uint16_t raw)
     return 1U;
 }
 
-static float app_chassis_line_follow_base_speed(float forward_normalized)
+static float app_chassis_line_follow_base_speed(float forward_normalized,
+                                                float speed_limit_mm_s)
 {
-    const float speed = forward_normalized * APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S;
+    const float speed = forward_normalized * speed_limit_mm_s;
 
-    return App_Math_ClampFloat(speed, -APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S,
-                               APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S);
+    return App_Math_ClampFloat(speed, -speed_limit_mm_s, speed_limit_mm_s);
 }
 
 void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis_command_t *command)
@@ -40,6 +40,7 @@ void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis
     float left;
     float right;
     float maximum;
+    uint32_t sc_state;
     if (command == 0) { return; }
     memset(command, 0, sizeof(*command));
     command->mode = APP_CHASSIS_MODE_REMOTE_IDLE;
@@ -50,13 +51,16 @@ void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis
         app_chassis_switch_state(input->channels[APP_H723_CRSF_SB_CHANNEL_INDEX]) != 1U) {
         return;
     }
+    sc_state = app_chassis_switch_state(input->channels[APP_H723_CRSF_SC_CHANNEL_INDEX]);
     command->forward_normalized = app_chassis_normalize(input->channels[2]);
     command->base_speed_mm_s = app_chassis_line_follow_base_speed(
-        command->forward_normalized);
+        command->forward_normalized,
+        sc_state == 2U ? APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_SPEED_MM_S :
+                         APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S);
     command->manual_active = true;
-    if (app_chassis_switch_state(input->channels[APP_H723_CRSF_SC_CHANNEL_INDEX]) == 0U) {
+    if (sc_state == 0U) {
         command->mode = APP_CHASSIS_MODE_REMOTE_MANUAL;
-    } else if (app_chassis_switch_state(input->channels[APP_H723_CRSF_SC_CHANNEL_INDEX]) == 1U) {
+    } else if (sc_state == 1U) {
         command->mode = APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW;
         command->left_target_rpm = command->base_speed_mm_s *
                                    APP_H723_MM_S_TO_OUTPUT_RPM * APP_H723_LEFT_SIGN;
@@ -64,10 +68,11 @@ void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis
                                     APP_H723_MM_S_TO_OUTPUT_RPM * APP_H723_RIGHT_SIGN;
         return;
     } else {
-        command->manual_active = false;
-        command->mode = APP_CHASSIS_MODE_REMOTE_IDLE;
-        command->left_target_rpm = 0.0f;
-        command->right_target_rpm = 0.0f;
+        command->mode = APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_S_CURVE;
+        command->left_target_rpm = command->base_speed_mm_s *
+                                   APP_H723_MM_S_TO_OUTPUT_RPM * APP_H723_LEFT_SIGN;
+        command->right_target_rpm = command->base_speed_mm_s *
+                                    APP_H723_MM_S_TO_OUTPUT_RPM * APP_H723_RIGHT_SIGN;
         return;
     }
 

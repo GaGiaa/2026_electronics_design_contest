@@ -664,6 +664,11 @@
               <FilePath>../App/Src/app_chassis.c</FilePath>
             </File>
             <File>
+              <FileName>app_speed_profile.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_speed_profile.c</FilePath>
+            </File>
+            <File>
               <FileName>app_line_follow.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_line_follow.c</FilePath>

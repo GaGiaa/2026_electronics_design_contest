@@ -13,6 +13,7 @@
 #include "app_line_follow.h"
 #include "app_jy901s_service.h"
 #include "app_m2006.h"
+#include "app_speed_profile.h"
 #include "app_single_motor.h"
 #include "app_task2.h"
 #include "app_task4.h"
@@ -64,6 +65,8 @@ static app_line_follow_state_t s_line_follow;
 static app_line_follow_output_t s_line_follow_output;
 static uint32_t s_line_follow_debug_last_sequence;
 static uint32_t s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
+static app_speed_profile_t s_remote_line_follow_speed_profile;
+static app_speed_profile_output_t s_remote_line_follow_speed_profile_output;
 static app_task2_state_t s_task2;
 static app_task2_output_t s_task2_output;
 static app_task4_state_t s_task4;
@@ -322,6 +325,63 @@ static void h723_line_follow_apply_debug_params(uint32_t active_group)
     }
 }
 
+static bool h723_remote_line_follow_speed_profile_params_are_valid(
+    const volatile h723_debug_speed_profile_t *debug)
+{
+    return isfinite(debug->max_speed_mm_s) &&
+           isfinite(debug->max_accel_mm_s2) &&
+           isfinite(debug->max_jerk_mm_s3) &&
+           debug->max_speed_mm_s > 0.0f &&
+           debug->max_accel_mm_s2 > 0.0f &&
+           debug->max_jerk_mm_s3 > 0.0f;
+}
+
+static void h723_remote_line_follow_speed_profile_step(
+    bool active, float requested_speed_mm_s)
+{
+    volatile h723_debug_speed_profile_t *debug = &g_h723_debug.speed_profile;
+
+    if (!h723_remote_line_follow_speed_profile_params_are_valid(debug)) {
+        debug->params_valid = 0U;
+        debug->params_rejected_count++;
+        app_speed_profile_reset(&s_remote_line_follow_speed_profile);
+        s_remote_line_follow_speed_profile.valid = false;
+    } else {
+        debug->params_valid = 1U;
+        s_remote_line_follow_speed_profile.config.max_speed_mm_s =
+            debug->max_speed_mm_s;
+        s_remote_line_follow_speed_profile.config.max_accel_mm_s2 =
+            debug->max_accel_mm_s2;
+        s_remote_line_follow_speed_profile.config.max_jerk_mm_s3 =
+            debug->max_jerk_mm_s3;
+        s_remote_line_follow_speed_profile.valid = true;
+    }
+
+    if (debug->reset_request != 0U) {
+        app_speed_profile_reset(&s_remote_line_follow_speed_profile);
+        debug->reset_request = 0U;
+    }
+
+    if (active && s_remote_line_follow_speed_profile.valid) {
+        app_speed_profile_step(
+            &s_remote_line_follow_speed_profile,
+            requested_speed_mm_s,
+            (float)APP_H723_CHASSIS_TASK_PERIOD_MS / 1000.0f,
+            &s_remote_line_follow_speed_profile_output);
+    } else {
+        app_speed_profile_reset(&s_remote_line_follow_speed_profile);
+        (void)memset(&s_remote_line_follow_speed_profile_output, 0,
+                     sizeof(s_remote_line_follow_speed_profile_output));
+    }
+
+    debug->active = active ? 1U : 0U;
+    debug->requested_speed_mm_s = requested_speed_mm_s;
+    debug->planned_speed_mm_s =
+        s_remote_line_follow_speed_profile_output.planned_speed_mm_s;
+    debug->planned_accel_mm_s2 =
+        s_remote_line_follow_speed_profile_output.planned_accel_mm_s2;
+}
+
 static void h723_line_follow_publish_debug(void)
 {
     volatile h723_debug_line_follow_t *debug = &g_h723_debug.line_follow;
@@ -409,6 +469,18 @@ void h723_chassis_service_init(void)
     (void)memset(&s_line_follow_output, 0, sizeof(s_line_follow_output));
     s_line_follow_debug_last_sequence = 0U;
     s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
+    app_speed_profile_init(
+        &s_remote_line_follow_speed_profile,
+        &(const app_speed_profile_config_t){
+            .max_speed_mm_s =
+                APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_SPEED_MM_S,
+            .max_accel_mm_s2 =
+                APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_ACCEL_MM_S2,
+            .max_jerk_mm_s3 =
+                APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_JERK_MM_S3,
+        });
+    (void)memset(&s_remote_line_follow_speed_profile_output, 0,
+                 sizeof(s_remote_line_follow_speed_profile_output));
     g_h723_debug.task2_line_follow.pid_kp = APP_H723_TASK2_LINE_FOLLOW_PID_KP;
     g_h723_debug.task2_line_follow.pid_ki = APP_H723_TASK2_LINE_FOLLOW_PID_KI;
     g_h723_debug.task2_line_follow.pid_kd = APP_H723_TASK2_LINE_FOLLOW_PID_KD;
@@ -443,6 +515,19 @@ void h723_chassis_service_init(void)
         (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f;
     g_h723_debug.line_follow.target_position = 0.0f;
     g_h723_debug.line_follow.pid_update_count = 0U;
+    g_h723_debug.speed_profile.max_speed_mm_s =
+        APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_SPEED_MM_S;
+    g_h723_debug.speed_profile.max_accel_mm_s2 =
+        APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_ACCEL_MM_S2;
+    g_h723_debug.speed_profile.max_jerk_mm_s3 =
+        APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_JERK_MM_S3;
+    g_h723_debug.speed_profile.reset_request = 0U;
+    g_h723_debug.speed_profile.active = 0U;
+    g_h723_debug.speed_profile.params_valid = 1U;
+    g_h723_debug.speed_profile.params_rejected_count = 0U;
+    g_h723_debug.speed_profile.requested_speed_mm_s = 0.0f;
+    g_h723_debug.speed_profile.planned_speed_mm_s = 0.0f;
+    g_h723_debug.speed_profile.planned_accel_mm_s2 = 0.0f;
     g_h723_debug.single_motor.default_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.selected_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     g_h723_debug.single_motor.enable = 0U;
@@ -951,6 +1036,20 @@ void h723_chassis_service_step(uint32_t now_ms)
                              button_snapshot.stable_high_mask, now_ms,
                              &s_control_output);
     s_command = s_control_output.chassis;
+    {
+        const bool remote_s_curve_line_follow =
+            s_command.manual_active &&
+            s_command.mode == APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_S_CURVE;
+
+        h723_remote_line_follow_speed_profile_step(
+            remote_s_curve_line_follow, s_command.base_speed_mm_s);
+        if (remote_s_curve_line_follow) {
+            s_command.base_speed_mm_s =
+                s_remote_line_follow_speed_profile_output.valid ?
+                s_remote_line_follow_speed_profile_output.planned_speed_mm_s :
+                0.0f;
+        }
+    }
     if (s_control_output.remote_takeover) {
         app_task2_abort(&s_task2);
         app_task4_abort(&s_task4);
@@ -1141,7 +1240,9 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.chassis.right_target_output_speed_rpm = 0.0f;
     h723_single_motor_service_step(now_ms, output_current_A);
 #else
-    if (s_command.mode == APP_CHASSIS_MODE_LINE_FOLLOW && s_command.manual_active) {
+    if ((s_command.mode == APP_CHASSIS_MODE_LINE_FOLLOW ||
+         s_command.mode == APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_S_CURVE) &&
+        s_command.manual_active) {
         const app_line_follow_input_t line_input = {
             .line_position = g_h723_debug.grayscale.line_position,
             .line_strength = g_h723_debug.grayscale.line_strength,
@@ -1177,7 +1278,8 @@ void h723_chassis_service_step(uint32_t now_ms)
         h723_update_m2006_debug(index, now_ms, target);
         debug->target_output_speed_rpm = target;
         if (index == 2U || !s_command.manual_active ||
-            (s_command.mode == APP_CHASSIS_MODE_LINE_FOLLOW &&
+            ((s_command.mode == APP_CHASSIS_MODE_LINE_FOLLOW ||
+              s_command.mode == APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_S_CURVE) &&
              !s_line_follow_output.active) || !feedback_fresh) {
             PID_Incremental_Reset(&s_speed_pid[index]);
             output_current_A[index] = 0.0f;

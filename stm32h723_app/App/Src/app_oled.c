@@ -218,6 +218,8 @@ static const char *oled_mode_name(uint32_t mode)
         return "MANUAL";
     case APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW:
         return "LINE FOLLOW";
+    case APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_S_CURVE:
+        return "LINE S-CURVE";
     case APP_CHASSIS_MODE_REMOTE_IDLE:
     default:
         return "IDLE";

@@ -113,11 +113,20 @@ static void test_crsf_manual_mix_and_switch_guard(void)
     assert(fabsf(command.right_target_rpm -
                  APP_H723_LINE_FOLLOW_STICK_RANGE_MM_S * APP_H723_MM_S_TO_OUTPUT_RPM) < 0.0001f);
 
-    input.channels[6] = 1811U;
-    input.channels[7] = 992U;
+    input.channels[6] = 992U;
+    input.channels[7] = 1811U;
+    input.channels[2] = 1811U;
     app_chassis_mix(&input, 10U, &command);
-    assert(!command.manual_active);
-    assert(command.mode == APP_CHASSIS_MODE_STOP);
+    assert(command.manual_active);
+    assert(command.mode == APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_S_CURVE);
+    assert(fabsf(command.base_speed_mm_s -
+                 APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_SPEED_MM_S) < 0.0001f);
+    assert(fabsf(command.left_target_rpm -
+                 APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_SPEED_MM_S *
+                 APP_H723_MM_S_TO_OUTPUT_RPM) < 0.0001f);
+    assert(fabsf(command.right_target_rpm +
+                 APP_H723_REMOTE_LINE_FOLLOW_SPEED_PROFILE_MAX_SPEED_MM_S *
+                 APP_H723_MM_S_TO_OUTPUT_RPM) < 0.0001f);
 
     input.channels[6] = 992U;
     input.channels[7] = 172U;

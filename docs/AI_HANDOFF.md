@@ -741,6 +741,28 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 - No Flash, SWD/GDB, CAN, UART/VOFA, motor, or other hardware operation was
   performed.
 
+## H723 SC High S-Curve Line Follow (2026-08-01)
+
+- Added `APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_S_CURVE` for SE pressed, SB
+  middle, and SC high. The left stick forward/backward request is limited to
+  `-350..+350 mm/s` and passed through an independent 1 ms speed planner.
+- Added `app_speed_profile.c/.h` with `300 mm/s^2` acceleration and
+  `1500 mm/s^3` jerk defaults. The implementation includes the
+  `459ea4dc2c41dbd6098733d62cafcf5f502f620f` correction: crossing the target
+  speed never snaps the planned speed or clears acceleration outside the jerk
+  limit.
+- The mode reuses the existing gray-line controller and safety gate. Invalid
+  gray data, ADC timeout, or weak line strength produces zero wheel targets.
+  Existing SC middle line follow, task 2/4/5/6 control, and ball-position
+  control are unchanged.
+- `g_h723_debug.speed_profile` exposes limits, reset request, active state,
+  parameter validation, rejected count, requested speed, planned speed, and
+  planned acceleration. The Keil project includes `app_speed_profile.c`.
+- Validation completed: speed-profile unit tests, chassis/control tests,
+  SC-high static integration check, line-follow service check, Keil project
+  check, and `git diff --check`. No Flash, SWD/GDB, UART/VOFA, CAN, motor,
+  grayscale sensor, or mobile chassis hardware operation was performed.
+
 ## H723 Tilt-Control VOFA Telemetry (2026-08-01)
 
 - Added the default-off compile-time UART8 switch

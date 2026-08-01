@@ -402,6 +402,21 @@ typedef struct {
 } h723_debug_oled_t;
 
 typedef struct {
+    /* Keil Watch inputs for SC high remote line-follow speed planning. */
+    float max_speed_mm_s;
+    float max_accel_mm_s2;
+    float max_jerk_mm_s3;
+    uint32_t reset_request;
+    /* Runtime planner snapshot. */
+    uint32_t active;
+    uint32_t params_valid;
+    uint32_t params_rejected_count;
+    float requested_speed_mm_s;
+    float planned_speed_mm_s;
+    float planned_accel_mm_s2;
+} h723_debug_speed_profile_t;
+
+typedef struct {
     h723_debug_system_t system;
     h723_debug_uart8_t uart8;
     h723_debug_crsf_t crsf;
@@ -424,6 +439,7 @@ typedef struct {
     h723_debug_buttons_t buttons;
     h723_debug_bno055_t bno055;
     h723_debug_ball_vision_t ball_vision;
+    h723_debug_speed_profile_t speed_profile;
     h723_debug_oled_t oled;
 } h723_debug_t;
 

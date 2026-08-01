@@ -335,6 +335,22 @@ The merge was verified with all 18 `tests\\test_stm32h723_*.ps1` scripts,
 SWD/GDB session, CAN, UART/VOFA hardware, motor, grayscale sensor, OLED, or
 other physical acceptance test was performed.
 
+## SC High S-Curve Line Follow
+
+With SE pressed, SB in the middle position, and SC in the high position, the
+left stick forward/backward axis selects a gray-line-follow base speed from
+`-350..+350 mm/s`. The request is passed through an independent S-curve speed
+profile at the 1 ms chassis rate, with configurable limits of `300 mm/s^2`
+acceleration and `1500 mm/s^3` jerk. The planner preserves jerk continuity
+when the requested speed changes or crosses the current planned speed.
+
+This mode reuses the existing gray-line safety gate: insufficient line
+strength, ADC timeout, or an invalid gray snapshot clears both wheel targets.
+The SC middle mode and task 2/4/5/6 speed behavior remain unchanged. Keil
+Watch fields under `g_h723_debug.speed_profile` expose the active state,
+requested/planned speed, planned acceleration, configurable limits, rejected
+parameter count, and a one-shot `reset_request`.
+
 ## 巡线位置式 PID Watch 与 VOFA 调试
 
 SB 中档、SC 中档时进入灰度巡线模式。灰度任务每 `10 ms` 发布一次新快照，底盘任务虽然每 `1 ms` 运行，但巡线位置式 PID 只在灰度 `sequence` 变化时计算，因此实际 PID 计算频率约为 `100 Hz`，PID `dt_s` 为 `0.010 s`。灰度序号未变化时沿用上一次转向修正；ADC 超时、线强度小于 `800` 或快照无效时复位 PID 并输出零目标。

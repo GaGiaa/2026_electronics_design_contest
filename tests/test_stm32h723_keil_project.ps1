@@ -17,9 +17,9 @@ if (-not (Test-Path -LiteralPath $projectPath)) {
 
 $project = Get-Content -LiteralPath $projectPath -Raw
 foreach ($line in @(
-    '<pCCUsed>6240000::V6.24::ARMCLANG</pCCUsed>',
+    '<pCCUsed>6070000::V6.7::.\ARMCLANG</pCCUsed>',
     '<uAC6>1</uAC6>',
-    '<PackID>Keil.STM32H7xx_DFP.4.1.2</PackID>',
+    '<PackID>Keil.STM32H7xx_DFP.4.1.3</PackID>',
     '<PackURL>https://www.keil.com/pack/</PackURL>',
     '<FilePath>../App/Src/app_debug.c</FilePath>',
     '<FilePath>../App/Src/app_buttons.c</FilePath>',
@@ -38,6 +38,7 @@ foreach ($line in @(
     '<FilePath>../App/Src/app_balance.c</FilePath>',
     '<FilePath>../App/Src/app_tilt_control.c</FilePath>',
     '<FilePath>../App/Src/app_chassis.c</FilePath>',
+    '<FilePath>../App/Src/app_speed_profile.c</FilePath>',
     '<FilePath>../App/Src/app_chassis_service.c</FilePath>',
     '<FilePath>../App/Src/app_line_follow.c</FilePath>',
     '<FilePath>../App/Src/app_task_menu.c</FilePath>',

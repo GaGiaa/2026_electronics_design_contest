@@ -49,7 +49,7 @@ H723 差速底盘工程现已包含 JY901S UART9 IMU 基础接入：`PG0/PG1`、
 | [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) | 软件版本、工具链、SDK、源码和硬件依赖的权威来源 |
 | [`docs/SETUP.md`](docs/SETUP.md) | 跨电脑安装、环境变量、CCS、VS Code、Keil 和构建操作 |
 | [`docs/CODING_STYLE.md`](docs/CODING_STYLE.md) | C 注释、接口、算法、驱动、FreeRTOS 任务和文档写作规范 |
-| [`docs/CLION_DAPLINK_SETUP.md`](docs/CLION_DAPLINK_SETUP.md) | CLion 下使用 DAPLink/pyOCD 烧录和 GDB 调试 H723 |
+| [`docs/SETUP.md`](docs/SETUP.md) | 跨电脑环境配置、pyOCD 和 GDB 调试 H723 |
 
 ## AI 首次接手顺序
 
