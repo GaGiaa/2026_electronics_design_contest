@@ -12,6 +12,7 @@ typedef enum {
 
 typedef struct {
     uint32_t now_ms;
+    float distance_mm;
 } app_task4_input_t;
 
 typedef struct {
@@ -19,6 +20,8 @@ typedef struct {
     uint32_t start_ms;
     uint32_t finish_ms;
     uint32_t last_step_ms;
+    float start_distance_mm;
+    float traveled_distance_mm;
 } app_task4_state_t;
 
 typedef struct {
@@ -28,10 +31,11 @@ typedef struct {
     bool stop;
     float base_speed_mm_s;
     uint32_t elapsed_ms;
+    float distance_mm;
 } app_task4_output_t;
 
 void app_task4_init(app_task4_state_t *state);
-void app_task4_start(app_task4_state_t *state, uint32_t now_ms);
+void app_task4_start(app_task4_state_t *state, uint32_t now_ms, float distance_mm);
 void app_task4_abort(app_task4_state_t *state);
 void app_task4_step(app_task4_state_t *state, const app_task4_input_t *input);
 void app_task4_get_output(const app_task4_state_t *state, app_task4_output_t *output);

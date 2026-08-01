@@ -564,6 +564,37 @@ static bool h723_m2006_feedback_is_fresh(uint32_t index, uint32_t now_ms)
            (uint32_t)(now_ms - s_feedback_time_ms[index]) < APP_H723_M2006_FEEDBACK_TIMEOUT_MS;
 }
 
+/**
+ * @brief 将位置跟踪器累计角度换算为车轮行驶里程。
+ *
+ * 从输出轴角度换算为车轮圆周距离：distance_mm = output_deg * (D * PI) / 360。
+ *
+ * @param[in] tracker 位置跟踪器指针。
+ * @return 行驶里程，单位 mm；tracker 为 NULL 时返回 0.0f。
+ */
+static float h723_position_tracker_distance_mm(
+    const app_m2006_position_tracker_t *tracker)
+{
+    float output_deg;
+
+    if (tracker == NULL) {
+        return 0.0f;
+    }
+    output_deg = app_m2006_position_tracker_output_degrees(tracker);
+    return output_deg * (APP_H723_WHEEL_DIAMETER_MM * APP_H723_PI_F) / 360.0f;
+}
+
+/**
+ * @brief 计算左右轮行驶里程的平均值。
+ *
+ * @return 左右轮平均行驶里程，单位 mm。
+ */
+static float h723_average_distance_mm(void)
+{
+    return (h723_position_tracker_distance_mm(&s_position_tracker[0]) +
+            h723_position_tracker_distance_mm(&s_position_tracker[1])) / 2.0f;
+}
+
 static void h723_update_m2006_debug(uint32_t index, uint32_t now_ms, float target_rpm)
 {
     volatile h723_m2006_debug_t *debug;
@@ -933,7 +964,7 @@ void h723_chassis_service_step(uint32_t now_ms)
             app_line_follow_reset(&s_line_follow);
         } else if (requested_task == 4U) {
             app_task2_abort(&s_task2);
-            app_task4_start(&s_task4, now_ms);
+            app_task4_start(&s_task4, now_ms, h723_average_distance_mm());
             s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK456;
             app_line_follow_reset(&s_line_follow);
         } else if ((requested_task == 5U) || (requested_task == 6U)) {
@@ -983,6 +1014,7 @@ void h723_chassis_service_step(uint32_t now_ms)
                (s_task4.phase == APP_TASK4_PHASE_RUNNING)) {
         const app_task4_input_t task4_input = {
             .now_ms = now_ms,
+            .distance_mm = h723_average_distance_mm(),
         };
         app_task4_step(&s_task4, &task4_input);
         app_task4_get_output(&s_task4, &s_task4_output);
@@ -1085,6 +1117,7 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.task4.phase = (uint32_t)s_task4_output.phase;
     g_h723_debug.task4.running = s_task4_output.running ? 1U : 0U;
     g_h723_debug.task4.elapsed_ms = s_task4_output.elapsed_ms;
+    g_h723_debug.task4.distance_mm = s_task4_output.distance_mm;
     g_h723_debug.task4.base_speed_mm_s = s_task4_output.base_speed_mm_s;
     g_h723_debug.task56.task_id = s_task56_task_id;
     g_h723_debug.task56.phase = (uint32_t)s_task56_output.phase;
