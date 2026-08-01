@@ -68,35 +68,6 @@
       "problemMatcher": []
     },
     {
-      "label": "STM32H723: Install pyOCD tools",
-      "type": "shell",
-      "command": "powershell",
-      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\install-h723-debug-tools.ps1"],
-      "problemMatcher": []
-    },
-    {
-      "label": "STM32H723: List DAPLink probes",
-      "type": "shell",
-      "command": "powershell",
-      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-h723.ps1", "-Action", "List"],
-      "problemMatcher": []
-    },
-    {
-      "label": "STM32H723: Load firmware to Flash",
-      "type": "shell",
-      "command": "powershell",
-      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-h723.ps1", "-Action", "Load"],
-      "problemMatcher": []
-    },
-    {
-      "label": "STM32H723: Start pyOCD GDB server",
-      "type": "shell",
-      "command": "powershell",
-      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\flash-and-debug-h723.ps1", "-Action", "GdbServer"],
-      "isBackground": true,
-      "problemMatcher": []
-    },
-    {
       "label": "MSPM0G3507: Install pyOCD tools",
       "type": "shell",
       "command": "powershell",

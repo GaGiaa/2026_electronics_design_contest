@@ -129,7 +129,6 @@ typedef struct {
     uint32_t running;
     uint32_t elapsed_ms;
     float base_speed_mm_s;
-    float distance_mm;
 } h723_debug_task4_t;
 
 typedef struct {
