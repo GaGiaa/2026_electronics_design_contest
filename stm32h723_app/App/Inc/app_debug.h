@@ -393,6 +393,14 @@ typedef struct {
     float pid_kd;
     float output_limit_deg;
     float pid_deadband_mm;
+    float hold_position_mm[3];
+    float hold_tilt_deg[3];
+    float engage_error_mm;
+    float release_error_mm;
+    float breakaway_positive_tilt_deg;
+    float breakaway_negative_tilt_deg;
+    float velocity_gain_deg_per_mm_s;
+    float velocity_filter_alpha;
     /* Runtime state. */
     uint32_t state;
     uint32_t fault;
@@ -408,6 +416,11 @@ typedef struct {
     float pid_output_deg;
     float target_tilt_deg;
     float pid_integral;
+    uint32_t drive_active;
+    float hold_tilt_output_deg;
+    float breakaway_tilt_output_deg;
+    float velocity_mm_s;
+    float velocity_damping_tilt_deg;
 } h723_debug_ball_position_t;
 
 typedef struct {

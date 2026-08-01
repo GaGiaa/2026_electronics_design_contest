@@ -501,6 +501,22 @@ void h723_chassis_service_init(void)
     g_h723_debug.ball_position.pid_kd = s_ball_position_config.pid_params.kd;
     g_h723_debug.ball_position.output_limit_deg = s_ball_position_config.output_limit_deg;
     g_h723_debug.ball_position.pid_deadband_mm = s_ball_position_config.deadband_mm;
+    for (index = 0U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
+        g_h723_debug.ball_position.hold_position_mm[index] =
+            s_ball_position_config.hold_position_mm[index];
+        g_h723_debug.ball_position.hold_tilt_deg[index] =
+            s_ball_position_config.hold_tilt_deg[index];
+    }
+    g_h723_debug.ball_position.engage_error_mm = s_ball_position_config.engage_error_mm;
+    g_h723_debug.ball_position.release_error_mm = s_ball_position_config.release_error_mm;
+    g_h723_debug.ball_position.breakaway_positive_tilt_deg =
+        s_ball_position_config.breakaway_positive_tilt_deg;
+    g_h723_debug.ball_position.breakaway_negative_tilt_deg =
+        s_ball_position_config.breakaway_negative_tilt_deg;
+    g_h723_debug.ball_position.velocity_gain_deg_per_mm_s =
+        s_ball_position_config.velocity_gain_deg_per_mm_s;
+    g_h723_debug.ball_position.velocity_filter_alpha =
+        s_ball_position_config.velocity_filter_alpha;
     s_single_motor_last_id = APP_H723_SINGLE_MOTOR_DEBUG_DEFAULT_ID;
     s_single_motor_last_enable = 0U;
     s_single_motor_last_control_mode = APP_SINGLE_MOTOR_CONTROL_MODE_SPEED;
@@ -637,24 +653,48 @@ static void h723_tilt_apply_debug_params(void)
     }
 }
 
-static bool h723_ball_position_params_are_valid(float kp, float ki, float kd,
-                                                float output_limit_deg,
-                                                float deadband_mm)
+static bool h723_ball_position_params_are_valid(
+    const volatile h723_debug_ball_position_t *debug)
 {
-    return isfinite(kp) && isfinite(ki) && isfinite(kd) &&
-           isfinite(output_limit_deg) && isfinite(deadband_mm) &&
-           kp >= 0.0f && ki >= 0.0f && kd >= 0.0f &&
-           output_limit_deg > 0.0f && deadband_mm >= 0.0f;
+    uint32_t index;
+
+    if (!isfinite(debug->pid_kp) || !isfinite(debug->pid_ki) ||
+        !isfinite(debug->pid_kd) || !isfinite(debug->output_limit_deg) ||
+        !isfinite(debug->pid_deadband_mm) || debug->pid_kp < 0.0f ||
+        debug->pid_ki < 0.0f || debug->pid_kd < 0.0f ||
+        debug->output_limit_deg <= 0.0f || debug->pid_deadband_mm < 0.0f ||
+        !isfinite(debug->engage_error_mm) || !isfinite(debug->release_error_mm) ||
+        debug->engage_error_mm < debug->release_error_mm ||
+        debug->release_error_mm < 0.0f ||
+        !isfinite(debug->breakaway_positive_tilt_deg) ||
+        !isfinite(debug->breakaway_negative_tilt_deg) ||
+        debug->breakaway_positive_tilt_deg < 0.0f ||
+        debug->breakaway_negative_tilt_deg < 0.0f ||
+        !isfinite(debug->velocity_gain_deg_per_mm_s) ||
+        debug->velocity_gain_deg_per_mm_s < 0.0f ||
+        !isfinite(debug->velocity_filter_alpha) ||
+        debug->velocity_filter_alpha <= 0.0f ||
+        debug->velocity_filter_alpha > 1.0f) {
+        return false;
+    }
+    for (index = 0U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
+        if (!isfinite(debug->hold_position_mm[index]) ||
+            !isfinite(debug->hold_tilt_deg[index]) ||
+            (index > 0U &&
+             debug->hold_position_mm[index] <= debug->hold_position_mm[index - 1U])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static void h723_ball_position_apply_debug_params(void)
 {
     volatile h723_debug_ball_position_t *debug = &g_h723_debug.ball_position;
 
-    if (!h723_ball_position_params_are_valid(debug->pid_kp, debug->pid_ki,
-                                             debug->pid_kd,
-                                             debug->output_limit_deg,
-                                             debug->pid_deadband_mm)) {
+    uint32_t index;
+
+    if (!h723_ball_position_params_are_valid(debug)) {
         return;
     }
     s_ball_position_config.pid_params.kp = debug->pid_kp;
@@ -662,6 +702,19 @@ static void h723_ball_position_apply_debug_params(void)
     s_ball_position_config.pid_params.kd = debug->pid_kd;
     s_ball_position_config.output_limit_deg = debug->output_limit_deg;
     s_ball_position_config.deadband_mm = debug->pid_deadband_mm;
+    for (index = 0U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
+        s_ball_position_config.hold_position_mm[index] = debug->hold_position_mm[index];
+        s_ball_position_config.hold_tilt_deg[index] = debug->hold_tilt_deg[index];
+    }
+    s_ball_position_config.engage_error_mm = debug->engage_error_mm;
+    s_ball_position_config.release_error_mm = debug->release_error_mm;
+    s_ball_position_config.breakaway_positive_tilt_deg =
+        debug->breakaway_positive_tilt_deg;
+    s_ball_position_config.breakaway_negative_tilt_deg =
+        debug->breakaway_negative_tilt_deg;
+    s_ball_position_config.velocity_gain_deg_per_mm_s =
+        debug->velocity_gain_deg_per_mm_s;
+    s_ball_position_config.velocity_filter_alpha = debug->velocity_filter_alpha;
     s_ball_position_control.config = s_ball_position_config;
     s_ball_position_control.pid.params.kp = debug->pid_kp;
     s_ball_position_control.pid.params.ki = debug->pid_ki;
@@ -731,6 +784,11 @@ static void h723_ball_position_publish_debug(const app_k230_sample_t *sample,
     debug->pid_output_deg = output->output_deg;
     debug->target_tilt_deg = output->target_tilt_deg;
     debug->pid_integral = output->integral;
+    debug->drive_active = output->drive_active ? 1U : 0U;
+    debug->hold_tilt_output_deg = output->hold_tilt_deg;
+    debug->breakaway_tilt_output_deg = output->breakaway_tilt_deg;
+    debug->velocity_mm_s = output->velocity_mm_s;
+    debug->velocity_damping_tilt_deg = output->velocity_damping_tilt_deg;
 }
 
 static void h723_tilt_publish_debug(const app_tilt_control_output_t *output,
@@ -781,6 +839,8 @@ static float h723_tilt_service_step(uint32_t now_ms, uint32_t motor_index)
     ball_input.measured_mm = ball_sample.distance_mm;
     ball_input.vision_valid = ball_snapshot_available && ball_sample.valid;
     ball_input.vision_age_ms = ball_sample_age_ms;
+    ball_input.vision_frame_count = ball_sample.valid_frame_count;
+    ball_input.vision_sample_ms = ball_sample.last_frame_ms;
     ball_input.calibration_ready = s_pipe_startup_snapshot.calibration_valid;
     ball_input.id3_ready = s_pipe_startup_snapshot.id3_allowed && s_balance.zero_valid;
     app_ball_position_control_step(&s_ball_position_control, &ball_input,

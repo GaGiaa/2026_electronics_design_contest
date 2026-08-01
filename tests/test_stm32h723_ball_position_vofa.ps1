@@ -9,7 +9,7 @@ $config = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\A
 $telemetry = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_telemetry.c')
 
 foreach ($pattern in @(
-    '#define\s+APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE\s+0U',
+    '#define\s+APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE\s+[01]U',
     '#define\s+APP_H723_BALL_POSITION_VOFA_TELEMETRY_INTERVAL_MS\s+25U',
     'APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE'
 )) {

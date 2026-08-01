@@ -43,6 +43,15 @@ foreach ($line in @(
 )) { Require-Text $chassis $line "Missing ball-control chassis integration: $line" }
 
 foreach ($line in @(
+    'ball_input.vision_frame_count = ball_sample.valid_frame_count;',
+    'ball_input.vision_sample_ms = ball_sample.last_frame_ms;',
+    'hold_position_mm',
+    'breakaway_negative_tilt_deg',
+    'velocity_gain_deg_per_mm_s',
+    'output->velocity_damping_tilt_deg'
+)) { Require-Text ($chassis + "`n" + $debug) $line "Missing ball-control tuning integration: $line" }
+
+foreach ($line in @(
     'h723_debug_ball_position_t',
     'h723_debug_pipe_startup_t',
     'h723_debug_ball_position_t ball_position;',

@@ -20,6 +20,14 @@ static app_ball_position_control_config_t make_config(void)
         .output_limit_deg = 3.0f,
         .sign = -1.0f,
         .deadband_mm = 1.0f,
+        .hold_position_mm = {0.0f, 100.0f, 200.0f},
+        .hold_tilt_deg = {0.0f, 0.0f, 0.0f},
+        .engage_error_mm = 6.0f,
+        .release_error_mm = 2.0f,
+        .breakaway_positive_tilt_deg = 0.0f,
+        .breakaway_negative_tilt_deg = 0.0f,
+        .velocity_gain_deg_per_mm_s = 0.0f,
+        .velocity_filter_alpha = 0.35f,
     };
 }
 
@@ -32,6 +40,8 @@ static app_ball_position_control_input_t make_input(uint32_t now_ms)
         .measured_mm = 100.0f,
         .vision_valid = true,
         .vision_age_ms = 0U,
+        .vision_frame_count = 1U,
+        .vision_sample_ms = now_ms,
         .calibration_ready = true,
         .id3_ready = true,
     };
@@ -148,6 +158,65 @@ static void test_invalid_configuration_faults(void)
     app_ball_position_control_init(&control, &config);
     assert(control.state == APP_BALL_POSITION_STATE_FAULT);
     assert(control.fault == APP_BALL_POSITION_FAULT_INVALID_CONFIG);
+
+    config = make_config();
+    config.engage_error_mm = 1.0f;
+    config.release_error_mm = 2.0f;
+    app_ball_position_control_init(&control, &config);
+    assert(control.state == APP_BALL_POSITION_STATE_FAULT);
+    assert(control.fault == APP_BALL_POSITION_FAULT_INVALID_CONFIG);
+}
+
+static void test_hold_map_and_breakaway_hysteresis(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+
+    config.hold_tilt_deg[1] = 0.20f;
+    config.hold_tilt_deg[2] = 0.40f;
+    config.breakaway_negative_tilt_deg = 0.15f;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+    assert(output.drive_active);
+    assert(fabsf(output.hold_tilt_deg - 0.20f) < 0.0001f);
+    assert(fabsf(output.breakaway_tilt_deg + 0.15f) < 0.0001f);
+    assert(fabsf(output.target_tilt_deg + 0.35f) < 0.0001f);
+
+    input.now_ms = 25U;
+    input.target_mm = 102.0f;
+    input.vision_frame_count = 2U;
+    input.vision_sample_ms = 25U;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(!output.drive_active);
+    assert(fabsf(output.output_deg) < 0.0001f);
+    assert(fabsf(output.target_tilt_deg - 0.20f) < 0.0001f);
+}
+
+static void test_velocity_damping_uses_new_vision_frames(void)
+{
+    app_ball_position_control_t control;
+    app_ball_position_control_config_t config = make_config();
+    app_ball_position_control_input_t input = make_input(0U);
+    app_ball_position_control_output_t output;
+
+    config.pid_params.kp = 0.0f;
+    config.velocity_gain_deg_per_mm_s = 0.002f;
+    config.velocity_filter_alpha = 0.5f;
+    input.target_mm = 100.0f;
+    app_ball_position_control_init(&control, &config);
+    app_ball_position_control_step(&control, &input, &output);
+    assert(fabsf(output.velocity_mm_s) < 0.0001f);
+
+    input.now_ms = 25U;
+    input.measured_mm = 110.0f;
+    input.vision_frame_count = 2U;
+    input.vision_sample_ms = 25U;
+    app_ball_position_control_step(&control, &input, &output);
+    assert(fabsf(output.velocity_mm_s - 200.0f) < 0.0001f);
+    assert(fabsf(output.velocity_damping_tilt_deg - 0.40f) < 0.0001f);
+    assert(fabsf(output.target_tilt_deg - 0.40f) < 0.0001f);
 }
 
 int main(void)
@@ -157,5 +226,7 @@ int main(void)
     test_deadband_and_output_limit();
     test_stale_vision_resets_pid_and_recovers();
     test_invalid_configuration_faults();
+    test_hold_map_and_breakaway_hysteresis();
+    test_velocity_damping_uses_new_vision_frames();
     return 0;
 }

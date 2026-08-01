@@ -154,6 +154,15 @@ K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使
 视觉无效、帧龄超过 `100 ms`、ID 3 未校准或反馈故障时，位置 PID 清积分并请求校准零倾角；
 现有 JY901S 5 ms 倾角环、ID 3 归零、70--210 deg 位置范围、速度/电流/CAN 保护继续生效。
 
+为补偿水管弯曲和钢珠静摩擦，`g_h723_debug.ball_position` 还提供三个按坐标递增的
+`hold_position_mm[0..2]` 与对应 `hold_tilt_deg[0..2]`，位置环在各点之间线性插值静止保持倾角。
+`engage_error_mm`/`release_error_mm` 形成起停滞回，必须满足前者不小于后者；
+`breakaway_positive_tilt_deg` 和 `breakaway_negative_tilt_deg` 分别为请求正/负倾角时叠加的最小起动量。
+`velocity_gain_deg_per_mm_s` 默认 `0`，设为正数后以 K230 新帧的低通速度估计产生反向制动倾角，
+`velocity_filter_alpha` 为 `(0, 1]`。先在 `enable=0U` 时记录三处钢珠静止所需倾角，再只调 P 和滞回，
+最后从很小的速度增益开始；运行量 `drive_active`、`hold_tilt_output_deg`、
+`breakaway_tilt_output_deg`、`velocity_mm_s` 与 `velocity_damping_tilt_deg` 可在 Watch 观察。
+
 将 `APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE` 设为 `1U` 后，UART8 按 40 Hz
 发送 13 通道 VOFA+ JustFloat 帧：`target_mm`、`measured_mm`、`error_mm`、P/I/D、
 `pid_output_deg`、`target_tilt_deg`、`vision_age_ms`、`vision_valid`、位置环 `state`、

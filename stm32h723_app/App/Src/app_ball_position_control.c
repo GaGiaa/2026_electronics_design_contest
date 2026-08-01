@@ -8,14 +8,36 @@ static bool app_ball_position_config_is_valid(
     const app_ball_position_control_config_t *config)
 {
     const PID_Position_Param_Config *params;
+    uint32_t index;
 
     if (config == NULL ||
         config->period_ms != APP_BALL_POSITION_CONTROL_PERIOD_MS ||
         config->max_age_ms == 0U || !isfinite(config->output_limit_deg) ||
         config->output_limit_deg <= 0.0f || !isfinite(config->sign) ||
         (config->sign != -1.0f && config->sign != 1.0f) ||
-        !isfinite(config->deadband_mm) || config->deadband_mm < 0.0f) {
+        !isfinite(config->deadband_mm) || config->deadband_mm < 0.0f ||
+        !isfinite(config->engage_error_mm) || !isfinite(config->release_error_mm) ||
+        config->engage_error_mm < config->release_error_mm ||
+        config->release_error_mm < 0.0f ||
+        !isfinite(config->breakaway_positive_tilt_deg) ||
+        !isfinite(config->breakaway_negative_tilt_deg) ||
+        config->breakaway_positive_tilt_deg < 0.0f ||
+        config->breakaway_negative_tilt_deg < 0.0f ||
+        !isfinite(config->velocity_gain_deg_per_mm_s) ||
+        config->velocity_gain_deg_per_mm_s < 0.0f ||
+        !isfinite(config->velocity_filter_alpha) ||
+        config->velocity_filter_alpha <= 0.0f ||
+        config->velocity_filter_alpha > 1.0f) {
         return false;
+    }
+
+    for (index = 0U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
+        if (!isfinite(config->hold_position_mm[index]) ||
+            !isfinite(config->hold_tilt_deg[index]) ||
+            (index > 0U &&
+             config->hold_position_mm[index] <= config->hold_position_mm[index - 1U])) {
+            return false;
+        }
     }
 
     params = &config->pid_params;
@@ -23,6 +45,58 @@ static bool app_ball_position_config_is_valid(
            isfinite(params->output_limit) && isfinite(params->deadband) &&
            params->kp >= 0.0f && params->ki >= 0.0f && params->kd >= 0.0f &&
            params->output_limit > 0.0f && params->deadband >= 0.0f;
+}
+
+static float app_ball_position_hold_tilt(const app_ball_position_control_t *control,
+                                         float position_mm)
+{
+    const app_ball_position_control_config_t *config = &control->config;
+    uint32_t index;
+
+    if (position_mm <= config->hold_position_mm[0U]) {
+        return config->hold_tilt_deg[0U];
+    }
+    for (index = 1U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
+        if (position_mm <= config->hold_position_mm[index]) {
+            const float lower_position = config->hold_position_mm[index - 1U];
+            const float ratio = (position_mm - lower_position) /
+                                (config->hold_position_mm[index] - lower_position);
+            return config->hold_tilt_deg[index - 1U] +
+                   ratio * (config->hold_tilt_deg[index] -
+                            config->hold_tilt_deg[index - 1U]);
+        }
+    }
+    return config->hold_tilt_deg[APP_BALL_POSITION_HOLD_MAP_POINT_COUNT - 1U];
+}
+
+static void app_ball_position_update_velocity(app_ball_position_control_t *control,
+                                              const app_ball_position_control_input_t *input)
+{
+    if (input->vision_frame_count == control->last_vision_frame_count &&
+        control->has_vision_history) {
+        return;
+    }
+
+    if (control->has_vision_history) {
+        const uint32_t elapsed_ms =
+            (uint32_t)(input->vision_sample_ms - control->last_vision_sample_ms);
+
+        if (elapsed_ms != 0U) {
+            const float raw_velocity =
+                (input->measured_mm - control->last_vision_measured_mm) * 1000.0f /
+                (float)elapsed_ms;
+            control->filtered_velocity_mm_s +=
+                control->config.velocity_filter_alpha *
+                (raw_velocity - control->filtered_velocity_mm_s);
+        }
+    } else {
+        control->filtered_velocity_mm_s = 0.0f;
+        control->has_vision_history = true;
+    }
+
+    control->last_vision_frame_count = input->vision_frame_count;
+    control->last_vision_sample_ms = input->vision_sample_ms;
+    control->last_vision_measured_mm = input->measured_mm;
 }
 
 static float app_ball_position_clamp(float value, float limit)
@@ -46,9 +120,13 @@ static void app_ball_position_publish(const app_ball_position_control_t *control
     output->i_out_deg = control->pid.i_out;
     output->d_out_deg = control->pid.d_out;
     output->output_deg = control->pid.output;
-    output->target_tilt_deg = app_ball_position_clamp(
-        control->config.sign * control->pid.output, control->config.output_limit_deg);
     output->integral = control->pid.integral;
+    output->drive_active = control->drive_active;
+    output->hold_tilt_deg = control->hold_tilt_deg;
+    output->breakaway_tilt_deg = control->breakaway_tilt_deg;
+    output->velocity_mm_s = control->filtered_velocity_mm_s;
+    output->velocity_damping_tilt_deg = control->velocity_damping_tilt_deg;
+    output->target_tilt_deg = control->target_tilt_deg;
 }
 
 static void app_ball_position_hold(app_ball_position_control_t *control,
@@ -58,6 +136,14 @@ static void app_ball_position_hold(app_ball_position_control_t *control,
 {
     PID_Position_Reset(&control->pid);
     control->has_last_update = false;
+    control->drive_active = false;
+    control->error_mm = 0.0f;
+    control->has_vision_history = false;
+    control->filtered_velocity_mm_s = 0.0f;
+    control->hold_tilt_deg = 0.0f;
+    control->breakaway_tilt_deg = 0.0f;
+    control->velocity_damping_tilt_deg = 0.0f;
+    control->target_tilt_deg = 0.0f;
     control->state = state;
     control->fault = fault;
     output->reset = true;
@@ -82,6 +168,14 @@ void app_ball_position_control_config_default(app_ball_position_control_config_t
         .output_limit_deg = 3.0f,
         .sign = -1.0f,
         .deadband_mm = 1.0f,
+        .hold_position_mm = {0.0f, 100.0f, 200.0f},
+        .hold_tilt_deg = {0.0f, 0.0f, 0.0f},
+        .engage_error_mm = 6.0f,
+        .release_error_mm = 2.0f,
+        .breakaway_positive_tilt_deg = 0.0f,
+        .breakaway_negative_tilt_deg = 0.0f,
+        .velocity_gain_deg_per_mm_s = 0.0f,
+        .velocity_filter_alpha = 0.35f,
     };
 }
 
@@ -119,6 +213,14 @@ void app_ball_position_control_reset(app_ball_position_control_t *control)
 
     PID_Position_Reset(&control->pid);
     control->has_last_update = false;
+    control->drive_active = false;
+    control->error_mm = 0.0f;
+    control->has_vision_history = false;
+    control->filtered_velocity_mm_s = 0.0f;
+    control->hold_tilt_deg = 0.0f;
+    control->breakaway_tilt_deg = 0.0f;
+    control->velocity_damping_tilt_deg = 0.0f;
+    control->target_tilt_deg = 0.0f;
 }
 
 void app_ball_position_control_step(app_ball_position_control_t *control,
@@ -168,7 +270,42 @@ void app_ball_position_control_step(app_ball_position_control_t *control,
         output->valid = true;
         output->update_due = update_due;
         if (update_due) {
-            (void)PID_Position_Calc(&control->pid, input->target_mm, input->measured_mm);
+            float command_tilt_deg;
+
+            control->error_mm = input->target_mm - input->measured_mm;
+            app_ball_position_update_velocity(control, input);
+            if (!control->drive_active &&
+                fabsf(control->error_mm) >= control->config.engage_error_mm) {
+                control->drive_active = true;
+            } else if (control->drive_active &&
+                       fabsf(control->error_mm) <= control->config.release_error_mm) {
+                control->drive_active = false;
+                PID_Position_Reset(&control->pid);
+            }
+
+            control->hold_tilt_deg = app_ball_position_hold_tilt(control, input->measured_mm);
+            control->breakaway_tilt_deg = 0.0f;
+            if (control->drive_active) {
+                (void)PID_Position_Calc(&control->pid, input->target_mm,
+                                        input->measured_mm);
+                command_tilt_deg = control->config.sign * control->pid.output;
+                if (command_tilt_deg > 0.0f) {
+                    control->breakaway_tilt_deg =
+                        control->config.breakaway_positive_tilt_deg;
+                } else if (command_tilt_deg < 0.0f) {
+                    control->breakaway_tilt_deg =
+                        -control->config.breakaway_negative_tilt_deg;
+                }
+            } else {
+                command_tilt_deg = 0.0f;
+            }
+            control->velocity_damping_tilt_deg =
+                control->config.velocity_gain_deg_per_mm_s *
+                control->filtered_velocity_mm_s;
+            control->target_tilt_deg = app_ball_position_clamp(
+                control->hold_tilt_deg + command_tilt_deg + control->breakaway_tilt_deg +
+                    control->velocity_damping_tilt_deg,
+                control->config.output_limit_deg);
             control->last_update_ms = input->now_ms;
             control->has_last_update = true;
         }

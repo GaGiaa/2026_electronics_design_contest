@@ -872,6 +872,9 @@ CAN、电机或灰度传感器硬件验收。
   使用最新有效距离，帧龄超过 `100 ms`、视觉无效、ID 3 未校准或反馈故障时清 PID 并请求 0 度校准倾角。
 - 位置环只生成 `target_tilt_deg`，仍经 JY901S 5 ms 倾角环和 `app_balance` 的归零、70--210 deg 范围、
   速度/电流/CAN 安全保护；新增 `g_h723_debug.ball_position` 和 `pipe_startup` Watch 快照以及 Keil 工程源文件登记。
+- 位置环新增三点分段线性 `hold_tilt` 补偿、`engage/release` 误差滞回、按请求倾角方向的起动补偿，
+  以及只在 K230 新帧到来时更新的低通速度阻尼。补偿、起动与速度增益默认均为零，保留原有控制行为；
+  Watch 可调参数均会校验有限值、递增坐标、非负增益和合法滞回后才生效。
 - 已通过位置 PID、启动状态机、K230 UART2 静态和球控集成静态测试；随后重新执行全部 42 个
   `tests\test_stm32h723_*.ps1`，均通过。`git diff --check` 无差异错误；以
   `D:\Keil_v5\UV4\UV4.exe -r .\stm32h723_app\MDK-ARM\stm32h723_app.uvprojx -j0`
@@ -888,3 +891,17 @@ CAN、电机或灰度传感器硬件验收。
 - 已通过新增的 `tests\test_stm32h723_ball_position_vofa.ps1`、全部 43 个 H723 测试脚本、
   文档检查和 `git diff --check`。默认关闭及临时启用该开关的两次 Keil 纯软件构建均为
   `0 Error(s), 0 Warning(s)`；未执行 UART8/VOFA 或其他实物验收。
+
+## H723 钢珠位置环摩擦与弯管补偿（2026-08-01）
+
+- `app_ball_position_control` 保持 40 Hz 位置 PID，新增三点分段线性保持倾角、双阈值滞回、
+  正/负倾角独立起动补偿和 K230 新帧速度低通阻尼。默认保持表为 0 deg、起动补偿为 0 deg、
+  速度增益为 0，因此未通过 Watch 调参时保留原控制行为。
+- Keil Watch 使用 `hold_position_mm[0..2]` 递增定义 K230 坐标，`hold_tilt_deg[0..2]` 填入各点
+  钢珠静止时的目标倾角；`engage_error_mm` 必须不小于 `release_error_mm`。`velocity_mm_s` 为朝车尾
+  的正方向，正 `velocity_gain_deg_per_mm_s` 产生相反重力方向的制动倾角。`drive_active`、
+  `hold_tilt_output_deg`、`breakaway_tilt_output_deg` 和 `velocity_damping_tilt_deg` 用于区分各分量。
+- 已通过扩展后的钢珠位置单元/集成测试、全部 43 个 H723 测试脚本、`git diff --check` 和 Keil
+  纯软件构建，日志为 `0 Error(s), 0 Warning(s)`。当前工作区将
+  `APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE` 设为 `1U` 以便现场观察；发布配置应改回 `0U`。
+  未执行 Flash、烧录、K230、UART8/VOFA、CAN、电机或钢珠实物验收。
