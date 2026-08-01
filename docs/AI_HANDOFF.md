@@ -1022,3 +1022,35 @@ CAN、电机或灰度传感器硬件验收。
   mm position map and the former `-120..120` pixel-conversion output range.
 - No Flash, SWD/GDB, UART, CAN, motor, K230, or physical operation was performed
   during this rollback.
+
+## H723 Task 3 Ball Balance and OLED Setup (2026-08-01)
+
+- Added `app_task3` as the Task 3 millimetre state machine. Selecting Task 3
+  enters the `125 mm` hold phase. The first B1 rising edge starts the timer and
+  changes the target to `225 mm`; a fresh valid K230 sample at or above `175 mm`
+  changes the target to `75 mm`; the next B1 rising edge ends the task and
+  freezes the elapsed time. Invalid or stale vision samples cannot advance the
+  state machine.
+- The task menu now contains Task 2 through Task 6 followed by `BALL SET`.
+  `BALL SET` is not a motion task: B1 captures the current fresh valid K230
+  distance into the RAM-only common target, while invalid or stale samples keep
+  the previous target and report capture failure on OLED.
+- In task mode, ID 3 always runs the ball-position loop. Task 3 temporarily
+  overrides the common target; after task completion the common target is used
+  again. In remote mode, only `SE pressed + SB middle` enables ID 3 ball
+  control. SB low, high, or any other switch state forces zero ID 3 current and
+  resets the instantaneous speed-loop PID output; returning to SB middle
+  resumes the common Watch target.
+- B1 is passed from the chassis service as a one-cycle rising-edge event, so the
+  menu confirmation edge cannot also advance the newly started Task 3. OLED
+  runtime pages show Task 3 phase, target, actual position, and elapsed time;
+  `BALL SET` shows target, actual position, and capture status.
+- `app_task3.c` is registered in the Keil project. The position-service test
+  also links this new source so the service integration build covers the new
+  state machine.
+- Fresh verification: all 44 `tests\\test_stm32h723_*.ps1` scripts passed,
+  `git diff --check` passed, and the Keil software-only rebuild produced
+  `stm32h723_app.axf` with `0 Error(s), 0 Warning(s)`.
+- No Flash, programming, SWD/GDB, CAN, UART/VOFA, K230 hardware, OLED hardware,
+  motor, steel-ball, mechanical-limit, or other physical acceptance test was
+  performed.

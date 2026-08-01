@@ -46,6 +46,7 @@ typedef struct {
     uint32_t sc_state;
     uint32_t selected_task;
     bool task_request_available;
+    bool confirm_button_pressed;
 } app_chassis_control_output_t;
 
 void app_chassis_mix(const app_crsf_input_t *input, uint32_t now_ms, app_chassis_command_t *command);

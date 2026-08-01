@@ -57,9 +57,10 @@ static void test_menu_wraps_and_reports_selected_task(void)
     assert(!app_task_menu_execution_requested());
 
     app_task_menu_key_event(APP_TASK_MENU_KEY_PREV, 200U);
-    assert(app_task_menu_current_page() == 4U);
-    assert(app_task_menu_selected_task() == 6U);
-    assert(display_state.last_task == 6U);
+    assert(app_task_menu_current_page() == 5U);
+    assert(app_task_menu_selected_task() == APP_TASK_MENU_BALANCE_SETUP_ID);
+    assert(display_state.last_task == APP_TASK_MENU_BALANCE_SETUP_ID);
+    assert(strcmp(display_state.last_title, "Ball balance setup") == 0);
 }
 
 static void test_menu_debounces_and_locks_after_confirm(void)
@@ -107,10 +108,29 @@ static void test_unimplemented_task_can_be_rejected_and_menu_unlocked(void)
     assert(app_task_menu_selected_task() == 4U);
 }
 
+static void test_balance_setup_page_emits_a_request_and_stays_selected(void)
+{
+    test_display_state_t display_state = {0};
+    const app_task_menu_display_t display = make_display(&display_state);
+    uint32_t task_id = 0U;
+
+    app_task_menu_init(&display);
+    app_task_menu_key_event(APP_TASK_MENU_KEY_PREV, 200U);
+    app_task_menu_key_event(APP_TASK_MENU_KEY_CONFIRM, 400U);
+    assert(app_task_menu_take_execution_request(&task_id));
+    assert(task_id == APP_TASK_MENU_BALANCE_SETUP_ID);
+
+    app_task_menu_finish_execution();
+    assert(app_task_menu_current_page() == 5U);
+    assert(app_task_menu_selected_task() == APP_TASK_MENU_BALANCE_SETUP_ID);
+    assert(!display_state.last_confirmed);
+}
+
 int main(void)
 {
     test_menu_wraps_and_reports_selected_task();
     test_menu_debounces_and_locks_after_confirm();
     test_unimplemented_task_can_be_rejected_and_menu_unlocked();
+    test_balance_setup_page_emits_a_request_and_stays_selected();
     return 0;
 }

@@ -42,7 +42,7 @@ static void test_menu_uses_button_mapping_and_confirm_request(void)
     assert(output.selected_task == 2U);
 
     step(&state, &input, 1U << 1U, 1U, &output);
-    assert(output.selected_task == 6U);
+    assert(output.selected_task == APP_TASK_MENU_BALANCE_SETUP_ID);
     step(&state, &input, 0U, 121U, &output);
     step(&state, &input, 1U << 2U, 122U, &output);
     assert(output.selected_task == 2U);

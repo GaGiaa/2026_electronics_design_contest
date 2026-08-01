@@ -15,6 +15,7 @@ try {
         "$appDir\App\Src\app_chassis.c" "$appDir\App\Src\app_task_menu.c" `
         "$appDir\App\Src\app_task2.c" "$appDir\App\Src\app_task4.c" `
         "$appDir\App\Src\app_task56.c" `
+        "$appDir\App\Src\app_task3.c" `
         "$appDir\App\Src\app_buttons.c" "$PSScriptRoot\stubs\gpio_state.c" `
         "$appDir\App\Src\app_m2006.c" `
         "$appDir\App\Src\app_line_follow.c" "$appDir\App\Src\app_balance.c" `

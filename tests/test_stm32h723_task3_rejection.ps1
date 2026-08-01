@@ -9,21 +9,36 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
 
 $service = Get-Content -Raw (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_chassis_service.c')
 $oled = Get-Content -Raw (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_oled.c')
+$task3 = Get-Content -Raw (Join-Path $ProjectRoot 'stm32h723_app\App\Src\app_task3.c')
+$debug = Get-Content -Raw (Join-Path $ProjectRoot 'stm32h723_app\App\Inc\app_debug.h')
 
 foreach ($pattern in @(
     'requested_task\s*==\s*3U',
-    'app_task_menu_finish_execution\(\)',
-    'app_task2_abort\(&s_task2\)',
-    'app_task4_abort\(&s_task4\)',
-    'app_task56_abort\(&s_task56\)'
+    'app_task3_start\(',
+    'app_task3_step\(',
+    'APP_TASK_MENU_BALANCE_SETUP_ID',
+    'h723_ball_position_capture_target',
+    's_control_output\.remote_takeover',
+    's_control_output\.sb_state\s*==\s*1U'
 )) {
     if ($service -notmatch $pattern) {
-        throw "Missing task 3 rejection safeguard: $pattern"
+        throw "Missing task 3 integration behavior: $pattern"
     }
 }
 
-if ($oled -notmatch 'TASK 3 N/A') {
-    throw 'OLED does not identify task 3 as unavailable.'
+if ($task3 -notmatch 'APP_TASK3_PHASE_WAIT_FINISH_KEY' -or
+    $task3 -notmatch 'measured_mm\s*>=\s*task->config.switch_threshold_mm') {
+    throw 'Task 3 does not implement the 175 mm threshold transition.'
+}
+if ($oled -match 'TASK 3 N/A|NOT IMPLEMENTED' -or
+    $oled -notmatch 'TASK 3' -or
+    $oled -notmatch 'BALL SET' -or
+    $oled -notmatch 'g_h723_debug\.task3') {
+    throw 'OLED does not render task 3 and BALL SET runtime pages.'
+}
+if ($debug -notmatch 'h723_debug_task3_t' -or
+    $debug -notmatch 'capture_status') {
+    throw 'Debug state does not expose task 3 and capture status.'
 }
 
-Write-Output 'STM32H723 task 3 rejection checks passed.'
+Write-Output 'STM32H723 task 3 integration checks passed.'

@@ -209,6 +209,21 @@ static void test_m2006_position_tracker_unwraps_and_converts_output_angle(void)
     assert(app_m2006_position_tracker_output_degrees(&tracker) == 360.0f);
 }
 
+static void test_chassis_control_reports_b1_rising_edge(void)
+{
+    app_chassis_control_state_t state;
+    app_chassis_control_output_t output;
+    app_crsf_input_t input = {0};
+
+    app_chassis_control_init(&state);
+    app_chassis_control_step(&state, &input, 0U, 0U, &output);
+    assert(!output.confirm_button_pressed);
+
+    app_chassis_control_step(&state, &input, 1U, 200U, &output);
+    assert(output.confirm_button_pressed);
+    assert(output.task_request_available);
+}
+
 int main(void)
 {
     test_crsf_manual_mix_and_switch_guard();
@@ -216,5 +231,6 @@ int main(void)
     test_m2006_feedback_and_group_command();
     test_m2006_current_conversion();
     test_m2006_position_tracker_unwraps_and_converts_output_angle();
+    test_chassis_control_reports_b1_rising_edge();
     return 0;
 }

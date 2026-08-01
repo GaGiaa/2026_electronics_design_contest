@@ -17,6 +17,7 @@
 #include "app_single_motor.h"
 #include "app_speed_profile.h"
 #include "app_task2.h"
+#include "app_task3.h"
 #include "app_task4.h"
 #include "app_task56.h"
 #include "app_task_menu.h"
@@ -75,11 +76,34 @@ static app_speed_profile_t s_remote_ball_speed_profile;
 static app_speed_profile_output_t s_remote_ball_speed_profile_output;
 static app_task2_state_t s_task2;
 static app_task2_output_t s_task2_output;
+static app_task3_t s_task3;
+static app_task3_output_t s_task3_output;
 static app_task4_state_t s_task4;
 static app_task4_output_t s_task4_output;
 static app_task56_state_t s_task56;
 static app_task56_output_t s_task56_output;
 static uint32_t s_task56_task_id;
+
+static app_task3_config_t h723_task3_config(void)
+{
+    return (app_task3_config_t){
+        .start_target_mm = APP_H723_TASK3_START_TARGET_MM,
+        .move_target_mm = APP_H723_TASK3_MOVE_TARGET_MM,
+        .switch_threshold_mm = APP_H723_TASK3_SWITCH_THRESHOLD_MM,
+        .finish_target_mm = APP_H723_TASK3_FINISH_TARGET_MM,
+    };
+}
+
+static void h723_task3_publish_debug(void)
+{
+    g_h723_debug.task3.phase = (uint32_t)s_task3_output.phase;
+    g_h723_debug.task3.running = s_task3_output.running ? 1U : 0U;
+    g_h723_debug.task3.config_valid = s_task3_output.config_valid ? 1U : 0U;
+    g_h723_debug.task3.target_mm = s_task3_output.target_mm;
+    g_h723_debug.task3.measured_mm = s_task3_output.measured_mm;
+    g_h723_debug.task3.vision_valid = s_task3_output.measured_valid ? 1U : 0U;
+    g_h723_debug.task3.elapsed_ms = s_task3_output.elapsed_ms;
+}
 
 static void h723_chassis_on_fdcan_rx(FDCAN_HandleTypeDef *fdcan);
 
@@ -406,6 +430,9 @@ void h723_chassis_service_init(void)
                          (float)APP_GRAYSCALE_TASK_PERIOD_MS / 1000.0f);
     app_task2_init(&s_task2);
     (void)memset(&s_task2_output, 0, sizeof(s_task2_output));
+    app_task3_init(&s_task3);
+    (void)memset(&s_task3_output, 0, sizeof(s_task3_output));
+    s_task3_output.config_valid = true;
     app_task4_init(&s_task4);
     (void)memset(&s_task4_output, 0, sizeof(s_task4_output));
     app_task56_init(&s_task56);
@@ -511,6 +538,22 @@ void h723_chassis_service_init(void)
     g_h723_debug.ball_position.breakaway_cooldown_ms =
         s_ball_position_config.breakaway_cooldown_ms;
     g_h723_debug.ball_position.breakaway_params_valid = 1U;
+    g_h723_debug.ball_position.capture_status = 0U;
+    g_h723_debug.ball_position.capture_count = 0U;
+    g_h723_debug.ball_position.capture_position_mm =
+        g_h723_debug.ball_position.target_mm;
+    g_h723_debug.task3.start_target_mm = APP_H723_TASK3_START_TARGET_MM;
+    g_h723_debug.task3.move_target_mm = APP_H723_TASK3_MOVE_TARGET_MM;
+    g_h723_debug.task3.switch_threshold_mm =
+        APP_H723_TASK3_SWITCH_THRESHOLD_MM;
+    g_h723_debug.task3.finish_target_mm = APP_H723_TASK3_FINISH_TARGET_MM;
+    g_h723_debug.task3.phase = APP_TASK3_PHASE_IDLE;
+    g_h723_debug.task3.running = 0U;
+    g_h723_debug.task3.config_valid = 1U;
+    g_h723_debug.task3.vision_valid = 0U;
+    g_h723_debug.task3.elapsed_ms = 0U;
+    g_h723_debug.task3.target_mm = 0.0f;
+    g_h723_debug.task3.measured_mm = 0.0f;
     g_h723_debug.ball_position_dynamic.target_mm = 0.0f;
     g_h723_debug.ball_position_dynamic.pid_kp =
         s_ball_position_dynamic_config.pid_params.kp;
@@ -864,21 +907,73 @@ static void h723_ball_position_publish_debug(const app_k230_sample_t *sample,
     debug->breakaway_offset_deg = output->breakaway_offset_deg;
 }
 
-static float h723_ball_position_service_step(uint32_t now_ms)
+static bool h723_ball_sample_is_fresh(const app_k230_sample_t *sample,
+                                      bool snapshot_available,
+                                      uint32_t sample_age_ms)
+{
+    float target_mm = 0.0f;
+
+    return sample != NULL && app_ball_position_capture_target(
+        snapshot_available, sample->valid, sample_age_ms,
+        APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS, sample->distance_mm,
+        &target_mm);
+}
+
+static void h723_task3_step(uint32_t now_ms, bool confirm_pressed)
+{
+    app_k230_sample_t sample = {0};
+    uint32_t sample_age_ms = UINT_MAX;
+    const bool snapshot_available = h723_k230_service_get_snapshot(
+        &sample, now_ms, &sample_age_ms);
+    const app_task3_input_t input = {
+        .now_ms = now_ms,
+        .confirm_pressed = confirm_pressed,
+        .measured_valid = h723_ball_sample_is_fresh(
+            &sample, snapshot_available, sample_age_ms),
+        .measured_mm = sample.distance_mm,
+    };
+
+    app_task3_step(&s_task3, &input, &s_task3_output);
+    h723_task3_publish_debug();
+}
+
+static void h723_ball_position_capture_target(uint32_t now_ms)
+{
+    app_k230_sample_t sample = {0};
+    float captured_target_mm = 0.0f;
+    uint32_t sample_age_ms = UINT_MAX;
+    const bool snapshot_available = h723_k230_service_get_snapshot(
+        &sample, now_ms, &sample_age_ms);
+
+    ++g_h723_debug.ball_position.capture_count;
+    if (app_ball_position_capture_target(
+            snapshot_available, sample.valid, sample_age_ms,
+            APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS, sample.distance_mm,
+            &captured_target_mm)) {
+        g_h723_debug.ball_position.target_mm = captured_target_mm;
+        g_h723_debug.ball_position.capture_position_mm = captured_target_mm;
+        g_h723_debug.ball_position.capture_status = 1U;
+    } else {
+        g_h723_debug.ball_position.capture_status = 2U;
+    }
+}
+
+static float h723_ball_position_service_step(uint32_t now_ms,
+                                             bool task3_active,
+                                             float task3_target_mm)
 {
     app_k230_sample_t ball_sample = {0};
     app_ball_position_control_input_t ball_input;
     uint32_t ball_sample_age_ms = UINT_MAX;
     const bool ball_snapshot_available = h723_k230_service_get_snapshot(
         &ball_sample, now_ms, &ball_sample_age_ms);
-    const bool dynamic_profile = s_command.manual_active &&
-                                 s_command.mode ==
-                                     APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_BALL;
+    const bool dynamic_profile = false;
     const bool startup_position_move = s_pipe_startup_snapshot.state ==
         APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION;
-    const bool ball_enabled = dynamic_profile ||
-                              (!dynamic_profile &&
-                               g_h723_debug.ball_position.enable != 0U);
+    const bool remote_balance_enabled = s_control_output.remote_takeover &&
+                                        s_control_output.sb_state == 1U;
+    const bool ball_enabled = !s_control_output.remote_takeover ||
+                              remote_balance_enabled;
     app_ball_position_control_t *ball_control = dynamic_profile ?
         &s_ball_position_dynamic_control : &s_ball_position_control;
 
@@ -891,8 +986,7 @@ static float h723_ball_position_service_step(uint32_t now_ms)
     }
     ball_input.now_ms = now_ms;
     ball_input.enabled = ball_enabled;
-    ball_input.target_mm = dynamic_profile ?
-        g_h723_debug.ball_position_dynamic.target_mm :
+    ball_input.target_mm = task3_active ? task3_target_mm :
         g_h723_debug.ball_position.target_mm;
     ball_input.measured_mm = ball_sample.distance_mm;
     ball_input.vision_valid = ball_snapshot_available && ball_sample.valid;
@@ -913,6 +1007,8 @@ static float h723_ball_position_service_step(uint32_t now_ms)
 static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3])
 {
     const uint32_t index = APP_H723_BALANCE_MOTOR_ID - 1U;
+    const bool remote_balance_allowed = !s_control_output.remote_takeover ||
+                                        s_control_output.sb_state == 1U;
     app_balance_step_input_t input = {
         .now_ms = now_ms,
         .feedback_valid = h723_m2006_feedback_is_fresh(index, now_ms),
@@ -927,7 +1023,8 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
     app_balance_step_output_t result;
     volatile h723_m2006_debug_t *debug = &g_h723_debug.m2006[index];
 
-    input.requested_target_position_deg = h723_ball_position_service_step(now_ms);
+    input.requested_target_position_deg = h723_ball_position_service_step(
+        now_ms, s_task3_output.running, s_task3_output.target_mm);
     if (s_pipe_startup_snapshot.state ==
         APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION) {
         /* The startup pose takes precedence over all Watch and ball-loop requests. */
@@ -968,6 +1065,10 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
     if (!s_pipe_startup_snapshot.id3_allowed &&
         s_pipe_startup_snapshot.state != APP_PIPE_STARTUP_STATE_WAIT_HOME) {
         /* Homing is allowed in WAIT_HOME; calibration and skip never energize ID 3. */
+        output_current_A[index] = 0.0f;
+        PID_Incremental_Reset(&s_balance.speed_pid);
+    }
+    if (s_control_output.remote_takeover && !remote_balance_allowed) {
         output_current_A[index] = 0.0f;
         PID_Incremental_Reset(&s_balance.speed_pid);
     }
@@ -1152,6 +1253,9 @@ void h723_chassis_service_step(uint32_t now_ms)
     uint32_t requested_task = 0U;
     bool task2_controls_chassis = false;
     bool task2_was_running = false;
+    bool task3_was_active = false;
+    bool task3_was_finished_waiting = false;
+    bool task3_started_this_cycle = false;
     bool task4_controls_chassis = false;
     bool task4_was_running = false;
     bool task56_controls_chassis = false;
@@ -1184,6 +1288,9 @@ void h723_chassis_service_step(uint32_t now_ms)
     }
     if (s_control_output.remote_takeover) {
         app_task2_abort(&s_task2);
+        app_task3_abort(&s_task3);
+        (void)memset(&s_task3_output, 0, sizeof(s_task3_output));
+        h723_task3_publish_debug();
         app_task4_abort(&s_task4);
         app_task56_abort(&s_task56);
         s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
@@ -1206,14 +1313,34 @@ void h723_chassis_service_step(uint32_t now_ms)
             s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_TASK456;
             app_line_follow_reset(&s_line_follow);
         } else if (requested_task == 3U) {
-            /* Task 3 has no executor: release the menu without issuing motion. */
+            const app_task3_config_t task3_config = h723_task3_config();
             app_task2_abort(&s_task2);
             app_task4_abort(&s_task4);
             app_task56_abort(&s_task56);
+            app_task3_start(&s_task3, &task3_config, now_ms);
+            task3_started_this_cycle = true;
             s_line_follow_active_group = APP_H723_LINE_FOLLOW_GROUP_COMMON;
             app_line_follow_reset(&s_line_follow);
+        } else if (requested_task == APP_TASK_MENU_BALANCE_SETUP_ID) {
+            h723_ball_position_capture_target(now_ms);
             app_task_menu_finish_execution();
         }
+    }
+    task3_was_active = s_task3.phase != APP_TASK3_PHASE_IDLE &&
+                       s_task3.phase != APP_TASK3_PHASE_FAULT;
+    if (!s_control_output.remote_takeover && task3_was_active) {
+        task3_was_finished_waiting =
+            s_task3.phase == APP_TASK3_PHASE_WAIT_FINISH_KEY;
+        h723_task3_step(now_ms, !task3_started_this_cycle &&
+                        s_control_output.confirm_button_pressed);
+        if (task3_was_finished_waiting &&
+            s_task3.phase == APP_TASK3_PHASE_IDLE) {
+            app_task_menu_finish_execution();
+        }
+    } else if (s_task3.phase == APP_TASK3_PHASE_FAULT) {
+        app_task_menu_finish_execution();
+        (void)memset(&s_task3_output, 0, sizeof(s_task3_output));
+        h723_task3_publish_debug();
     }
     task2_was_running = !s_control_output.remote_takeover &&
                         (s_task2.phase == APP_TASK2_PHASE_RUNNING);
@@ -1221,7 +1348,12 @@ void h723_chassis_service_step(uint32_t now_ms)
                         (s_task4.phase == APP_TASK4_PHASE_RUNNING);
     task56_was_running = !s_control_output.remote_takeover &&
                          (s_task56.phase == APP_TASK56_PHASE_RUNNING);
-    if (!s_control_output.remote_takeover &&
+    if (!s_control_output.remote_takeover && task3_was_active) {
+        s_command.mode = APP_CHASSIS_MODE_TASK_MENU;
+        s_command.manual_active = false;
+        s_command.left_target_rpm = 0.0f;
+        s_command.right_target_rpm = 0.0f;
+    } else if (!s_control_output.remote_takeover &&
         (s_task2.phase == APP_TASK2_PHASE_RUNNING)) {
         const app_task2_input_t task2_input = {
             .now_ms = now_ms,
@@ -1328,6 +1460,8 @@ void h723_chassis_service_step(uint32_t now_ms)
         s_control_output.task_request_available ? 1U : 0U;
     if (s_control_output.selected_task == 2U) {
         g_h723_debug.control.active_task_elapsed_ms = s_task2_output.elapsed_ms;
+    } else if (s_control_output.selected_task == 3U) {
+        g_h723_debug.control.active_task_elapsed_ms = s_task3_output.elapsed_ms;
     } else if (s_control_output.selected_task == 4U) {
         g_h723_debug.control.active_task_elapsed_ms = s_task4_output.elapsed_ms;
     } else if ((s_control_output.selected_task == 5U) ||
@@ -1346,6 +1480,7 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.task2.elapsed_ms = s_task2_output.elapsed_ms;
     g_h723_debug.task2.distance_mm = 0.0f;
     g_h723_debug.task2.base_speed_mm_s = s_task2_output.base_speed_mm_s;
+    h723_task3_publish_debug();
     g_h723_debug.task4.phase = (uint32_t)s_task4_output.phase;
     g_h723_debug.task4.running = s_task4_output.running ? 1U : 0U;
     g_h723_debug.task4.elapsed_ms = s_task4_output.elapsed_ms;

@@ -43,6 +43,22 @@ static bool app_ball_position_config_is_valid(
            params->output_limit > 0.0f && params->deadband >= 0.0f;
 }
 
+bool app_ball_position_capture_target(bool snapshot_available,
+                                      bool sample_valid,
+                                      uint32_t sample_age_ms,
+                                      uint32_t max_age_ms,
+                                      float measured_mm,
+                                      float *target_mm)
+{
+    if (target_mm == NULL || !snapshot_available || !sample_valid ||
+        max_age_ms == 0U || sample_age_ms > max_age_ms ||
+        !isfinite(measured_mm)) {
+        return false;
+    }
+    *target_mm = measured_mm;
+    return true;
+}
+
 static float app_ball_position_hold_motor_position(
     const app_ball_position_control_t *control, float position_mm)
 {

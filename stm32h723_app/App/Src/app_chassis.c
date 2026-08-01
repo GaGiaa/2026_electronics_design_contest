@@ -98,6 +98,7 @@ void app_chassis_control_step(app_chassis_control_state_t *state,
 {
     uint32_t rising_buttons;
     bool se_pressed = false;
+    bool confirm_button_pressed = false;
 
     if (state == NULL || output == NULL) {
         return;
@@ -128,6 +129,7 @@ void app_chassis_control_step(app_chassis_control_state_t *state,
     if (!se_pressed) {
         rising_buttons = button_stable_high_mask & ~state->last_button_mask;
         if ((rising_buttons & (1U << 0U)) != 0U) {
+            confirm_button_pressed = true;
             app_task_menu_key_event(APP_TASK_MENU_KEY_CONFIRM, now_ms);
         }
         if ((rising_buttons & (1U << 1U)) != 0U) {
@@ -153,6 +155,7 @@ void app_chassis_control_step(app_chassis_control_state_t *state,
     state->previous_se_pressed = se_pressed;
     output->selected_task = app_task_menu_selected_task();
     output->task_request_available = app_task_menu_execution_requested();
+    output->confirm_button_pressed = confirm_button_pressed;
     if (!se_pressed) {
         output->mode = APP_CHASSIS_MODE_TASK_MENU;
         output->chassis.mode = APP_CHASSIS_MODE_TASK_MENU;

@@ -141,15 +141,20 @@ foreach ($line in @(
     '0xAEU',
     '0xAFU',
     '#include "app_task2.h"',
+    '#include "app_task3.h"',
     '#include "app_task56.h"',
     'board_oled_write_string',
     'render_runtime_page',
     'REMOTE CONTROL',
     'TASK MENU',
     'TASK 2',
+    'TASK 3',
     'TASK 4',
     'TASK 5',
     'TASK 6',
+    'BALL SET',
+    'show_task3',
+    'g_h723_debug.task3.elapsed_ms',
     'MOVE PIPE',
     'TARGET:%.0f',
     'WAIT:SETTLE',
@@ -158,6 +163,7 @@ foreach ($line in @(
     'TIME:%lu.%03lus',
     'g_h723_debug.control',
     'g_h723_debug.task2',
+    'g_h723_debug.task3',
     'selected_task',
     'APP_TASK2_PHASE_STOPPED',
     'APP_TASK4_PHASE_STOPPED',
@@ -175,6 +181,10 @@ foreach ($line in @(
     's_service_initialized = false'
 )) {
     Require-Text $oledSource $line "Missing SSD1306 OLED behavior: $line"
+}
+
+if ($oledSource -notmatch '(?s)else if \(show_task3\).*?TIME:%lu\.%03lus') {
+    throw 'Task 3 OLED page must render its elapsed time.'
 }
 
 foreach ($line in @(

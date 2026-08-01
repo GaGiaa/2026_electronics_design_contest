@@ -98,6 +98,12 @@ typedef struct {
 } app_ball_position_control_t;
 
 void app_ball_position_control_config_default(app_ball_position_control_config_t *config);
+bool app_ball_position_capture_target(bool snapshot_available,
+                                      bool sample_valid,
+                                      uint32_t sample_age_ms,
+                                      uint32_t max_age_ms,
+                                      float measured_mm,
+                                      float *target_mm);
 void app_ball_position_control_init(app_ball_position_control_t *control,
                                     const app_ball_position_control_config_t *config);
 void app_ball_position_control_reset(app_ball_position_control_t *control);

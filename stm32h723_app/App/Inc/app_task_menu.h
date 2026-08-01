@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define APP_TASK_MENU_BALANCE_SETUP_ID 7U
+
 typedef enum {
     APP_TASK_MENU_KEY_PREV = 0,
     APP_TASK_MENU_KEY_NEXT,
@@ -23,7 +25,7 @@ typedef struct {
 } app_task_menu_display_t;
 
 /**
- * @brief 初始化任务 2 至任务 6 的选择菜单。
+ * @brief 初始化任务 2 至任务 6 以及钢珠平衡点设定页的菜单。
  *
  * @param[in] display 可为空的显示适配器。
  */

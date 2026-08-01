@@ -717,6 +717,11 @@
               <FilePath>../App/Src/app_task2.c</FilePath>
             </File>
             <File>
+              <FileName>app_task3.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/Src/app_task3.c</FilePath>
+            </File>
+            <File>
               <FileName>app_task4.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/Src/app_task4.c</FilePath>

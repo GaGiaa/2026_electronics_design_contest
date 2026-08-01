@@ -140,6 +140,20 @@ typedef struct {
 } h723_debug_task56_t;
 
 typedef struct {
+    float start_target_mm;
+    float move_target_mm;
+    float switch_threshold_mm;
+    float finish_target_mm;
+    float target_mm;
+    float measured_mm;
+    uint32_t phase;
+    uint32_t running;
+    uint32_t config_valid;
+    uint32_t vision_valid;
+    uint32_t elapsed_ms;
+} h723_debug_task3_t;
+
+typedef struct {
     uint32_t rx_count;
     uint32_t tx_count;
     uint32_t tx_error_count;
@@ -394,6 +408,9 @@ typedef struct {
     uint32_t breakaway_trigger_count;
     uint32_t breakaway_stall_elapsed_ms;
     float breakaway_offset_deg;
+    uint32_t capture_status;
+    uint32_t capture_count;
+    float capture_position_mm;
 } h723_debug_ball_position_t;
 
 typedef struct {
@@ -458,6 +475,7 @@ typedef struct {
     h723_debug_crsf_t crsf;
     h723_debug_control_t control;
     h723_debug_task2_t task2;
+    h723_debug_task3_t task3;
     h723_debug_task4_t task4;
     h723_debug_task56_t task56;
     h723_debug_chassis_t chassis;

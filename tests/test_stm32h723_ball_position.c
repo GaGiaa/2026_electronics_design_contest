@@ -47,6 +47,24 @@ static app_ball_position_control_input_t make_input(uint32_t now_ms)
     };
 }
 
+static void test_capture_target_accepts_only_fresh_valid_position(void)
+{
+    float target_mm = 125.0f;
+
+    assert(app_ball_position_capture_target(true, true, 20U, 100U,
+                                            175.0f, &target_mm));
+    assert(target_mm == 175.0f);
+    assert(!app_ball_position_capture_target(false, true, 20U, 100U,
+                                             190.0f, &target_mm));
+    assert(target_mm == 175.0f);
+    assert(!app_ball_position_capture_target(true, true, 101U, 100U,
+                                             190.0f, &target_mm));
+    assert(target_mm == 175.0f);
+    assert(!app_ball_position_capture_target(true, false, 20U, 100U,
+                                             190.0f, &target_mm));
+    assert(target_mm == 175.0f);
+}
+
 static void test_positive_error_requests_positive_motor_offset(void)
 {
     app_ball_position_control_t control;
@@ -414,6 +432,7 @@ static void test_default_configuration_matches_tuned_watch_values(void)
 
 int main(void)
 {
+    test_capture_target_accepts_only_fresh_valid_position();
     test_positive_error_requests_positive_motor_offset();
     test_hold_map_interpolates_motor_position();
     test_updates_at_50_hz_only();

@@ -9,7 +9,8 @@ static const char *const s_task_titles[APP_TASK_MENU_PAGE_COUNT] = {
     "Task 3: ball +5cm to -5cm",
     "Task 4: carry ball through B",
     "Task 5: lap and pass A",
-    "Task 6: lap and stop ball"
+    "Task 6: lap and stop ball",
+    "Ball balance setup"
 };
 
 static app_task_menu_display_t s_display;
@@ -22,7 +23,8 @@ static uint32_t s_last_key_ms;
 
 static uint32_t app_task_menu_page_to_task(uint32_t page)
 {
-    return APP_TASK_MENU_FIRST_TASK_ID + page;
+    return page == APP_TASK_MENU_PAGE_COUNT - 1U ?
+        APP_TASK_MENU_BALANCE_SETUP_ID : APP_TASK_MENU_FIRST_TASK_ID + page;
 }
 
 static void app_task_menu_render(void)
