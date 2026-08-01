@@ -10,16 +10,9 @@
 #define APP_K230_VALID_FALSE 0x00U
 #define APP_K230_VALID_TRUE 0x01U
 
-/* K230 pixel-to-pipe calibration for the 1920x1080 camera view. */
-#define APP_K230_PX_CENTER 993.0f
-#define APP_K230_PX_PER_MM 6.575f
-#define APP_K230_CAMERA_HEIGHT_MM 24.5f
-#define APP_K230_BALL_TRAVEL_MAX_MM 120.0f
-
-/** K230 视觉协议的最新合法帧快照。pixel_x 是原始像素坐标。 */
+/** K230 钢珠位置协议的最新合法帧快照。距离单位为相对零点的有符号 mm。 */
 typedef struct {
-    float pixel_x;
-    float ball_position_mm;
+    float distance_mm;
     uint32_t valid_frame_count;
     uint32_t crc_error_count;
     uint32_t format_error_count;
@@ -43,7 +36,7 @@ void app_k230_parser_init(app_k230_parser_t *parser);
 /**
  * @brief 向解析器输入一个 UART 字节，并在收到合法完整帧时更新测量快照。
  *
- * CRC 覆盖包头、有效标志和像素字段。`valid=0` 的合法帧仍保留原始像素值；
+ * CRC 覆盖包头、有效标志和距离字段。`valid=0` 的合法帧发布 `0.0f` 距离；
  * CRC 或格式错误帧不覆盖既有快照。
  *
  * @param[in,out] parser 已初始化的解析状态。
@@ -55,8 +48,5 @@ void app_k230_parser_init(app_k230_parser_t *parser);
  */
 bool app_k230_parser_feed(app_k230_parser_t *parser, uint8_t byte,
                           uint32_t now_ms, app_k230_sample_t *sample);
-
-/** Convert a camera X coordinate to the ball position on the tilted pipe. */
-float app_k230_pixel_to_ball_mm(float pixel_x, float pipe_tilt_deg);
 
 #endif

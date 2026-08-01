@@ -324,34 +324,11 @@ this dynamic instance. `g_h723_debug.ball_position.active_profile`
 is `1` for the dynamic loop and `0` for the stationary loop, so the existing
 13-channel ball-position VOFA frame continues to show whichever loop is active.
 
-The dynamic loop uses the tuned static position PID defaults (`Kp=2.0`,
-`Ki=0.0`, `Kd=0.8`, `output_limit_deg=360`, `pid_deadband_mm=0.5`) and the
-same derivative-on-measurement calculation. Its PID offset is added to the
-fixed `134 deg` motor-position base. It does not use the static three-point
-hold map or breakaway pulse, and the dynamic PID fields remain editable through
-Keil Watch for later tuning.
-
 The dynamic loop remains subject to the same ID3 homing, K230 validity, and
 100 ms vision-age gates. A failed gate clears the active position PID and holds
 the last safe motor-position target. Initial vehicle testing must be performed
 with the chassis lifted and the ball retained, beginning with low speed and low
 PID gain; this software was not flashed or physically accepted during development.
-
-## K230 Pixel Coordinate Conversion
-
-USART2 keeps the existing 9-byte K230 frame and CRC-16 protocol, but the
-little-endian float payload is now the camera X coordinate `pixel_x`, not a
-physical distance. `app_k230_pixel_to_ball_mm()` converts it to the pipe
-coordinate using the 993.0 pixel center, 6.575 pixel/mm scale, 24.5 mm camera
-height, and a +/-120 mm physical limit. The chassis service applies perspective
-correction using the current ID3 actual relative angle and
-`pipe_tilt_deg = (155.0 - motor_deg) * 0.0747`.
-
-The position controllers continue to consume millimetres through
-`ball_position_mm`. `g_h723_debug.ball_vision` exposes the raw pixel,
-corrected position, pipe tilt, validity, age, parser errors, and DMA state.
-K230 diagnostic VOFA uses five channels in this order: `pixel_x`,
-`ball_position_mm`, `pipe_tilt_deg`, `valid`, and `frame_age_ms`.
 
 This checkout explicitly sets `APP_H723_CHASSIS_ACTUATION_ENABLE=1U`; nonzero
 current commands are therefore possible once every CRSF, switch, and feedback

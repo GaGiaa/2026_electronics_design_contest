@@ -20,7 +20,6 @@ static app_ball_position_control_config_t make_config(void)
         },
         .output_limit_deg = 3.0f,
         .sign = 1.0f,
-        .use_hold_position_map = true,
         .deadband_mm = 1.0f,
         .hold_position_mm = {0.0f, 100.0f, 200.0f},
         .hold_motor_position_deg = {120.0f, 134.0f, 148.0f},
@@ -83,25 +82,6 @@ static void test_hold_map_interpolates_motor_position(void)
     assert(!output.drive_active);
     assert(fabsf(output.hold_motor_position_deg - 141.0f) < 0.0001f);
     assert(fabsf(output.target_motor_position_deg - 141.0f) < 0.0001f);
-}
-
-static void test_fixed_base_ignores_hold_map(void)
-{
-    app_ball_position_control_t control;
-    app_ball_position_control_config_t config = make_config();
-    app_ball_position_control_input_t input = make_input(0U);
-    app_ball_position_control_output_t output;
-
-    config.use_hold_position_map = false;
-    config.safe_motor_position_deg = 134.0f;
-    input.target_mm = 150.0f;
-    input.measured_mm = 150.0f;
-    app_ball_position_control_init(&control, &config);
-    app_ball_position_control_step(&control, &input, &output);
-
-    assert(!output.drive_active);
-    assert(fabsf(output.hold_motor_position_deg - 134.0f) < 0.0001f);
-    assert(fabsf(output.target_motor_position_deg - 134.0f) < 0.0001f);
 }
 
 static void test_updates_at_50_hz_only(void)
@@ -436,7 +416,6 @@ int main(void)
 {
     test_positive_error_requests_positive_motor_offset();
     test_hold_map_interpolates_motor_position();
-    test_fixed_base_ignores_hold_map();
     test_updates_at_50_hz_only();
     test_deadband_and_offset_limit();
     test_integral_freezes_inside_engage_release_hysteresis_band();

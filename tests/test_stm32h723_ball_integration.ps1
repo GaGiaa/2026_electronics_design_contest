@@ -47,22 +47,10 @@ foreach ($line in @(
     'h723_k230_service_get_snapshot',
     'output_current_A[index] = 0.0f;'
 )) { Require-Text $chassis $line "Missing ball-control chassis integration: $line" }
-Require-Text $ballControl 'PID_Position_Calc_DerivativeOnMeasurement' `
-    'Ball-position PID must use derivative-on-measurement calculation.'
-
-foreach ($line in @(
-    'app_k230_pixel_to_ball_mm',
-    'ball_sample.pixel_x',
-    'ball_sample.ball_position_mm',
-    'input.feedback_position_deg - s_balance.zero_offset_deg',
-    '(155.0f - motor_position_deg) * 0.0747f',
-    'input.feedback_valid'
-)) { Require-Text $chassis $line "Missing vision perspective correction integration: $line" }
 
 foreach ($line in @(
     'hold_position_mm',
     'hold_motor_position_deg',
-    'use_hold_position_map',
     'target_motor_position_deg',
     'breakaway_enable',
     'breakaway_pulse_deg',
@@ -73,14 +61,6 @@ foreach ($line in @(
     'breakaway_trigger_count',
     'breakaway_stall_elapsed_ms'
 )) { Require-Text ($chassis + "`n" + $debug) $line "Missing ball-control tuning integration: $line" }
-
-Require-Text $chassis 's_ball_position_dynamic_config.use_hold_position_map = false;' `
-    'Dynamic ball control must use a fixed base instead of the static hold map.'
-Require-Text $chassis 's_ball_position_dynamic_config.pid_params = s_ball_position_config.pid_params;' `
-    'Dynamic ball control must inherit the tuned static PID defaults.'
-if ($chassis -match 's_ball_position_dynamic_config\s*=\s*s_ball_position_config\s*;') {
-    throw 'Dynamic ball control must not copy the static three-point configuration.'
-}
 
 foreach ($line in @(
     'g_h723_debug.ball_position.enable = 1U;',

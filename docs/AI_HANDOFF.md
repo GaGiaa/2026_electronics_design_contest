@@ -11,35 +11,6 @@
 
 ## H723 合并任务菜单、循迹与定时任务（2026-08-01）
 
-## H723 任务 4 距离式循迹速度曲线（2026-08-01）
-
-- 将 `app_task4` 从纯时间-based 速度曲线替换为编码器里程-based 梯形速度曲线。
-  底盘服务通过 `h723_average_distance_mm()` 取左右轮 `app_m2006_position_tracker`
-  输出轴角度平均值换算为车轮圆周距离，传入 `app_task4_input_t`。任务启动时记录
-  `start_distance_mm`，`step()` 中计算已驶里程，`get_output()` 中按已驶距离
-  （加速段比例爬升 → 匀速段 → 制动段线性递减）输出目标速度。
-- 停止条件为已驶里程 ≥ `APP_H723_TASK4_A_TO_B_DISTANCE_MM`（1500 mm），同时保留
-  `APP_H723_TASK4_RUN_TIMEOUT_MS` 从 10000 ms 收紧为 8000 ms 作为安全超时。
-  速度曲线中的加速和制动距离以 `APP_H723_TASK4_ACCEL_DISTANCE_MM` 和
-  `APP_H723_TASK4_BRAKE_DISTANCE_MM` 配置（均为 612.5 mm：350²/(2×100)），
-  全程不使用 `sqrtf`，仅用线性比例计算。
-- `app_task4_start()` 签名新增 `float distance_mm` 参数以记录起点里程快照；
-  `app_task4_state_t` 新增 `start_distance_mm` 和 `traveled_distance_mm`；
-  `app_task4_output_t` 和 `h723_debug_task4_t` 新增 `distance_mm` 字段。
-  钢球平衡由 `app_tilt_control` 在 1 ms 底盘循环中独立运行，任务 4 不做额外处理。
-- 新增 `test_stm32h723_task4_integration.ps1`，检查底盘服务的距离接入、任务
-  状态机集成、配置宏默认值和 debug 结构体字段；旧时间-based 测试用例已改写为
-  距离-based 加速、匀速、制动和停车验证。
-- 验证：全部 39 个 `tests/test_stm32h723_*.ps1` 均通过（H723_FAIL_COUNT=0）；
-  Keil 纯软件重建在 stash 旧代码对比后确认 1 个 Error 为已存在的 FreeRTOS
-  `port.c` 中的 `SystemCoreClock` 引用（与本轮改动无关），本轮修改的文件编译
-  仅产生预期的 struct padding 警告，无新增 Error。未执行 Flash、烧录、
-  SWD/GDB、CAN、编码器、电机、JY901S、灰度或实物里程/制动验收。
-  首次联动应车架悬空并可立即断电，先在低占空比下确认编码器距离单位、符号和
-  两组 tracker 的连续累计，再逐步提高目标速度。
-
-## H723 合并任务菜单、循迹与定时任务（2026-08-01）
-
 - 以 `8b87ba111e11fcabf31d808320cf9bd032d12416` 为共同基线，选择性合并无 Git 对方目录中的 H723
   任务与灰度循迹源码。导入 `app_task4`、`app_task56`、任务菜单完成接口、任务 2 简化停车逻辑、
   OLED 运行页、分组巡线 PID、任务/遥测测试和 Keil 工程源文件登记；未导入 `.o`、`.d`、`.axf`、
@@ -1009,18 +980,6 @@ CAN、电机或灰度传感器硬件验收。
   全部 `tests\test_stm32h723_*.ps1` 以及 `git diff --check`。
 - 本轮未执行 Flash、烧录、SWD/GDB、CAN、电机、UART8/VOFA 或其他实物验收；提高比例增益后，
   首次实物调试仍须车架悬空并从低目标位移、低电流限制开始确认反馈方向和响应。
-
-## H723 Dynamic Ball PID Update (2026-08-01)
-
-- The dynamic ball-position controller inherits the stationary PID defaults:
-  `Kp=2.0`, `Ki=0.0`, `Kd=0.8`, `output_limit_deg=360`, and
-  `pid_deadband_mm=0.5`.
-- Both loops use derivative-on-measurement calculation. Dynamic PID state stays
-  independent and remains tunable through `g_h723_debug.ball_position_dynamic`.
-- Dynamic output is the PID offset plus a fixed `134 deg` motor-position base.
-  It does not consume the stationary three-point hold map or breakaway pulse.
-- No Flash, SWD/GDB, CAN, motor, or physical ball acceptance was performed.
-
 ## H723 K230 像素坐标透视修正（2026-08-01）
 
 - K230 UART2 的 9 字节协议保持不变，但 payload 的 float32 语义改为摄像头像素 X 坐标，
@@ -1035,3 +994,31 @@ CAN、电机或灰度传感器硬件验收。
 - 已通过 K230 UART2 单元测试、UART2 静态集成测试和钢球控制集成静态测试。全量测试、
   Keil 纯软件构建及硬件验收状态以本轮最终验证结果为准；未执行 Flash、烧录、SWD/GDB、
   K230 实物通信、UART/VOFA 实物接收或电机联动验收。
+
+## H723 Reverted Commits (2026-08-01)
+
+- Reverted merge commit `994d00a17456e663bd4912c642a969a94354d906` with
+  revert commit `9f4c845`. The dynamic ball-position PID additions were
+  removed while the later K230 perspective-correction record was retained.
+- Reverted merge commit `d9bb017149765be6ce2d1cb6b0d3693f8fe3bbbb` with
+  revert commit `dfded67`. The encoder-distance Task 4 speed-planning
+  changes, related tests, debug fields, editor tasks, and handoff section
+  were removed.
+- This rollback only changes software history. No Flash, SWD/GDB, UART,
+  CAN, motor, K230, steel-ball, or other physical operation was performed.
+- Verification after the rollback passed: all 43 `tests/test_stm32h723_*.ps1`
+  scripts passed, `git diff --check` passed, and the Keil software-only build
+  produced `stm32h723_app.axf` with `0 Error(s), 0 Warning(s)`.
+
+## H723 K230 Perspective Rollback (2026-08-01)
+
+- Reverted merge commit `9348f858bd5e496cb37789251f2b6afc2697edb9` with the
+  current revert operation. The K230 payload is restored to `distance_mm`;
+  pixel-X parsing, perspective conversion, pipe-tilt calculation, and related
+  pixel diagnostics are no longer part of the active control path.
+- The active path is again K230 UART2 `distance_mm` -> 50 Hz ball-position PID
+  -> ID3 output-axis position target -> `app_balance` cascade control.
+- This rollback removes the coordinate-frame mismatch between the `20/125/230`
+  mm position map and the former `-120..120` pixel-conversion output range.
+- No Flash, SWD/GDB, UART, CAN, motor, K230, or physical operation was performed
+  during this rollback.

@@ -32,7 +32,6 @@ typedef struct {
     PID_Position_Param_Config pid_params;
     float output_limit_deg;
     float sign;
-    bool use_hold_position_map;
     float deadband_mm;
     float hold_position_mm[APP_BALL_POSITION_HOLD_MAP_POINT_COUNT];
     float hold_motor_position_deg[APP_BALL_POSITION_HOLD_MAP_POINT_COUNT];

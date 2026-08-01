@@ -129,7 +129,6 @@ typedef struct {
     uint32_t running;
     uint32_t elapsed_ms;
     float base_speed_mm_s;
-    float distance_mm;
 } h723_debug_task4_t;
 
 typedef struct {
@@ -341,9 +340,7 @@ typedef struct {
 } h723_debug_bno055_t;
 
 typedef struct {
-    float pixel_x;
-    float ball_position_mm;
-    float pipe_tilt_deg;
+    float distance_mm;
     uint32_t valid;
     uint32_t valid_frame_count;
     uint32_t crc_error_count;

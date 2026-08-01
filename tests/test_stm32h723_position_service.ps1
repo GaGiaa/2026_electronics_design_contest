@@ -21,7 +21,6 @@ try {
         "$appDir\App\Src\app_speed_profile.c" `
         "$appDir\App\Src\app_ball_position_control.c" `
         "$appDir\App\Src\app_pipe_startup.c" `
-        "$appDir\App\Src\app_k230.c" `
         "$PSScriptRoot\test_support\stm32h723_service\app_k230_service_stub.c" `
         "$appDir\App\Src\app_single_motor.c" "$appDir\App\Src\app_chassis_service.c" `
         "$PSScriptRoot\test_stm32h723_position_service.c" '-lm' '-o' $output
