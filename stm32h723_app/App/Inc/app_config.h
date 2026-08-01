@@ -109,7 +109,7 @@
 #define APP_H723_K230_UART2_TEST_ENABLE 0U
 #endif
 
-/* K230 distance frames are part of the production steel-ball feedback path. */
+/* K230 pixel frames are part of the production steel-ball feedback path. */
 #ifndef APP_H723_K230_UART2_ENABLE
 #define APP_H723_K230_UART2_ENABLE 1U
 #endif
