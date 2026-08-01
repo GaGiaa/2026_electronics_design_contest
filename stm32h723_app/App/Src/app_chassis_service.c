@@ -482,8 +482,8 @@ void h723_chassis_service_init(void)
     g_h723_debug.balance.target_position_deg = 0.0f;
     g_h723_debug.balance.rehome_request = 0U;
     g_h723_debug.balance.allow_extended_position_range = 0U;
-    g_h723_debug.ball_position.enable = 0U;
-    g_h723_debug.ball_position.target_mm = 0.0f;
+    g_h723_debug.ball_position.enable = 1U;
+    g_h723_debug.ball_position.target_mm = 125.0f;
     g_h723_debug.ball_position.pid_kp = s_ball_position_config.pid_params.kp;
     g_h723_debug.ball_position.pid_ki = s_ball_position_config.pid_params.ki;
     g_h723_debug.ball_position.pid_kd = s_ball_position_config.pid_params.kd;

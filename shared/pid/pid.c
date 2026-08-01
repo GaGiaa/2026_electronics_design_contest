@@ -185,9 +185,10 @@ void PID_Position_Reset(PID_Position *pid)
     pid->d_out = 0.0f;
     pid->output = 0.0f;
     pid->has_last_error = false;
+    pid->last_feedback = 0.0f;
+    pid->has_last_feedback = false;
 #if (PID_POSITION_CONFIG_VARIANT == PID_POSITION_VARIANT_ADVANCED)
     pid->last_target = 0.0f;
-    pid->last_feedback = 0.0f;
     pid->filtered_derivative = 0.0f;
     pid->filtered_output = 0.0f;
     pid->has_last_sample = false;
@@ -195,7 +196,7 @@ void PID_Position_Reset(PID_Position *pid)
 }
 
 static float pid_position_calc(PID_Position *pid, float target, float feedback,
-                               bool integrate)
+                               bool integrate, bool derivative_on_measurement)
 {
     float error;
 
@@ -214,12 +215,16 @@ static float pid_position_calc(PID_Position *pid, float target, float feedback,
         const float c = isfinite(pid->params.setpoint_weight_c) ? pid->params.setpoint_weight_c : 0.0f;
         const float anti_windup_gain = pid_param_or_default(pid->params.anti_windup_gain, 1.0f);
         const float proportional_error = (b * target) - feedback;
-        const float derivative_input = (c * target) - feedback;
+        const float derivative_input = derivative_on_measurement ? -feedback :
+                                       ((c * target) - feedback);
+        const float last_derivative_input = derivative_on_measurement ?
+                                            -pid->last_feedback :
+                                            ((c * pid->last_target) - pid->last_feedback);
         float raw_derivative = 0.0f;
         float raw_output;
 
         if (pid->has_last_sample) {
-            raw_derivative = (derivative_input - ((c * pid->last_target) - pid->last_feedback)) / pid->dt_s;
+            raw_derivative = (derivative_input - last_derivative_input) / pid->dt_s;
         }
         pid->filtered_derivative = pid_first_order_filter(pid->filtered_derivative,
                                                           raw_derivative,
@@ -259,7 +264,6 @@ static float pid_position_calc(PID_Position *pid, float target, float feedback,
             pid->filtered_output = pid->output;
         }
         pid->last_target = target;
-        pid->last_feedback = feedback;
         pid->has_last_sample = true;
     }
 #else
@@ -269,7 +273,12 @@ static float pid_position_calc(PID_Position *pid, float target, float feedback,
     if (integrate) {
         pid->integral += error * pid->dt_s;
     }
-    derivative = pid->has_last_error ? ((error - pid->last_error) / pid->dt_s) : 0.0f;
+    if (derivative_on_measurement) {
+        derivative = pid->has_last_feedback ?
+                         -(feedback - pid->last_feedback) / pid->dt_s : 0.0f;
+    } else {
+        derivative = pid->has_last_error ? ((error - pid->last_error) / pid->dt_s) : 0.0f;
+    }
     pid->p_out = pid->params.kp * error;
     pid->i_out = pid->params.ki * pid->integral;
     pid->d_out = pid->params.kd * derivative;
@@ -280,6 +289,8 @@ static float pid_position_calc(PID_Position *pid, float target, float feedback,
     }
 #endif
 
+    pid->last_feedback = feedback;
+    pid->has_last_feedback = true;
     pid->last_error = error;
     pid->has_last_error = true;
     return pid->output;
@@ -287,10 +298,23 @@ static float pid_position_calc(PID_Position *pid, float target, float feedback,
 
 float PID_Position_Calc(PID_Position *pid, float target, float feedback)
 {
-    return pid_position_calc(pid, target, feedback, true);
+    return pid_position_calc(pid, target, feedback, true, false);
+}
+
+float PID_Position_Calc_DerivativeOnMeasurement(PID_Position *pid, float target,
+                                                float feedback)
+{
+    return pid_position_calc(pid, target, feedback, true, true);
+}
+
+float PID_Position_Calc_DerivativeOnMeasurement_NoIntegral(PID_Position *pid,
+                                                           float target,
+                                                           float feedback)
+{
+    return pid_position_calc(pid, target, feedback, false, true);
 }
 
 float PID_Position_Calc_NoIntegral(PID_Position *pid, float target, float feedback)
 {
-    return pid_position_calc(pid, target, feedback, false);
+    return pid_position_calc(pid, target, feedback, false, false);
 }

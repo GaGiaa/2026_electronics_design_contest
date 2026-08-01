@@ -800,6 +800,27 @@ VOFA+ 曲线接收和 UART 物理链路仍需硬件验收。
 用户明确要求执行 `git commit` 时，提交信息必须使用详细中文，说明改动目的、主要内容
 和验证结果；不得只使用笼统的英文标题或过于简短的提交说明。
 
+## H723 Ball Position PID Derivative-on-Measurement (2026-08-01)
+
+- The `g_h723_debug.ball_position` steel-ball position loop now uses a
+  dedicated derivative-on-measurement position PID API. Its D term is
+  `-Kd * (measured_now - measured_prev) / dt`, so a target-position step with
+  unchanged vision feedback does not create derivative kick.
+- The existing `PID_Position_Calc()` and all other position-loop callers retain
+  their previous error-derivative behavior. The new API also has a no-integral
+  variant for the ball-position hysteresis path. PID measurement history is
+  cleared by `PID_Position_Reset()` and the first valid sample produces zero D.
+- Regression coverage was added to
+  `tests/test_stm32h723_ball_position.c`. The ball-position unit test passed.
+  No Flash, SWD/GDB, UART/VOFA, K230, CAN, motor, steel-ball, or mechanical
+  hardware validation was performed.
+- The default stationary Watch configuration now matches the tuning snapshot:
+  enabled, target `125 mm`, `Kp=2.0`, `Ki=0`, `Kd=0.8`, output limit `360 deg`,
+  deadband and engage/release hysteresis `0.5 mm`, position sign `+1`, and
+  breakaway disabled. The collapsed three-point hold arrays were left at their
+  existing project defaults because their values were not visible in the
+  screenshot.
+
 ## H723 Selective Merge After 805ad2a
 
 The current H723 tree is the primary implementation after
@@ -977,3 +998,14 @@ CAN、电机或灰度传感器硬件验收。
   纯软件构建，日志为 `0 Error(s), 0 Warning(s)`。当前工作区将
   `APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE` 设为 `1U` 以便现场观察；发布配置应改回 `0U`。
   未执行 Flash、烧录、K230、UART8/VOFA、CAN、电机或钢珠实物验收。
+
+## H723 单电机位置环比例增益移植（2026-08-01）
+
+- 选择性移植提交 `b2a7aef523d62990e55a676809fa266764d42a1d` 的功能改动，将
+  `APP_H723_SINGLE_MOTOR_POSITION_PID_KP` 从 `2.0f` 调整为 `20.0f`；积分、微分、
+  输出限幅、调试开关和 UART8 VOFA 开关保持不变。
+- 同步更新 H723 IOC 静态配置测试和单电机调试 README，避免测试与默认参数说明继续引用旧增益。
+- 验证命令：`tests\test_stm32h723_single_motor.ps1`、`tests\test_stm32h723_ioc.ps1`、
+  全部 `tests\test_stm32h723_*.ps1` 以及 `git diff --check`。
+- 本轮未执行 Flash、烧录、SWD/GDB、CAN、电机、UART8/VOFA 或其他实物验收；提高比例增益后，
+  首次实物调试仍须车架悬空并从低目标位移、低电流限制开始确认反馈方向和响应。

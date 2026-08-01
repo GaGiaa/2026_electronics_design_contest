@@ -14,6 +14,7 @@ $config = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'App\Inc\app_config.
 $freertos = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'Core\Src\freertos.c')
 $k230Header = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'App\Inc\app_k230_service.h')
 $chassis = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'App\Src\app_chassis_service.c')
+$ballControl = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'App\Src\app_ball_position_control.c')
 $debug = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'App\Inc\app_debug.h')
 $oled = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'App\Src\app_oled.c')
 $project = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'MDK-ARM\stm32h723_app.uvprojx')
@@ -60,6 +61,24 @@ foreach ($line in @(
     'breakaway_trigger_count',
     'breakaway_stall_elapsed_ms'
 )) { Require-Text ($chassis + "`n" + $debug) $line "Missing ball-control tuning integration: $line" }
+
+foreach ($line in @(
+    'g_h723_debug.ball_position.enable = 1U;',
+    'g_h723_debug.ball_position.target_mm = 125.0f;'
+)) { Require-Text $chassis $line "Missing tuned static ball-position default: $line" }
+
+foreach ($line in @(
+    '.kp = 2.0f',
+    '.kd = 0.8f',
+    '.output_limit = 360.0f',
+    '.deadband = 0.5f',
+    '.output_limit_deg = 360.0f',
+    '.deadband_mm = 0.5f',
+    '.engage_error_mm = 0.5f',
+    '.release_error_mm = 0.5f',
+    '.breakaway_enable = false',
+    '.breakaway_pulse_deg = 10.0f'
+)) { Require-Text $ballControl $line "Missing tuned ball-position PID default: $line" }
 
 foreach ($line in @(
     'h723_debug_ball_position_t',
