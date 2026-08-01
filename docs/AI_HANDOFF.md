@@ -21,6 +21,13 @@
   `0 Error(s), 0 Warning(s)`。未执行 Flash、烧录、SWD/GDB、CAN、电机、JY901S、灰度、OLED、
   UART8/VOFA 或机械限位实物验收；首次联动应车架悬空并可立即断电。
 
+## H723 ID 3 归零后自动进入 134 度标定姿态（2026-08-01）
+
+- `app_pipe_startup` 在 ID 3 首次机械归零成功后，不再直接进入 `CALIBRATION_REQUIRED`，而是先进入 `MOVE_TO_CALIBRATION_POSITION`。`chassisTask` 强制既有 `app_balance` 位置/速度双环请求相对软件零位 `134.0 deg`，该请求优先于 Keil Watch 倾角目标、钢珠位置环和 `capture_zero_request`。
+- 到位判据为位置误差不超过 `1.0 deg`、输出轴速度绝对值不超过 `5 RPM` 并连续 `200 ms`。满足后立即禁止 ID 3 电流并显示 OLED `CALIBRATE PIPE` 页面，用户可手动调整水管后按 PC5/B1 捕获 JY901S pitch 零位，或按 PC4/B2 放弃。移动、校准期间均屏蔽任务菜单按键，并在释放按键前维持互锁。
+- 位置/速度反馈丢失、归零状态丢失或自动移动超过 `10000 ms` 会转入 `ID3_LOCKED` 并保持 ID 3 零电流；ID 1/2、遥控器和无关任务保持可用。`g_h723_debug.pipe_startup` 新增故障码、移动目标、相对位置、输出轴速度和到位稳定标志。配置位于 `APP_H723_PIPE_STARTUP_CALIBRATION_*` 宏，均为受版本管理的构建期默认值，不作为普通 Watch 写入项。
+- 新增状态机单测覆盖自动进入移动、位置/速度稳定到位、超时、反馈丢失和仅锁定 ID 3；并扩展钢珠控制集成、OLED 和调试布局静态检查。未执行 Flash、烧录、SWD/GDB、CAN、电机或水管实物验收；首次实物通电仍须车架悬空、钢珠取出或固定且能立即断电。
+
 ## H723 JY901S 接管水管倾角闭环（2026-08-01）
 
 - 水管上的 BNO055 已移出当前项目。ID 3 倾角外环现在唯一消费 JY901S UART9 服务发布的一致性控制快照；快照以序列号保护，包含校准 `vehicle_angle_deg[1]`、完整样本序号、样本时间、样本有效性和启动校准有效性。`chassisTask` 读取发布中的快照不等待，当周期按保持保护处理，绝不读取 `g_h723_debug.jy901s`。

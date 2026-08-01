@@ -319,6 +319,28 @@ static board_oled_status_t render_runtime_page(void)
         if (status != BOARD_OLED_STATUS_OK) { return status; }
         return board_oled_update();
     }
+    if (g_h723_debug.pipe_startup.state ==
+        (uint32_t)APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION) {
+        status = board_oled_write_string("MOVE PIPE");
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_set_cursor(0U, 2U);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        (void)snprintf(line, sizeof(line), "TARGET:%.0f",
+                       (double)g_h723_debug.pipe_startup.calibration_target_position_deg);
+        status = board_oled_write_string(line);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_set_cursor(0U, 4U);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        (void)snprintf(line, sizeof(line), "POS:%.1f",
+                       (double)g_h723_debug.pipe_startup.id3_position_deg);
+        status = board_oled_write_string(line);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_set_cursor(0U, 6U);
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        status = board_oled_write_string("WAIT:SETTLE");
+        if (status != BOARD_OLED_STATUS_OK) { return status; }
+        return board_oled_update();
+    }
     if (g_h723_debug.control.remote_takeover) {
         title = "REMOTE CONTROL";
     } else if (g_h723_debug.control.selected_task == 3U) {

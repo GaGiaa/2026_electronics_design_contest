@@ -124,7 +124,11 @@ ReceiveToIdle。车体坐标约定为 `X=前、Y=左、Z=上`。`App/Src/app_jy9
 固定偏置通过 `APP_JY901S_*_OFFSET_DEG` 配置。校准只保存在 RAM，不写 Flash。
 
 当前 `APP_JY901S_VOFA_CALIBRATED_ENABLE` 为 `1U`，现有 JY901S 十通道 VOFA 输出切换到车体坐标和校准结果；
-设为 `0U` 时恢复原始数据。ID 3 首次归零后必须先在 OLED 校准页捕获 pitch 零位，之后才允许倾角或钢珠位置环接管。详细操作和验收步骤见
+设为 `0U` 时恢复原始数据。ID 3 首次归零后会先由既有位置/速度双环自动移动到相对软件零位
+`APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_DEG=134.0 deg`。位置误差不超过
+`APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_TOLERANCE_DEG=1.0 deg`、输出轴速度绝对值不超过
+`APP_H723_PIPE_STARTUP_CALIBRATION_SPEED_TOLERANCE_RPM=5 RPM` 且持续 `200 ms` 后，ID 3 切换为零电流，OLED 才显示
+`CALIBRATE PIPE` 以允许手动调整水管并捕获 pitch 零位。移动阶段超时 `10 s`、ID 3 反馈失效或归零状态丢失会锁定 ID 3 零电流；底盘两电机不受影响。自动移动期间 Watch 倾角目标、钢珠位置环和 `capture_zero_request` 均不会接管。详细操作和验收步骤见
 [`docs/STM32H723_JY901S.md`](../docs/STM32H723_JY901S.md)。该零位作为 ID 3 倾角闭环的启动安全门，并由既有倾角环消耗。
 
 ## K230 UART2 钢珠位置闭环
@@ -169,9 +173,8 @@ K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使
 `fault` 与 `pipe_startup.calibration_valid`。该开关默认 `0U`，与全部其他 UART8 VOFA
 遥测模式编译期互斥，仅读取 `g_h723_debug`，不会改变位置 PID、倾角环或电机输出。
 
-每次上电首次归零成功后 OLED 显示 `CALIBRATE PIPE`。PC5（B1）记录当前有效 pitch，
-PC4（B2）放弃并锁定 ID 3 零电流，PA6 忽略。校准或放弃后返回原遥控器/任务页面；放弃只锁定
-ID 3，底盘两电机保持可用。ID 3 归零失败或尚未完成时同样只禁止 ID 3，不影响无关电机。
+每次上电首次归零成功后 OLED 先显示 `MOVE PIPE`，自动前往 `134 deg`；到位并稳定后才显示
+`CALIBRATE PIPE`。PC5（B1）记录当前有效 pitch，PC4（B2）放弃并锁定 ID 3 零电流，PA6 忽略。校准或放弃后返回原遥控器/任务页面；放弃、自动移动超时或移动反馈故障只锁定 ID 3，底盘两电机保持可用。ID 3 归零失败或尚未完成时同样只禁止 ID 3，不影响无关电机。`g_h723_debug.pipe_startup` 提供状态、故障、自动移动目标/反馈位置、速度和稳定标志供 Watch 观察。
 
 ## CubeMX Regeneration
 

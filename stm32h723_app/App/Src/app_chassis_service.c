@@ -855,13 +855,20 @@ static void h723_remote_ball_speed_profile_step(bool active, float requested_spe
 static void h723_pipe_startup_update(uint32_t now_ms, uint32_t button_mask)
 {
     h723_jy901s_control_snapshot_t imu_snapshot = {0};
-    app_pipe_startup_input_t input;
+    const uint32_t id3_index = APP_H723_BALANCE_MOTOR_ID - 1U;
+    app_pipe_startup_input_t input = {0};
     uint32_t sample_age_ms = UINT_MAX;
     const app_pipe_startup_state_t previous_state = s_pipe_startup_snapshot.state;
     const bool snapshot_available = h723_jy901s_service_get_snapshot(
         &imu_snapshot, now_ms, &sample_age_ms);
 
     input.balance_zero_valid = s_balance.zero_valid;
+    input.id3_feedback_valid = h723_m2006_feedback_is_fresh(id3_index, now_ms);
+    input.id3_position_deg =
+        app_m2006_position_tracker_output_degrees(&s_position_tracker[id3_index]) -
+        s_balance.zero_offset_deg;
+    input.id3_output_speed_rpm = s_feedback[id3_index].output_speed_rpm;
+    input.now_ms = now_ms;
     input.imu_pitch_valid = snapshot_available && imu_snapshot.sample_valid &&
                             imu_snapshot.calibration_valid;
     input.imu_pitch_fresh = input.imu_pitch_valid &&
@@ -875,6 +882,7 @@ static void h723_pipe_startup_update(uint32_t now_ms, uint32_t button_mask)
         g_h723_debug.tilt.capture_zero_request = 1U;
     }
     g_h723_debug.pipe_startup.state = (uint32_t)s_pipe_startup_snapshot.state;
+    g_h723_debug.pipe_startup.fault = (uint32_t)s_pipe_startup_snapshot.fault;
     g_h723_debug.pipe_startup.calibration_valid =
         s_pipe_startup_snapshot.calibration_valid ? 1U : 0U;
     g_h723_debug.pipe_startup.id3_allowed =
@@ -883,6 +891,13 @@ static void h723_pipe_startup_update(uint32_t now_ms, uint32_t button_mask)
         s_pipe_startup_snapshot.other_motors_allowed ? 1U : 0U;
     g_h723_debug.pipe_startup.captured_pitch_deg =
         s_pipe_startup_snapshot.captured_pitch_deg;
+    g_h723_debug.pipe_startup.calibration_target_position_deg =
+        s_pipe_startup_snapshot.calibration_target_position_deg;
+    g_h723_debug.pipe_startup.id3_position_deg = s_pipe_startup_snapshot.id3_position_deg;
+    g_h723_debug.pipe_startup.id3_output_speed_rpm =
+        s_pipe_startup_snapshot.id3_output_speed_rpm;
+    g_h723_debug.pipe_startup.calibration_position_stable =
+        s_pipe_startup_snapshot.calibration_position_stable ? 1U : 0U;
 }
 #else
 static void h723_pipe_startup_update(uint32_t now_ms, uint32_t button_mask)
@@ -962,6 +977,8 @@ static float h723_tilt_service_step(uint32_t now_ms, uint32_t motor_index)
     const bool dynamic_profile = s_command.manual_active &&
                                  s_command.mode ==
                                      APP_CHASSIS_MODE_REMOTE_LINE_FOLLOW_BALL;
+    const bool startup_position_move = s_pipe_startup_snapshot.state ==
+        APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION;
     const bool ball_enabled = dynamic_profile ||
                               (!dynamic_profile &&
                                g_h723_debug.ball_position.enable != 0U);
@@ -995,12 +1012,18 @@ static float h723_tilt_service_step(uint32_t now_ms, uint32_t motor_index)
     }
     h723_ball_position_publish_debug(&ball_sample, ball_sample_age_ms, dynamic_profile,
                                      &s_ball_position_output);
+    if (startup_position_move) {
+        /* Only PC5 may capture the pipe zero after the startup pose is reached. */
+        g_h723_debug.tilt.capture_zero_request = 0U;
+    }
 
     const app_tilt_control_input_t input = {
         .now_ms = now_ms,
-        .enabled = (g_h723_debug.tilt.enable != 0U) || ball_enabled,
+        .enabled = !startup_position_move &&
+                   ((g_h723_debug.tilt.enable != 0U) || ball_enabled),
         .target_tilt_deg = target_tilt_deg,
-        .capture_zero_request = g_h723_debug.tilt.capture_zero_request != 0U,
+        .capture_zero_request = !startup_position_move &&
+                                g_h723_debug.tilt.capture_zero_request != 0U,
         .balance_zero_valid = s_balance.zero_valid,
         .motor_feedback_valid = h723_m2006_feedback_is_fresh(motor_index, now_ms),
         .motor_feedback_position_deg =
@@ -1019,6 +1042,9 @@ static float h723_tilt_service_step(uint32_t now_ms, uint32_t motor_index)
         g_h723_debug.tilt.capture_zero_request = 0U;
     }
     h723_tilt_publish_debug(&output, sample_age_ms);
+    if (startup_position_move) {
+        return APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_DEG;
+    }
     return input.enabled ? output.motor_target_position_deg :
                            g_h723_debug.balance.target_position_deg;
 }
@@ -1045,6 +1071,12 @@ static void h723_balance_service_step(uint32_t now_ms, float output_current_A[3]
 #if (APP_H723_TILT_CONTROL_ENABLE == 1U)
     input.requested_target_position_deg = h723_tilt_service_step(now_ms, index);
 #endif
+    if (s_pipe_startup_snapshot.state ==
+        APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION) {
+        /* The startup pose takes precedence over all Watch and ball-loop requests. */
+        input.requested_target_position_deg =
+            APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_DEG;
+    }
     app_balance_step(&s_balance, &input, &result);
     if (result.rehome_request_consumed) {
         g_h723_debug.balance.rehome_request = 0U;
@@ -1274,8 +1306,9 @@ void h723_chassis_service_step(uint32_t now_ms)
     }
     h723_app_buttons_snapshot_copy(&button_snapshot);
     h723_pipe_startup_update(now_ms, button_snapshot.stable_high_mask);
-    if (s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED) {
-        /* Prevent the calibration keys from entering the normal task menu. */
+    if (s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION ||
+        s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED) {
+        /* Startup motion and calibration keys must not enter the normal task menu. */
         s_pipe_button_release_required = true;
         button_snapshot.stable_high_mask = 0U;
     } else if (s_pipe_button_release_required) {
@@ -1435,7 +1468,8 @@ void h723_chassis_service_step(uint32_t now_ms)
     g_h723_debug.control.mode = (uint32_t)s_control_output.mode;
     g_h723_debug.control.remote_takeover = s_control_output.remote_takeover ? 1U : 0U;
     g_h723_debug.control.buttons_enabled =
-        (s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED) ?
+        (s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION ||
+         s_pipe_startup_snapshot.state == APP_PIPE_STARTUP_STATE_CALIBRATION_REQUIRED) ?
         0U : (s_control_output.buttons_enabled ? 1U : 0U);
     g_h723_debug.control.se_pressed = s_control_output.se_pressed ? 1U : 0U;
     g_h723_debug.control.sb_state = s_control_output.sb_state;

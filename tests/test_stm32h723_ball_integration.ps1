@@ -22,7 +22,10 @@ foreach ($line in @(
     '#define APP_H723_K230_UART2_ENABLE 1U',
     '#define APP_H723_K230_UART2_TEST_ENABLE 0U',
     '#define APP_H723_BALL_POSITION_PERIOD_MS 25U',
-    '#define APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS 100U'
+    '#define APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS 100U',
+    '#define APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_DEG 134.0f',
+    '#define APP_H723_PIPE_STARTUP_CALIBRATION_SETTLE_MS 200U',
+    '#define APP_H723_PIPE_STARTUP_CALIBRATION_MOVE_TIMEOUT_MS 10000U'
 )) { Require-Text $config $line "Missing ball-control configuration: $line" }
 
 foreach ($line in @(
@@ -37,6 +40,8 @@ foreach ($line in @(
     '#include "app_ball_position_control.h"',
     '#include "app_pipe_startup.h"',
     'app_pipe_startup_step',
+    'APP_PIPE_STARTUP_STATE_MOVE_TO_CALIBRATION_POSITION',
+    'APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_DEG',
     'app_ball_position_control_step',
     'h723_k230_service_get_snapshot',
     'output_current_A[index] = 0.0f;'
@@ -54,6 +59,8 @@ foreach ($line in @(
 foreach ($line in @(
     'h723_debug_ball_position_t',
     'h723_debug_pipe_startup_t',
+    'calibration_target_position_deg',
+    'id3_output_speed_rpm',
     'h723_debug_ball_position_t ball_position;',
     'h723_debug_pipe_startup_t pipe_startup;'
 )) { Require-Text $debug $line "Missing ball-control debug field: $line" }

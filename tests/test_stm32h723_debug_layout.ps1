@@ -62,6 +62,10 @@ foreach ($path in @(
     'g_h723_debug.balance.speed_pid_error_rpm',
     'g_h723_debug.balance.speed_pid_integral_output_a',
     'g_h723_debug.balance.speed_pid_output_a',
+    'g_h723_debug.pipe_startup.fault',
+    'g_h723_debug.pipe_startup.calibration_target_position_deg',
+    'g_h723_debug.pipe_startup.id3_position_deg',
+    'g_h723_debug.pipe_startup.id3_output_speed_rpm',
     'g_h723_debug.tilt',
     'g_h723_debug.bno055.angle_deg'
 )) {

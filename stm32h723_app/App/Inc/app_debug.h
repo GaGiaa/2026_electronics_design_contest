@@ -455,10 +455,15 @@ typedef struct {
 
 typedef struct {
     uint32_t state;
+    uint32_t fault;
     uint32_t calibration_valid;
     uint32_t id3_allowed;
     uint32_t other_motors_allowed;
+    uint32_t calibration_position_stable;
     float captured_pitch_deg;
+    float calibration_target_position_deg;
+    float id3_position_deg;
+    float id3_output_speed_rpm;
 } h723_debug_pipe_startup_t;
 
 typedef struct {
