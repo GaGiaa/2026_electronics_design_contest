@@ -394,11 +394,7 @@ void h723_chassis_service_init(void)
     app_ball_position_control_config_default(&s_ball_position_dynamic_config);
     s_ball_position_dynamic_config.period_ms = APP_H723_BALL_POSITION_PERIOD_MS;
     s_ball_position_dynamic_config.max_age_ms = APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS;
-    s_ball_position_dynamic_config.use_hold_position_map = false;
     s_ball_position_dynamic_config.breakaway_enable = false;
-    s_ball_position_dynamic_config.pid_params = s_ball_position_config.pid_params;
-    s_ball_position_dynamic_config.output_limit_deg = s_ball_position_config.output_limit_deg;
-    s_ball_position_dynamic_config.deadband_mm = s_ball_position_config.deadband_mm;
     app_ball_position_control_init(&s_ball_position_dynamic_control,
                                    &s_ball_position_dynamic_config);
     s_ball_position_dynamic_active = false;
@@ -772,9 +768,9 @@ static void h723_ball_position_dynamic_apply_debug_params(void)
         return;
     }
     debug->params_valid = 1U;
-    /* Dynamic mode owns only PID tuning and the fixed 134 deg base position. */
+    /* The physical hold/friction calibration remains shared; PID state does not. */
+    s_ball_position_dynamic_config = s_ball_position_config;
     s_ball_position_dynamic_config.breakaway_enable = false;
-    s_ball_position_dynamic_config.use_hold_position_map = false;
     s_ball_position_dynamic_config.pid_params.kp = debug->pid_kp;
     s_ball_position_dynamic_config.pid_params.ki = debug->pid_ki;
     s_ball_position_dynamic_config.pid_params.kd = debug->pid_kd;

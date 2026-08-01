@@ -324,13 +324,6 @@ this dynamic instance. `g_h723_debug.ball_position.active_profile`
 is `1` for the dynamic loop and `0` for the stationary loop, so the existing
 13-channel ball-position VOFA frame continues to show whichever loop is active.
 
-The dynamic loop uses the tuned static position PID defaults (`Kp=2.0`,
-`Ki=0.0`, `Kd=0.8`, `output_limit_deg=360`, `pid_deadband_mm=0.5`) and the
-same derivative-on-measurement calculation. Its PID offset is added to the
-fixed `134 deg` motor-position base. It does not use the static three-point
-hold map or breakaway pulse, and the dynamic PID fields remain editable through
-Keil Watch for later tuning.
-
 The dynamic loop remains subject to the same ID3 homing, K230 validity, and
 100 ms vision-age gates. A failed gate clears the active position PID and holds
 the last safe motor-position target. Initial vehicle testing must be performed
