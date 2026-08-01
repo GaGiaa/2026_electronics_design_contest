@@ -21,7 +21,7 @@ $project = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'MDK-ARM\stm32h723_
 foreach ($line in @(
     '#define APP_H723_K230_UART2_ENABLE 1U',
     '#define APP_H723_K230_UART2_TEST_ENABLE 0U',
-    '#define APP_H723_BALL_POSITION_PERIOD_MS 25U',
+    '#define APP_H723_BALL_POSITION_PERIOD_MS 20U',
     '#define APP_H723_BALL_POSITION_SAMPLE_MAX_AGE_MS 100U',
     '#define APP_H723_PIPE_STARTUP_CALIBRATION_POSITION_DEG 134.0f',
     '#define APP_H723_PIPE_STARTUP_CALIBRATION_SETTLE_MS 200U',

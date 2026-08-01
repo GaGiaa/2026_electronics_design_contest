@@ -6,7 +6,7 @@
 
 #include "pid.h"
 
-#define APP_BALL_POSITION_CONTROL_PERIOD_MS (25U)
+#define APP_BALL_POSITION_CONTROL_PERIOD_MS (20U)
 #define APP_BALL_POSITION_HOLD_MAP_POINT_COUNT (3U)
 
 typedef enum {

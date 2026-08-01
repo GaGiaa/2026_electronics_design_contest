@@ -17,7 +17,7 @@
 
 ## ID 3 钢珠位置直驱
 
-`app_balance` 始终独占 ID 3 的机械归零、输出轴位置环、速度环和 `0x200` 第三个电流槽位。归零后，正常位置目标限制在相对软件零位 `70–210 deg`；`0 deg` 只保留给负向搜索机械限位。钢珠位置控制不再经过水管倾角或 IMU 外环：静态 Watch 环和动态循迹环均以 40 Hz 直接生成 ID 3 输出轴位置请求，随后仍由 `app_balance` 的位置、速度、电流级联和机械保护执行。
+`app_balance` 始终独占 ID 3 的机械归零、输出轴位置环、速度环和 `0x200` 第三个电流槽位。归零后，正常位置目标限制在相对软件零位 `70–210 deg`；`0 deg` 只保留给负向搜索机械限位。钢珠位置控制不再经过水管倾角或 IMU 外环：静态 Watch 环和动态循迹环均以 50 Hz 直接生成 ID 3 输出轴位置请求，随后仍由 `app_balance` 的位置、速度、电流级联和机械保护执行。
 
 首次归零成功后，`app_pipe_startup` 强制 ID 3 自动移动至 `134 deg`。位置误差不超过 `1 deg`、速度绝对值不超过 `5 RPM` 且持续 `200 ms` 后直接进入 `READY`；无需人工倾角校零，也不消费 PC5/PC4。自动移动超时、反馈失效或归零状态丢失只锁定 ID 3 为零电流，ID 1/2、遥控器和无关任务仍可用。
 
@@ -111,9 +111,9 @@ K230 `TX` 接 `PD6`，STM32 `PD5` 保留给 K230 `RX`，两端必须共地且使
 灰度及单电机 UART8 遥测编译期互斥；UART8 保持 `PE1` TX、1 Mbit/s。Keil Watch 可观察
 `g_h723_debug.ball_vision` 的距离、帧年龄、DMA 状态和 CRC/格式/UART/环形缓冲错误计数。
 
-钢珠位置 PID 固定为 40 Hz（25 ms）。静态环由 `g_h723_debug.ball_position.enable` 显式启用；动态遥控循迹模式使用独立的 `g_h723_debug.ball_position_dynamic` 配置。两者均直接输出 `target_motor_position_deg`，不依赖 JY901S。三点保持表和 PID 偏移的调参方式见前文“ID 3 钢珠位置直驱”。
+钢珠位置 PID 固定为 50 Hz（20 ms）。静态环由 `g_h723_debug.ball_position.enable` 显式启用；动态遥控循迹模式使用独立的 `g_h723_debug.ball_position_dynamic` 配置。两者均直接输出 `target_motor_position_deg`，不依赖 JY901S。三点保持表和 PID 偏移的调参方式见前文“ID 3 钢珠位置直驱”。
 
-`APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE=1U` 时，UART8 按 40 Hz 发送固定 13 通道 VOFA+ JustFloat 帧：`target_mm`、`measured_mm`、`error_mm`、P/I/D、`pid_offset_deg`、`target_motor_position_deg`、`vision_age_ms`、`vision_valid`、位置环 `state`、`fault` 与 `pipe_startup.id3_allowed`。保持电机位置仍可通过 `g_h723_debug.ball_position.hold_motor_position_output_deg` 在 Watch 观察。当前配置为 `1U`；该模式与其他 UART8 VOFA 遥测编译期互斥，只读调试快照。
+`APP_H723_BALL_POSITION_VOFA_TELEMETRY_ENABLE=1U` 时，UART8 按 50 Hz 发送固定 13 通道 VOFA+ JustFloat 帧：`target_mm`、`measured_mm`、`error_mm`、P/I/D、`pid_offset_deg`、`target_motor_position_deg`、`vision_age_ms`、`vision_valid`、位置环 `state`、`fault` 与 `pipe_startup.id3_allowed`。保持电机位置仍可通过 `g_h723_debug.ball_position.hold_motor_position_output_deg` 在 Watch 观察。当前配置为 `1U`；该模式与其他 UART8 VOFA 遥测编译期互斥，只读调试快照。
 
 ## CubeMX Regeneration
 

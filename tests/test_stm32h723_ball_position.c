@@ -78,7 +78,7 @@ static void test_hold_map_interpolates_motor_position(void)
     assert(fabsf(output.target_motor_position_deg - 141.0f) < 0.0001f);
 }
 
-static void test_updates_at_40_hz_only(void)
+static void test_updates_at_50_hz_only(void)
 {
     app_ball_position_control_t control;
     const app_ball_position_control_config_t config = make_config();
@@ -90,13 +90,13 @@ static void test_updates_at_40_hz_only(void)
     app_ball_position_control_step(&control, &input, &output);
     initial_target = output.target_motor_position_deg;
 
-    input.now_ms = 24U;
+    input.now_ms = 19U;
     input.target_mm = 220.0f;
     app_ball_position_control_step(&control, &input, &output);
     assert(!output.update_due);
     assert(fabsf(output.target_motor_position_deg - initial_target) < 0.0001f);
 
-    input.now_ms = 25U;
+    input.now_ms = 20U;
     app_ball_position_control_step(&control, &input, &output);
     assert(output.update_due);
     assert(fabsf(output.pid_offset_deg - 2.4f) < 0.0001f);
@@ -141,7 +141,7 @@ static void test_stale_vision_resets_pid_and_holds_last_safe_position(void)
     assert(output.integral > 0.0f);
     last_target = output.target_motor_position_deg;
 
-    input.now_ms = 25U;
+    input.now_ms = 20U;
     input.vision_age_ms = 101U;
     app_ball_position_control_step(&control, &input, &output);
     assert(output.state == APP_BALL_POSITION_STATE_HOLD);
@@ -150,7 +150,7 @@ static void test_stale_vision_resets_pid_and_holds_last_safe_position(void)
     assert(fabsf(output.integral) < 0.0001f);
     assert(fabsf(output.target_motor_position_deg - last_target) < 0.0001f);
 
-    input.now_ms = 50U;
+    input.now_ms = 40U;
     input.vision_age_ms = 0U;
     app_ball_position_control_step(&control, &input, &output);
     assert(output.state == APP_BALL_POSITION_STATE_ACTIVE);
@@ -184,7 +184,7 @@ static void test_invalid_configuration_faults(void)
     assert(control.fault == APP_BALL_POSITION_FAULT_INVALID_CONFIG);
 
     config = make_config();
-    config.period_ms = 20U;
+    config.period_ms = 19U;
     app_ball_position_control_init(&control, &config);
     assert(control.state == APP_BALL_POSITION_STATE_FAULT);
     assert(control.fault == APP_BALL_POSITION_FAULT_INVALID_CONFIG);
@@ -200,7 +200,7 @@ int main(void)
 {
     test_positive_error_requests_positive_motor_offset();
     test_hold_map_interpolates_motor_position();
-    test_updates_at_40_hz_only();
+    test_updates_at_50_hz_only();
     test_deadband_and_offset_limit();
     test_stale_vision_resets_pid_and_holds_last_safe_position();
     test_first_fault_uses_safe_motor_position();
