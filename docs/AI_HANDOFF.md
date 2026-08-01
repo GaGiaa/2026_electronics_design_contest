@@ -1009,3 +1009,14 @@ CAN、电机或灰度传感器硬件验收。
   全部 `tests\test_stm32h723_*.ps1` 以及 `git diff --check`。
 - 本轮未执行 Flash、烧录、SWD/GDB、CAN、电机、UART8/VOFA 或其他实物验收；提高比例增益后，
   首次实物调试仍须车架悬空并从低目标位移、低电流限制开始确认反馈方向和响应。
+
+## H723 Dynamic Ball PID Update (2026-08-01)
+
+- The dynamic ball-position controller inherits the stationary PID defaults:
+  `Kp=2.0`, `Ki=0.0`, `Kd=0.8`, `output_limit_deg=360`, and
+  `pid_deadband_mm=0.5`.
+- Both loops use derivative-on-measurement calculation. Dynamic PID state stays
+  independent and remains tunable through `g_h723_debug.ball_position_dynamic`.
+- Dynamic output is the PID offset plus a fixed `134 deg` motor-position base.
+  It does not consume the stationary three-point hold map or breakaway pulse.
+- No Flash, SWD/GDB, CAN, motor, or physical ball acceptance was performed.

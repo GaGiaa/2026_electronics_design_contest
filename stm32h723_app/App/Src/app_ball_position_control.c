@@ -27,12 +27,14 @@ static bool app_ball_position_config_is_valid(
         return false;
     }
 
-    for (index = 0U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
-        if (!isfinite(config->hold_position_mm[index]) ||
-            !isfinite(config->hold_motor_position_deg[index]) ||
-            (index > 0U &&
-             config->hold_position_mm[index] <= config->hold_position_mm[index - 1U])) {
-            return false;
+    if (config->use_hold_position_map) {
+        for (index = 0U; index < APP_BALL_POSITION_HOLD_MAP_POINT_COUNT; ++index) {
+            if (!isfinite(config->hold_position_mm[index]) ||
+                !isfinite(config->hold_motor_position_deg[index]) ||
+                (index > 0U &&
+                 config->hold_position_mm[index] <= config->hold_position_mm[index - 1U])) {
+                return false;
+            }
         }
     }
 
@@ -48,6 +50,10 @@ static float app_ball_position_hold_motor_position(
 {
     const app_ball_position_control_config_t *config = &control->config;
     uint32_t index;
+
+    if (!config->use_hold_position_map) {
+        return config->safe_motor_position_deg;
+    }
 
     if (position_mm <= config->hold_position_mm[0U]) {
         return config->hold_motor_position_deg[0U];
@@ -197,6 +203,7 @@ void app_ball_position_control_config_default(app_ball_position_control_config_t
         },
         .output_limit_deg = 360.0f,
         .sign = 1.0f,
+        .use_hold_position_map = true,
         .deadband_mm = 0.5f,
         .hold_position_mm = {20.0f, 125.0f, 230.0f},
         .hold_motor_position_deg = {134.0f, 134.0f, 134.0f},
