@@ -2,6 +2,35 @@
 
 ## H723 合并任务菜单、循迹与定时任务（2026-08-01）
 
+## H723 任务 4 距离式循迹速度曲线（2026-08-01）
+
+- 将 `app_task4` 从纯时间-based 速度曲线替换为编码器里程-based 梯形速度曲线。
+  底盘服务通过 `h723_average_distance_mm()` 取左右轮 `app_m2006_position_tracker`
+  输出轴角度平均值换算为车轮圆周距离，传入 `app_task4_input_t`。任务启动时记录
+  `start_distance_mm`，`step()` 中计算已驶里程，`get_output()` 中按已驶距离
+  （加速段比例爬升 → 匀速段 → 制动段线性递减）输出目标速度。
+- 停止条件为已驶里程 ≥ `APP_H723_TASK4_A_TO_B_DISTANCE_MM`（1500 mm），同时保留
+  `APP_H723_TASK4_RUN_TIMEOUT_MS` 从 10000 ms 收紧为 8000 ms 作为安全超时。
+  速度曲线中的加速和制动距离以 `APP_H723_TASK4_ACCEL_DISTANCE_MM` 和
+  `APP_H723_TASK4_BRAKE_DISTANCE_MM` 配置（均为 612.5 mm：350²/(2×100)），
+  全程不使用 `sqrtf`，仅用线性比例计算。
+- `app_task4_start()` 签名新增 `float distance_mm` 参数以记录起点里程快照；
+  `app_task4_state_t` 新增 `start_distance_mm` 和 `traveled_distance_mm`；
+  `app_task4_output_t` 和 `h723_debug_task4_t` 新增 `distance_mm` 字段。
+  钢球平衡由 `app_tilt_control` 在 1 ms 底盘循环中独立运行，任务 4 不做额外处理。
+- 新增 `test_stm32h723_task4_integration.ps1`，检查底盘服务的距离接入、任务
+  状态机集成、配置宏默认值和 debug 结构体字段；旧时间-based 测试用例已改写为
+  距离-based 加速、匀速、制动和停车验证。
+- 验证：全部 39 个 `tests/test_stm32h723_*.ps1` 均通过（H723_FAIL_COUNT=0）；
+  Keil 纯软件重建在 stash 旧代码对比后确认 1 个 Error 为已存在的 FreeRTOS
+  `port.c` 中的 `SystemCoreClock` 引用（与本轮改动无关），本轮修改的文件编译
+  仅产生预期的 struct padding 警告，无新增 Error。未执行 Flash、烧录、
+  SWD/GDB、CAN、编码器、电机、JY901S、灰度或实物里程/制动验收。
+  首次联动应车架悬空并可立即断电，先在低占空比下确认编码器距离单位、符号和
+  两组 tracker 的连续累计，再逐步提高目标速度。
+
+## H723 合并任务菜单、循迹与定时任务（2026-08-01）
+
 - 以 `8b87ba111e11fcabf31d808320cf9bd032d12416` 为共同基线，选择性合并无 Git 对方目录中的 H723
   任务与灰度循迹源码。导入 `app_task4`、`app_task56`、任务菜单完成接口、任务 2 简化停车逻辑、
   OLED 运行页、分组巡线 PID、任务/遥测测试和 Keil 工程源文件登记；未导入 `.o`、`.d`、`.axf`、

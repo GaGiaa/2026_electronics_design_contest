@@ -48,6 +48,18 @@
       "gdbPath": "${env:ARM_GDB_PATH}",
       "device": "MSPM0G3507",
       "preLaunchTask": "MSPM0G3507 App: Build"
+    },
+    {
+      "name": "STM32H723: Attach to pyOCD",
+      "type": "cortex-debug",
+      "request": "attach",
+      "servertype": "external",
+      "gdbTarget": "localhost:3333",
+      "cwd": "${workspaceFolder}/stm32h723_app",
+      "executable": "${workspaceFolder}/stm32h723_app/MDK-ARM/stm32h723_app/stm32h723_app.axf",
+      "gdbPath": "${env:ARM_GDB_PATH}",
+      "device": "STM32H723ZGTx",
+      "svdFile": "${workspaceFolder}/stm32h723_app/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h"
     }
   ]
 }
